@@ -1,0 +1,23 @@
+[project]
+name = "bayesgpt"
+version = "0.1.0"
+description = "Generalized framework for multi-model amortized Bayesian inference"
+authors = [
+    { name = "Jerry Huang", email = "huangm5@rpi.edu" }
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "bayesflow>=2.0.2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3.5",
+]
+dev = [
+    "jupyter>=1.1.1",
+    "jupyterlab>=4.4.1",
+    "pre-commit>=4.2.0",
+    "ruff>=0.11.7",
+]
