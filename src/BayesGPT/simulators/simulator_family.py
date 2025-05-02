@@ -44,12 +44,12 @@ class SimulatorFamily:
         }
 
         # Run each model
-        results = {model["name"]: [] for model in self.simulators}
+        results = {simulator["simulator_name"]: [] for simulator in self.simulators}
         for i in range(batch_size):
             for simulator in self.simulators:
                 local_params = {
                     k: full_kwargs[k][i]
-                    for k in simulator["params"]
+                    for k in simulator["variable_names"]
                     if k in full_kwargs
                 }
                 output = simulator["simulator"](**local_params)
