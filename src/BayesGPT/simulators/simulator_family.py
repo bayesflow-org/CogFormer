@@ -16,6 +16,9 @@ class SimulatorFamily:
         variable_names: Sequence[str] = None,
         fixed_variables: dict = None,
     ):
+        if not isinstance(simulator, Callable):
+            raise TypeError(f"Provided func '{simulator}' is not callable.")
+
         if fixed_variables is not None:
             simulator = partial(simulator, **fixed_variables)
 
