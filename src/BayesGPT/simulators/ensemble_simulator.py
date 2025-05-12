@@ -4,7 +4,7 @@ from functools import partial
 import numpy as np
 
 
-class SimulatorFamily:
+class EnsembleSimulator:
     def __init__(self):
         super().__init__()
         self.simulators = []

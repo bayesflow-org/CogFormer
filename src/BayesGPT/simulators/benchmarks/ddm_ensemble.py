@@ -1,9 +1,9 @@
 import numpy as np
 
-from BayesGPT.simulators.simulator_family import SimulatorFamily
+from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
 
 
-class DDMFamily(SimulatorFamily):
+class DDMEnsemble(EnsembleSimulator):
     def __init__(self):
         super().__init__()
         self._add_variants()

@@ -4,7 +4,7 @@ from pytest import fixture
 
 @fixture(scope="session")
 def test_simulator_family():
-    from BayesGPT.simulators.simulator_family import SimulatorFamily
+    from BayesGPT.simulators.ensemble_simulator import SimulatorFamily
 
     family = SimulatorFamily()
 

@@ -1,9 +1,9 @@
 from ssms.basic_simulators.simulator import simulator as ssm_simulator
 from ssms.config import model_config
-from BayesGPT.simulators.simulator_family import SimulatorFamily
+from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
 
 
-class SSMFamily(SimulatorFamily):
+class SSMEnsemble(EnsembleSimulator):
     def __init__(self, models=None):
         super().__init__()
         self.available_models = models or ["ddm", "angle", "weibull"]
