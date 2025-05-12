@@ -1,22 +1,51 @@
-import numpy as np
+import pytest
 from pytest import fixture
 
+from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
+from BayesGPT.simulators.benchmarks.ddm_ensemble import DDMEnsemble
+from BayesGPT.simulators.benchmarks.ssm_ensemble import SSMEnsemble
 
-@fixture(scope="session")
-def test_simulator_family():
-    from BayesGPT.simulators.ensemble_simulator import SimulatorFamily
 
-    family = SimulatorFamily()
+@fixture
+def ensemble_simulator():
+    """
+    Fixture for a basic ModelFamily/EnsembleSimulator-like model to test infrastructure.
 
-    def simulator1():
-        return np.random.normal(0.0, 1.0, size=100)
+    Returns
+    -------
+    ModelFamily
+        A testable model family containing a simple arithmetic simulator.
+    """
+    simulator = EnsembleSimulator()
+    simulator.add(
+        lambda x, y: {"sum": x + y}, variable_names=["x", "y"], simulator_name="adder"
+    )
+    return simulator
 
-    def simulator2():
-        return np.random.normal(0.0, 0.1, size=100)
 
-    family.add(simulator=simulator1, simulator_name="s1")
-    family.add(simulator=simulator2, simulator_name="s2")
+@fixture
+def ddm_ensemble():
+    """
+    Fixture for initializing and reusing a DDMEnsemble instance across tests.
 
-    results = family.run(batch_size=2)
+    Returns
+    -------
+    DDMEnsemble
+        An initialized ensemble of DDM variants.
+    """
+    return DDMEnsemble()
 
-    return results
+
+@fixture
+def ssm_ensemble():
+    """
+    Fixture for initializing and reusing an SSMFamily (SSM ensemble) instance.
+
+    Returns
+    -------
+    SSMFamily
+        An ensemble containing variants like 'ddm', 'angle', etc., if ssms is available.
+    """
+    if SSMEnsemble is None:
+        pytest.skip("ssms library not available")
+    return SSMEnsemble(models=["ddm"])
