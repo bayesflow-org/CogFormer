@@ -4,12 +4,30 @@ from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
 
 
 class SSMEnsemble(EnsembleSimulator):
+    """
+    A specialized ModelFamily subclass that integrates simulators from the `ssms` package.
+
+    Automatically registers common SSM variants like 'ddm', 'angle', and 'weibull'.
+    """
+
     def __init__(self, models=None):
+        """
+        Initialize and register available SSM variants.
+
+        Parameters
+        ----------
+        models : list of str, optional
+            List of model names from `ssms` to include. Defaults to ['ddm', 'angle', 'weibull'].
+        """
         super().__init__()
         self.available_models = models or ["ddm", "angle", "weibull"]
         self._add_ssm_variants()
 
     def _add_ssm_variants(self):
+        """
+        Add each selected SSM model from `ssms` as a simulator in the family.
+        """
+
         for model_name in self.available_models:
             config = model_config[model_name]
             param_names = config["params"]
