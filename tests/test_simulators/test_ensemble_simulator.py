@@ -12,7 +12,7 @@ def test_ensemble_simulator(ensemble_simulator):
     "subset, expected",
     [
         pytest.param({"x": [1, 2], "y": [3, 4]}, {"adder"}, id="valid-adder"),
-        pytest.param({"x": [1, 2]}, {}, id="missing-y"),
+        pytest.param({"x": [1, 2]}, set(), id="missing-y"),
     ],
 )
 def test_ensemble_simulator_partial(ensemble_simulator, subset, expected):

@@ -48,4 +48,4 @@ def ssm_ensemble():
     """
     if SSMEnsemble is None:
         pytest.skip("ssms library not available")
-    return SSMEnsemble(models=["ddm"])
+    return SSMEnsemble(models=["ddm", "angle", "weibull"])
