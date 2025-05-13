@@ -12,7 +12,7 @@ def test_ensemble_simulator(ensemble_simulator):
     "subset, expected",
     [
         pytest.param({"x": [1, 2], "y": [3, 4]}, {"adder"}, id="valid-adder"),
-        pytest.param({"x": [1, 2]}, set(), id="missing-y"),
+        pytest.param({"x": [1, 2]}, {}, id="missing-y"),
     ],
 )
 def test_ensemble_simulator_partial(ensemble_simulator, subset, expected):
@@ -29,5 +29,5 @@ def test_ensemble_simulator_partial(ensemble_simulator, subset, expected):
     expected : set of str
         Simulator names expected to be present in the output.
     """
-    results = ensemble_simulator.run_all(**subset)
+    results = ensemble_simulator.run(**subset)
     assert set(results.keys()) == expected
