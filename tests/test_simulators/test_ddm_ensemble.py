@@ -44,3 +44,47 @@ def test_ddm_ensemble_variants(ddm_ensemble, simulator_name, kwargs, expected_ke
     )
     output = results[simulator_name][0]
     assert expected_keys.issubset(output.keys())
+
+
+@pytest.mark.parametrize(
+    "present_params, expected_simulators",
+    [
+        pytest.param({"drift": 1.0, "boundary": 1.5}, {"basic"}, id="only-basic"),
+        pytest.param(
+            {"drift": 1.0, "boundary": 1.5, "ndt": 0.3},
+            {"basic", "with_ndt", "trajectory"},
+            id="basic-with_ndt-trajectory",
+        ),
+        pytest.param(
+            {"drift": 1.0, "initial_boundary": 1.2, "ndt": 0.25, "collapse_rate": 0.05},
+            {"collapsing_bound"},
+            id="only-collapsing",
+        ),
+    ],
+)
+def test_ddm_partial_parameter_skip(ddm_ensemble, present_params, expected_simulators):
+    """
+    Parametrized test that checks which DDM simulators are run
+    when only a subset of all possible parameters is provided.
+
+    Parameters
+    ----------
+    ddm_ensemble : DDMEnsemble
+        The simulator ensemble containing DDM variants.
+    present_params : dict
+        Dictionary of parameters to be passed to the ensemble.
+    expected_simulators : set of str
+        Set of simulator names expected to run given the provided parameters.
+    """
+
+    results = ddm_ensemble.run(batch_size=1, **present_params)
+    for name in expected_simulators:
+        assert name in results
+        assert isinstance(results[name], list) and len(results[name]) == 1
+    for name in {
+        "basic",
+        "with_ndt",
+        "trajectory",
+        "collapsing_bound",
+    } - expected_simulators:
+        assert name not in results
