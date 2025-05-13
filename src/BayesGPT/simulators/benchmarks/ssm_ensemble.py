@@ -5,9 +5,10 @@ from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
 
 class SSMEnsemble(EnsembleSimulator):
     """
-    A specialized ModelFamily subclass that integrates simulators from the `ssms` package.
+    Ensemble of Sequential Sampling Model (SSM) variants using the `ssms` package.
 
-    Automatically registers common SSM variants like 'ddm', 'angle', and 'weibull'.
+    This class automatically registers variants such as 'ddm', 'angle', and 'weibull'.
+    Each simulator is only executed when its required parameters are provided.
     """
 
     def __init__(self, models=None):
@@ -25,15 +26,30 @@ class SSMEnsemble(EnsembleSimulator):
 
     def _add_ssm_variants(self):
         """
-        Add each selected SSM model from `ssms` as a simulator in the family.
-        """
+        Add each selected SSM model from `ssms` as a simulator in the ensemble.
 
+        Each simulator pulls its parameter list from `model_config` and passes
+        those parameters as a dictionary to `ssm_simulator()`.
+        """
         for model_name in self.available_models:
             config = model_config[model_name]
             param_names = config["params"]
 
             def make_simulator(model_name=model_name, param_names=param_names):
                 def sim_func(**kwargs):
+                    """
+                    Simulation wrapper for a single SSM variant.
+
+                    Parameters
+                    ----------
+                    kwargs : dict
+                        Keyword arguments matching required SSM parameters.
+
+                    Returns
+                    -------
+                    dict
+                        Dictionary with 'RT', 'choice', and 'metadata' from the simulation.
+                    """
                     try:
                         theta = {p: kwargs[p] for p in param_names}
                     except KeyError as e:

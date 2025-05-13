@@ -1,15 +1,17 @@
 from collections.abc import Callable, Sequence
 from functools import partial
-
 import numpy as np
 
 
 class EnsembleSimulator:
+    """
+    Base class for managing and executing a collection of simulators
+    with varying parameter requirements.
+    """
+
     def __init__(self):
         """
-        Initialize an empty model family.
-
-        Each model is stored with its function, parameter names, and optional name.
+        Initializes an empty ensemble of simulators.
         """
         super().__init__()
         self.simulators = []
@@ -22,23 +24,23 @@ class EnsembleSimulator:
         fixed_variables: dict = None,
     ):
         """
-        Add a model to the family.
+        Adds a simulator to the ensemble.
 
         Parameters
         ----------
         simulator : callable
-            The model function to add.
-        variable_names : list of str, optional
-            Names of parameters the model expects.
+            The simulation function to register.
         simulator_name : str, optional
-            Name to assign to the model. Defaults to the function name.
+            A unique name for the simulator. Defaults to the function name.
+        variable_names : Sequence[str], optional
+            List of parameter names required by the simulator.
         fixed_variables : dict, optional
-            Dictionary of parameter names and values to be fixed using `functools.partial`.
+            Fixed parameters to be bound using functools.partial.
 
         Raises
         ------
         TypeError
-            If `func` is not callable.
+            If `simulator` is not callable.
         """
         if not isinstance(simulator, Callable):
             raise TypeError(f"Provided func '{simulator}' is not callable.")
@@ -49,28 +51,30 @@ class EnsembleSimulator:
         self.simulators.append(
             {
                 "simulator": simulator,
-                "simulator_name": simulator_name,
+                "simulator_name": simulator_name or simulator.__name__,
                 "variable_names": variable_names or [],
             }
         )
 
     def run(self, batch_size: int = None, **kwargs):
         """
-        Run all models across a batch of input values.
+        Run all compatible simulators with provided parameters.
+
+        Each simulator runs only if all of its required parameters are present.
 
         Parameters
         ----------
         batch_size : int, optional
-            Number of samples to run per model. If not provided, inferred from the length
-            of the first sequence-type parameter.
+            Number of samples to generate. Inferred if not specified.
         **kwargs : dict
-            Parameter values. Each key should match one or more of the model parameter names.
+            All possible simulation parameters. Scalars are broadcast.
 
         Returns
         -------
         dict
-            Dictionary of model outputs. Each key is a model name mapping to a list
-            of outputs for each batch sample.
+            Dictionary of simulator outputs. Each key is a simulator name mapping
+            to a list of outputs per batch sample. Simulators with missing parameters
+            are skipped.
         """
         if batch_size is None:
             for v in kwargs.values():
@@ -79,7 +83,6 @@ class EnsembleSimulator:
                     break
             batch_size = batch_size or 1
 
-        # Broadcast all parameters to batch size
         full_kwargs = {
             k: np.array(v)
             if isinstance(v, Sequence) and not isinstance(v, str)
@@ -87,16 +90,17 @@ class EnsembleSimulator:
             for k, v in kwargs.items()
         }
 
-        # Run each model
-        results = {simulator["simulator_name"]: [] for simulator in self.simulators}
-        for i in range(batch_size):
-            for simulator in self.simulators:
-                local_params = {
-                    k: full_kwargs[k][i]
-                    for k in simulator["variable_names"]
-                    if k in full_kwargs
-                }
-                output = simulator["simulator"](**local_params)
-                results[simulator["simulator_name"]].append(output)
+        results = {}
+        for simulator in self.simulators:
+            name = simulator["simulator_name"]
+            required_params = simulator["variable_names"]
+            if not all(p in full_kwargs for p in required_params):
+                continue  # Skip if not all required params are provided
 
-        return results  # Results are lists of dictionaries, one per model
+            results[name] = []
+            for i in range(batch_size):
+                local_params = {k: full_kwargs[k][i] for k in required_params}
+                output = simulator["simulator"](**local_params)
+                results[name].append(output)
+
+        return results

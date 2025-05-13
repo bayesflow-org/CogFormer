@@ -1,96 +1,90 @@
 import numpy as np
-
 from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
 
 
 class DDMEnsemble(EnsembleSimulator):
     """
-    An ensemble of Drift Diffusion Model (DDM) variants for simulating simple decision-making tasks.
+    Ensemble of Drift Diffusion Model (DDM) variants for simulating decision-making.
 
-    This class wraps several DDM variants differing in their complexity:
+    This class defines multiple DDM variants with differing parameterization:
 
-    Variants
-    --------
-    - 'basic': Basic DDM with drift and fixed boundary.
-    - 'with_ndt': Adds non-decision time to the basic DDM.
+    - 'basic': Basic DDM with drift and boundary.
+    - 'with_ndt': Adds non-decision time (NDT).
     - 'trajectory': Tracks the trajectory of evidence accumulation.
-    - 'collapsing_bound': Implements a time-collapsing boundary.
+    - 'collapsing_bound': Models a boundary that collapses over time.
     """
 
     def __init__(self):
         """
-        Initializes the DDM ensemble by adding each variant to the simulator registry.
+        Initializes the DDM ensemble by registering each variant.
         """
         super().__init__()
         self._add_variants()
 
     def _add_variants(self):
         """
-        Defines and registers multiple DDM variants with different parameter sets.
-        Each variant is added with a name and its required input variables.
+        Defines and registers each DDM variant simulator with its required parameters.
         """
 
         def ddm_basic(drift, boundary):
             """
-            Basic DDM with a fixed decision boundary.
+            Basic DDM with constant decision boundary.
 
             Parameters
             ----------
             drift : float
-                Drift rate of evidence accumulation.
+                The drift rate of evidence accumulation.
             boundary : float
-                Decision threshold.
+                The static decision threshold.
 
             Returns
             -------
             dict
-                A dictionary with keys 'RT' (reaction time) and 'choice' (0 or 1).
+                Contains 'RT' (reaction time) and 'choice' (binary decision).
             """
-
             rt = np.abs(boundary / drift) + np.random.normal(0, 0.1)
             choice = int(drift > 0)
             return {"RT": rt, "choice": choice}
 
         def ddm_with_ndt(drift, boundary, ndt):
             """
-            DDM with added non-decision time (e.g., encoding and motor delay).
+            DDM that includes a non-decision time component.
 
             Parameters
             ----------
             drift : float
                 Drift rate.
             boundary : float
-                Decision boundary.
+                Decision threshold.
             ndt : float
-                Non-decision time added to RT.
+                Non-decision time added to the RT.
 
             Returns
             -------
             dict
-                Dictionary with keys 'RT', 'choice', and 'ndt'.
+                Contains 'RT', 'choice', and 'ndt'.
             """
-
             rt = np.abs(boundary / drift) + ndt + np.random.normal(0, 0.1)
             choice = int(drift > 0)
             return {"RT": rt, "choice": choice, "ndt": ndt}
 
         def ddm_with_trajectory(drift, boundary, ndt):
             """
-            DDM variant that returns the evidence trajectory over time.
+            DDM that returns the trajectory of evidence accumulation.
 
             Parameters
             ----------
             drift : float
                 Drift rate.
             boundary : float
-                Decision boundary.
+                Decision threshold.
             ndt : float
                 Non-decision time.
 
             Returns
             -------
             dict
-                Contains 'RT', 'choice', and 'trajectory' (list of positions over time).
+                Contains 'RT', 'choice', and 'trajectory' (list of evidence values over time).
             """
             dt = 0.01
             x = 0
@@ -105,23 +99,23 @@ class DDMEnsemble(EnsembleSimulator):
 
         def ddm_collapsing_bound(drift, initial_boundary, ndt, collapse_rate):
             """
-            DDM with a collapsing boundary that shrinks linearly over time.
+            DDM with a boundary that collapses linearly over time.
 
             Parameters
             ----------
             drift : float
                 Drift rate.
             initial_boundary : float
-                The initial decision threshold at time 0.
+                The initial decision threshold at time zero.
             ndt : float
                 Non-decision time.
             collapse_rate : float
-                Rate at which the boundary decreases per unit time.
+                Rate at which the boundary collapses per time step.
 
             Returns
             -------
             dict
-                Contains 'RT', 'choice', 'trajectory', and 'final_bound'.
+                Contains 'RT', 'choice', 'trajectory', and 'final_bound' (value of boundary at decision).
             """
             dt = 0.01
             x = 0

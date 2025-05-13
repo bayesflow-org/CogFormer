@@ -22,8 +22,25 @@ import pytest
         ),
     ],
 )
-def test_ddm_variants(ddm_ensemble, simulator_name, kwargs, expected_keys):
-    results = ddm_ensemble.run(simulator_name=simulator_name, batch_size=2, **kwargs)
-    assert isinstance(results, list) and len(results) == 2
-    for r in results:
-        assert expected_keys.issubset(r.keys())
+def test_ddm_ensemble_variants(ddm_ensemble, simulator_name, kwargs, expected_keys):
+    """
+    Test that each DDMEnsemble variant produces valid outputs when provided the correct parameters.
+
+    Parameters
+    ----------
+    ddm_ensemble : DDMEnsemble
+        The simulator ensemble containing DDM variants.
+    simulator_name : str
+        The name of the variant being tested.
+    kwargs : dict
+        The input parameters for the simulator.
+    expected_keys : set
+        The expected keys in the simulator's output dictionary.
+    """
+    results = ddm_ensemble.run(batch_size=1, **kwargs)
+    assert simulator_name in results
+    assert (
+        isinstance(results[simulator_name], list) and len(results[simulator_name]) == 1
+    )
+    output = results[simulator_name][0]
+    assert expected_keys.issubset(output.keys())
