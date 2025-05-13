@@ -4,18 +4,20 @@ import pytest
 @pytest.mark.parametrize(
     "simulator_name, kwargs, expected_keys",
     [
-        pytest.param("basic", dict(drift=1.0, boundary=1.5), {"RT", "choice"}),
+        pytest.param("basic", {"drift": 1.0, "boundary": 1.5}, {"RT", "choice"}),
         pytest.param(
-            "with_ndt", dict(drift=0.8, boundary=1.2, ndt=0.3), {"RT", "choice", "ndt"}
+            "with_ndt",
+            {"drift": 0.8, "boundary": 1.2, "ndt": 0.3},
+            {"RT", "choice", "ndt"},
         ),
         pytest.param(
             "trajectory",
-            dict(drift=0.7, boundary=1.1, ndt=0.2),
+            {"drift": 0.7, "boundary": 1.1, "ndt": 0.2},
             {"RT", "choice", "trajectory"},
         ),
         pytest.param(
             "collapsing_bound",
-            dict(drift=1.0, initial_boundary=1.3, ndt=0.25, collapse_rate=0.05),
+            {"drift": 1.0, "initial_boundary": 1.3, "ndt": 0.25, "collapse_rate": 0.05},
             {"RT", "choice", "trajectory", "final_bound"},
         ),
     ],
