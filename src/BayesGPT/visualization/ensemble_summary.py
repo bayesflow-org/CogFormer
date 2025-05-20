@@ -8,8 +8,9 @@ def plot_ensemble_summary(results, keys=None, max_lines=10):
     """
     Grid-based summary of simulator outputs using Seaborn and matplotlib.
 
-    Simulators are arranged in columns, and output keys in rows. Scalars are plotted
-    as histograms; sequences as overlayed line plots. Empty cells are left blank.
+    Simulator types are arranged in rows, and output keys in columns.
+    Scalars are plotted as histograms; sequences as overlayed line plots.
+    Cells are left blank when a simulator does not return that key.
 
     Parameters
     ----------
@@ -33,19 +34,19 @@ def plot_ensemble_summary(results, keys=None, max_lines=10):
         keys = sorted(all_keys)
 
     keys = keys or []
-    nrows, ncols = len(keys), len(simulators)
+    nrows, ncols = len(simulators), len(keys)
     fig, axes = plt.subplots(
         nrows=nrows, ncols=ncols, figsize=(5 * ncols, 4 * nrows), squeeze=False
     )
 
-    for col, model_name in enumerate(simulators):
+    for row, model_name in enumerate(simulators):
         outputs = results[model_name]
         if not outputs:
-            for row in range(nrows):
+            for col in range(ncols):
                 axes[row][col].set_visible(False)
             continue
 
-        for row, key in enumerate(keys):
+        for col, key in enumerate(keys):
             ax = axes[row][col]
             values = [o[key] for o in outputs if key in o]
 
@@ -57,18 +58,32 @@ def plot_ensemble_summary(results, keys=None, max_lines=10):
             if all(isinstance(v, (int, float, np.number)) for v in values):
                 df = pd.DataFrame({key: values})
                 sns.histplot(df, x=key, bins=30, kde=True, ax=ax, element="step")
-                ax.set_title(f"{model_name}: {key}")
 
             # Sequence values (e.g., trajectory)
             elif all(isinstance(v, (list, np.ndarray)) for v in values):
                 for traj in values[:max_lines]:
                     ax.plot(traj, alpha=0.6)
-                ax.set_title(f"{model_name}: {key}")
                 ax.set_xlabel("Step")
 
             # Unsupported
             else:
                 ax.set_visible(False)
+                continue
+
+            sns.despine(ax=ax)
+
+            # Add labels only on leftmost and bottom plots
+            if col == 0:
+                ax.set_ylabel(model_name)
+            else:
+                ax.set_ylabel("")
+
+            if row == nrows - 1:
+                ax.set_xlabel(key)
+            else:
+                ax.set_xlabel("")
+
+            ax.set_title("")
 
     plt.tight_layout()
     plt.show()

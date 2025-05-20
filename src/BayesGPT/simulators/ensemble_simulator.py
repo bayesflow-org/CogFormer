@@ -1,106 +1,58 @@
-from collections.abc import Callable, Sequence
-from functools import partial
-import numpy as np
+from bayesflow.simulators import make_simulator
 
 
 class EnsembleSimulator:
     """
-    Base class for managing and executing a collection of simulators
-    with varying parameter requirements.
+    Ensemble of simulation models built on BayesFlow's make_simulator abstraction.
+
+    This version standardizes parameter passing and output formatting, ensuring
+    compatibility with BayesFlow training pipelines while retaining flexibility
+    for custom ensembles.
     """
 
-    def __init__(self):
+    def __init__(self, simulators_config):
         """
-        Initializes an empty ensemble of simulators.
-        """
-        super().__init__()
-        self.simulators = []
-
-    def add(
-        self,
-        simulator: Callable,
-        simulator_name: str = None,
-        variable_names: Sequence[str] = None,
-        fixed_variables: dict = None,
-    ):
-        """
-        Adds a simulator to the ensemble.
+        Initializes an ensemble of BayesFlow-compatible simulators.
 
         Parameters
         ----------
-        simulator : callable
-            The simulation function to register.
-        simulator_name : str, optional
-            A unique name for the simulator. Defaults to the function name.
-        variable_names : Sequence[str], optional
-            List of parameter names required by the simulator.
-        fixed_variables : dict, optional
-            Fixed parameters to be bound using functools.partial.
-
-        Raises
-        ------
-        TypeError
-            If `simulator` is not callable.
+        simulators_config : dict
+            A dictionary mapping simulator names to configuration dictionaries.
+            Each config should contain:
+                - 'simulator': Callable simulation function
+                - 'parameter_names': list of str
         """
-        if not isinstance(simulator, Callable):
-            raise TypeError(f"Provided func '{simulator}' is not callable.")
+        self.simulators = {}
+        for name, config in simulators_config.items():
+            simulator_fn = config["simulator"]
+            parameter_names = config["parameter_names"]
+            self.simulators[name] = make_simulator(
+                simulator_fn, parameter_names=parameter_names
+            )
 
-        if fixed_variables is not None:
-            simulator = partial(simulator, **fixed_variables)
-
-        self.simulators.append(
-            {
-                "simulator": simulator,
-                "simulator_name": simulator_name or simulator.__name__,
-                "variable_names": variable_names or [],
-            }
-        )
-
-    def run(self, batch_size: int = None, **kwargs):
+    def run(self, batch_size=1, parameters=None):
         """
-        Run all compatible simulators with provided parameters.
-
-        Each simulator runs only if all of its required parameters are present.
+        Runs each simulator in the ensemble with shared or model-specific parameters.
 
         Parameters
         ----------
         batch_size : int, optional
-            Number of samples to generate. Inferred if not specified.
-        **kwargs : dict
-            All possible simulation parameters. Scalars are broadcast.
+            Number of samples to generate per simulator. Default is 1.
+        parameters : dict, optional
+            Dictionary mapping simulator names to parameter dictionaries.
+            Each dict should contain the required keys defined by that simulator.
 
         Returns
         -------
         dict
-            Dictionary of simulator outputs. Each key is a simulator name mapping
-            to a list of outputs per batch sample. Simulators with missing parameters
-            are skipped.
+            A dictionary mapping simulator names to their simulation outputs
+            in BayesFlow format: {'sim_data': ..., 'parameters': ...}
         """
-        if batch_size is None:
-            for v in kwargs.values():
-                if isinstance(v, Sequence) and not isinstance(v, str):
-                    batch_size = len(v)
-                    break
-            batch_size = batch_size or 1
-
-        full_kwargs = {
-            k: np.array(v)
-            if isinstance(v, Sequence) and not isinstance(v, str)
-            else np.full(batch_size, v)
-            for k, v in kwargs.items()
-        }
-
         results = {}
-        for simulator in self.simulators:
-            name = simulator["simulator_name"]
-            required_params = simulator["variable_names"]
-            if not all(p in full_kwargs for p in required_params):
-                continue  # Skip if not all required params are provided
-
-            results[name] = []
-            for i in range(batch_size):
-                local_params = {k: full_kwargs[k][i] for k in required_params}
-                output = simulator["simulator"](**local_params)
-                results[name].append(output)
-
+        for name, simulator in self.simulators.items():
+            sim_params = parameters.get(name, None) if parameters else None
+            if sim_params is not None:
+                results[name] = simulator(batch_size=batch_size, parameters=sim_params)
+            else:
+                results[name] = simulator(batch_size=batch_size)
         return results
