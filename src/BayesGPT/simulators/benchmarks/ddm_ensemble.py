@@ -1,6 +1,7 @@
 import numpy as np
-
 from BayesGPT.simulators.ensemble_simulator import EnsembleSimulator
+
+# --- Simulator functions (unchanged) ---
 
 
 def ddm_basic(drift, boundary):
@@ -19,6 +20,7 @@ def ddm_basic(drift, boundary):
     dict
         Dictionary with simulated 'RT' and 'choice'.
     """
+
     rt = np.abs(boundary / drift) + np.random.normal(0, 0.1)
     choice = int(drift > 0)
     return {"RT": rt, "choice": choice}
@@ -42,6 +44,7 @@ def ddm_with_ndt(drift, boundary, ndt):
     dict
         Dictionary with simulated 'RT', 'choice', and 'ndt'.
     """
+
     rt = np.abs(boundary / drift) + ndt + np.random.normal(0, 0.1)
     choice = int(drift > 0)
     return {"RT": rt, "choice": choice, "ndt": ndt}
@@ -65,6 +68,7 @@ def ddm_with_trajectory(drift, boundary, ndt):
     dict
         Dictionary with 'RT', 'choice', and 'trajectory'.
     """
+
     dt = 0.01
     x = 0
     trajectory = [x]
@@ -97,6 +101,7 @@ def ddm_collapsing_bound(drift, initial_boundary, ndt, collapse_rate):
     dict
         Dictionary with 'RT', 'choice', 'trajectory', and 'final_bound'.
     """
+
     dt = 0.01
     x = 0
     trajectory = [x]
@@ -118,6 +123,15 @@ def ddm_collapsing_bound(drift, initial_boundary, ndt, collapse_rate):
 class DDMEnsemble(EnsembleSimulator):
     """
     BayesFlow-compatible ensemble of DDM variants.
+
+    Supports both attribute- and dict-style access to all DDM variant simulators.
+    Example:
+        ensemble = DDMEnsemble()
+        result = ensemble.basic(batch_size=5, parameters={'drift': 1.0, 'boundary': 1.0})  # Attribute access
+        result2 = ensemble['collapsing_bound'](batch_size=5, parameters={...})             # Dict access
+        for name, sim in ensemble:
+            print(name, sim)
+        print("Attribute-accessible:", ensemble.list_attribute_accessible())
     """
 
     def __init__(self):
