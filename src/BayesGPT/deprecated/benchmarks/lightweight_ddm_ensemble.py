@@ -1,5 +1,5 @@
 import numpy as np
-from BayesGPT.simulators.lightweight_ensemble_simulator import (
+from BayesGPT.deprecated.lightweight_ensemble_simulator import (
     LightweightEnsembleSimulator,
 )
 
