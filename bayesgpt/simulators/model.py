@@ -2,7 +2,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 
-class BaseSimulator(ABC):
+class Model(ABC):
     """
     Abstract base class for all simulators.
 
