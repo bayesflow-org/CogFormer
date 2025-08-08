@@ -1,4 +1,4 @@
-from BayesGPT.deprecated.ensemble_simulator import EnsembleSimulator
+from bayesgpt.deprecated.ensemble_simulator import EnsembleSimulator
 from ssms.basic_simulators.simulator import simulator as ssm_simulator
 from ssms.config import model_config
 

@@ -1,5 +1,5 @@
 import numpy as np
-from BayesGPT.deprecated.ensemble_simulator import EnsembleSimulator
+from bayesgpt.deprecated.ensemble_simulator import EnsembleSimulator
 
 # --- Simulator functions (unchanged) ---
 

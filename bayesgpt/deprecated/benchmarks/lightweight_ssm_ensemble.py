@@ -1,6 +1,6 @@
 from ssms.basic_simulators.simulator import simulator as ssm_simulator
 from ssms.config import model_config
-from BayesGPT.deprecated.lightweight_ensemble_simulator import (
+from bayesgpt.deprecated.lightweight_ensemble_simulator import (
     LightweightEnsembleSimulator,
 )
 

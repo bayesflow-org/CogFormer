@@ -1,9 +1,9 @@
 import pytest
 from pytest import fixture
 
-from BayesGPT.deprecated.lightweight_ensemble_simulator import EnsembleSimulator
-from BayesGPT.deprecated.benchmarks.lightweight_ddm_ensemble import DDMEnsemble
-from BayesGPT.deprecated.benchmarks import SSMEnsemble
+from bayesgpt.deprecated.lightweight_ensemble_simulator import EnsembleSimulator
+from bayesgpt.deprecated.benchmarks.lightweight_ddm_ensemble import DDMEnsemble
+from bayesgpt.deprecated.benchmarks import SSMEnsemble
 
 
 @fixture
