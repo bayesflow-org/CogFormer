@@ -1,6 +1,6 @@
 import numpy as np
 from .model import Model
-from ..utils.simulator_utils import ParameterManager
+from ..utils.simulator_utils import Tokenizer
 
 
 class ModelVariant:
@@ -22,12 +22,12 @@ class ModelVariant:
         self,
         name: str,
         model: type[Model],
-        parameter_manager: ParameterManager
+        tokenizer: Tokenizer
     ):
         self.name = name
         self.model: Model = model()
-        self.parameter_manager = parameter_manager
-        self.parameter_names = list(parameter_manager.parameter_names)
+        self.parameter_manager = tokenizer
+        self.parameter_names = list(tokenizer.parameter_names)
 
 
     def sample(self, batch_size: int) -> dict[str, np.ndarray]:

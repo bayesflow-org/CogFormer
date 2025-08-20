@@ -1,6 +1,8 @@
 import numpy as np
 from ..model import Model
 
+# Accelerate with Numba or jax.jit
+# Also, come up with a SuperDDM with variability for all parameters
 
 class StandardDDM(Model):
     """

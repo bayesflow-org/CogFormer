@@ -3,10 +3,10 @@ from collections.abc import Callable
 
 from .model import Model
 from .model_variant import ModelVariant
-from ..utils.simulator_utils import ParameterManager
+from ..utils.simulator_utils import Tokenizer
 
 
-class ModelFamily:
+class NestedModelFamily:
     """
     A collection of related model variants sharing a common interface.
 
@@ -51,7 +51,7 @@ class ModelFamily:
         default_value : float
             Default value for unspecified parameters.
         """
-        parameter_manager = ParameterManager(
+        tokenizer = Tokenizer(
             parameter_names=self.parameter_names,
             free_parameters=free_parameters,
             fixed_parameters=fixed_parameters,
@@ -61,7 +61,7 @@ class ModelFamily:
         self.variants[name] = ModelVariant(
             name=name,
             model=model,
-            parameter_manager=parameter_manager
+            tokenizer=tokenizer
         )
 
 
@@ -136,9 +136,9 @@ class ModelFamily:
         """
         variant_names = self.variant_names
         idx = variant_names.index(variant_name)
-        cond = np.zeros((batch_size, len(variant_names)), dtype=np.float32)
-        cond[:, idx] = 1.0
-        return cond
+        conditions = np.zeros((batch_size, len(variant_names)), dtype=np.float32)
+        conditions[:, idx] = 1.0
+        return conditions
 
 
     @property

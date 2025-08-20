@@ -2,7 +2,7 @@ import numpy as np
 from collections.abc import Callable
 
 
-class ParameterManager:
+class Tokenizer:
     """
         Manages parameter sampling and simulation input construction
         for a model variant using a shared global parameter schema.
