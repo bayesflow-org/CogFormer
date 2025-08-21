@@ -33,7 +33,7 @@ class NestedModelFamily:
         model: type[Model],
         free_parameters: dict[str, Callable[[int], np.ndarray]],
         fixed_parameters: dict[str, float],
-        default_value: float = 0.0
+        fallback_value: float = 0.0
     ):
         """
         Adds a new variant to the model family.
@@ -48,14 +48,14 @@ class NestedModelFamily:
             Sampling functions for free parameters.
         fixed_parameters : dict
             Fixed values for some parameters.
-        default_value : float
+        fallback_value : float
             Default value for unspecified parameters.
         """
         tokenizer = Tokenizer(
             parameter_names=self.parameter_names,
             free_parameters=free_parameters,
             fixed_parameters=fixed_parameters,
-            default_value=default_value,
+            fallback_value=fallback_value,
         )
 
         self.variants[name] = ModelVariant(
@@ -69,6 +69,7 @@ class NestedModelFamily:
         self,
         variant_name: str,
         batch_size: int,
+        context: np.ndarray = None
     ) -> dict[str, np.ndarray]:
         """
         Samples a batch of simulations from a specified variant.
@@ -96,10 +97,25 @@ class NestedModelFamily:
             Fixed/defaulted parameter values in schema order.
         """
 
-        return self.variants[variant_name].sample(batch_size)
+        # Sample data from model variants
+        variant = self.variants[variant_name]
+        samples = variant.sample(batch_size=batch_size)
+        output  = samples
+
+        # Get variant encoder
+        variant_encoder = self.get_variant_encoder(variant_name=variant_name, batch_size=batch_size)
+        inference_conditions = variant.build_inference_conditions(
+            batch_size=batch_size,
+            variant_encoder=variant_encoder,
+            context_encoder=context
+        )
+
+        output['inference_conditions'] = inference_conditions['full_conditions']
+
+        return output
 
 
-    def get_mask(self, variant_name: str, batch_size: int) -> np.ndarray:
+    def get_infer_mask(self, variant_name: str, batch_size: int) -> np.ndarray:
         """
         Returns the binary parameter mask for a given variant.
 
@@ -115,10 +131,14 @@ class NestedModelFamily:
         np.ndarray of shape (batch_size, num_parameters)
             Mask where 1.0 indicates a free parameter.
         """
-        return self.variants[variant_name].get_mask(batch_size)
+        return self.variants[variant_name].get_infer_mask(batch_size)
 
 
-    def get_condition_vector(self, variant_name: str, batch_size: int) -> np.ndarray:
+    def get_variant_encoder(
+            self,
+            variant_name: str,
+            batch_size: int
+    ) -> np.ndarray:
         """
         Returns a one-hot encoded model identity vector.
 
@@ -136,9 +156,9 @@ class NestedModelFamily:
         """
         variant_names = self.variant_names
         idx = variant_names.index(variant_name)
-        conditions = np.zeros((batch_size, len(variant_names)), dtype=np.float32)
-        conditions[:, idx] = 1.0
-        return conditions
+        encoder = np.zeros((batch_size, len(variant_names)), dtype=np.float32)
+        encoder[:, idx] = 1.0
+        return encoder
 
 
     @property

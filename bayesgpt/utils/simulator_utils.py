@@ -10,7 +10,7 @@ class Tokenizer:
         Each parameter in the global schema can be:
         - Sampled (free): if defined in `parameter_samplers`
         - Fixed: if defined in `fixed_values`
-        - Defaulted: if unspecified (filled with `default_value`)
+        - Defaulted: if unspecified (filled with `fallback_value`)
 
         Parameters
         ----------
@@ -23,7 +23,7 @@ class Tokenizer:
         fixed_parameters : dict of {str: float}
             Mapping of parameter names to fixed values.
 
-        default_value : float, optional
+        fallback_value : float, optional
             Value used for parameters that are neither free nor fixed.
             Defaults to 0.0.
 
@@ -38,27 +38,38 @@ class Tokenizer:
         parameter_names: list[str],
         free_parameters: dict[str, Callable[[int], np.ndarray]],
         fixed_parameters: dict[str, float],
-        default_value: float = 0.0
+        fallback_value: float = 0.0
     ):
         self.parameter_names = list(parameter_names)
         self.free_parameters = free_parameters
         self.fixed_parameters = fixed_parameters
-        self.default_value = default_value
+        self.fallback_value = fallback_value
 
         # Sanity check: no parameters should be both fixed and free
         overlap = set(free_parameters) & set(fixed_parameters)
         if overlap:
             raise ValueError(f"The following parameters cannot be both fixed and free: {overlap}")
 
-        # Binary mask for the parameters (1.0 for free parameters, 0.0 otherwise)
-        self.mask = np.array([
-            1.0 if name in free_parameters else 0.0 for name in self.parameter_names
-        ], dtype=np.float32)
+        for name, sampler in self.free_parameters.items():
+            if not callable(sampler):
+                raise ValueError(f"The parameter '{name}' must be a callable")
+
+        # Binary infer masks for the parameters (1.0 for free parameters, 0.0 otherwise)
+        self.infer_mask = np.array(
+            [1.0 if name in free_parameters else 0.0 for name in self.parameter_names],
+            dtype=np.float32
+        )
+
+        self.active_mask = np.array(
+            [1.0 if (n in self.free_parameters or n in self.fixed_parameters) else 0.0
+             for n in self.parameter_names],
+            dtype=np.float32,
+        )
 
         # Add conditioning so that fixed parameters get default values
         # if otherwise undefined.
-        self.fixed_defaults = np.array([
-            fixed_parameters.get(name, default_value) for name in self.parameter_names
+        self.base_values = np.array([
+            [fixed_parameters.get(name, fallback_value) for name in self.parameter_names]
         ], dtype=np.float32)
 
         self.num_parameters = len(self.parameter_names)
@@ -111,17 +122,19 @@ class Tokenizer:
         full_parameters = {}
 
         for i, name in enumerate(self.parameter_names):
-            if self.mask[i] == 1.0:
+            if self.active_mask[i] == 0.0:
+                continue
+            if self.infer_mask[i] == 1.0:
                 full_parameters[name] = float(sample_parameters[name][index])
             elif name in self.fixed_parameters:
                 full_parameters[name] = self.fixed_parameters[name]
             else:
-                full_parameters[name] = self.default_value
+                full_parameters[name] = self.fallback_value
 
         return full_parameters
 
 
-    def build_inference_condition(
+    def build_inference_conditions(
             self,
             batch_size: int,
             *,
@@ -149,52 +162,65 @@ class Tokenizer:
         Returns
         -------
         A dictionary consisting of all components of the inference conditions:
-        - mask: binary mask for free and fixed parameters
+        - infer_mask: binary infer_mask for free and fixed parameters
         - fixed_defaults: fixed default values for the fixed parameters
         - variant: one-hot encoded variant encoder
         - context: context variables
         - full_embeddings: all of the above concatenated for training purposes.
         """
 
-
-        # Batch mask and conditions
-        batched_mask = np.tile(self.mask, (batch_size, 1)).astype(np.float32)
-        batched_defaults = np.tile(self.fixed_defaults, (batch_size, 1)).astype(np.float32)
+        # Batch infer_mask and conditions
+        batched_infer_mask  = np.tile(self.infer_mask, (batch_size, 1)).astype(np.float32)
+        batched_active_mask = np.tile(self.active_mask, (batch_size, 1)).astype(np.float32)
+        batched_base_values = np.tile(self.base_values, (batch_size, 1)).astype(np.float32)
 
         # Make a list of inference conditions to be concatenated as embeddings
-        inference_embeddings = [batched_mask, batched_defaults]
+        full_conditions = [batched_infer_mask, batched_active_mask, batched_base_values]
         inference_conditions = {
-            "mask": batched_mask,
-            "fixed_defaults": batched_defaults
+            "infer_mask": batched_infer_mask,
+            "active_mask": batched_active_mask,
+            "base_values": batched_base_values,
         }
 
         if include_variant:
             if variant_encoder is not None:
                 inference_conditions["variant"] = variant_encoder.astype(np.float32)
-                inference_embeddings.append(variant_encoder)
+                full_conditions.append(variant_encoder)
 
         if include_context:
             if context_encoder is not None:
                 inference_conditions["context"] = context_encoder.astype(np.float32)
-                inference_embeddings.append(context_encoder)
+                full_conditions.append(context_encoder)
 
-        inference_conditions["full_embeddings"] = np.concatenate(inference_embeddings, axis=1)
+        inference_conditions["full_conditions"] = np.concatenate(full_conditions, axis=1)
         return inference_conditions
 
 
-    def get_mask(self) -> np.ndarray:
+    def get_infer_mask(self) -> np.ndarray:
         """
-        Returns the mask array for the free parameters.
+        Returns the infer_mask array for the free parameters.
 
         Returns
         -------
         np.ndarray of shape (num_parameters,)
-            Binary mask indicating which parameters are free (and therefore learnable).
+            Binary infer_mask indicating which parameters are free (and therefore learnable).
         """
-        return self.mask
+        return self.infer_mask
 
 
-    def get_fixed_defaults(self) -> np.ndarray:
+    def get_active_mask(self) -> np.ndarray:
+        """
+        Returns the infer_mask array for the free parameters.
+
+        Returns
+        -------
+        np.ndarray of shape (num_parameters,)
+            Binary infer_mask indicating which parameters are free (and therefore learnable).
+        """
+        return self.active_mask
+
+
+    def get_base_values(self) -> np.ndarray:
         """
         Returns the conditioning vector for the free parameters.
 
@@ -204,4 +230,4 @@ class Tokenizer:
             Conditioning vector for the fixed and default values for all parameters.
             This vector aligns with the global parameter schema.
         """
-        return self.fixed_defaults
+        return self.base_values
