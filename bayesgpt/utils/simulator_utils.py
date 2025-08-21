@@ -57,7 +57,7 @@ class Tokenizer:
 
         # Add conditioning so that fixed parameters get default values
         # if otherwise undefined.
-        self.conditioning_vector = np.array([
+        self.fixed_defaults = np.array([
             fixed_parameters.get(name, default_value) for name in self.parameter_names
         ], dtype=np.float32)
 
@@ -121,6 +121,67 @@ class Tokenizer:
         return full_parameters
 
 
+    def build_inference_condition(
+            self,
+            batch_size: int,
+            *,
+            include_variant: bool = True,
+            include_context: bool = True,
+            variant_encoder: np.ndarray = None,
+            context_encoder: np.ndarray = None
+    ):
+        """
+        Builds an inference condition using a shared global parameter schema.
+
+        Parameters
+        ----------
+        batch_size      : int
+            The number of samples to generate for each parameter.
+        include_variant : bool, optional, default: True
+            Whether to include variant one-hot encoder inference condition.
+        include_context : bool, optional, default: True
+            Whether to include context encoder inference condition.
+        variant_encoder : np.ndarray, optional, default: None
+            The one-hot encoded variant encoder.
+        context_encoder : np.ndarray, optional, default: None
+            The context variables.
+
+        Returns
+        -------
+        A dictionary consisting of all components of the inference conditions:
+        - mask: binary mask for free and fixed parameters
+        - fixed_defaults: fixed default values for the fixed parameters
+        - variant: one-hot encoded variant encoder
+        - context: context variables
+        - full_embeddings: all of the above concatenated for training purposes.
+        """
+
+
+        # Batch mask and conditions
+        batched_mask = np.tile(self.mask, (batch_size, 1)).astype(np.float32)
+        batched_defaults = np.tile(self.fixed_defaults, (batch_size, 1)).astype(np.float32)
+
+        # Make a list of inference conditions to be concatenated as embeddings
+        inference_embeddings = [batched_mask, batched_defaults]
+        inference_conditions = {
+            "mask": batched_mask,
+            "fixed_defaults": batched_defaults
+        }
+
+        if include_variant:
+            if variant_encoder is not None:
+                inference_conditions["variant"] = variant_encoder.astype(np.float32)
+                inference_embeddings.append(variant_encoder)
+
+        if include_context:
+            if context_encoder is not None:
+                inference_conditions["context"] = context_encoder.astype(np.float32)
+                inference_embeddings.append(context_encoder)
+
+        inference_conditions["full_embeddings"] = np.concatenate(inference_embeddings, axis=1)
+        return inference_conditions
+
+
     def get_mask(self) -> np.ndarray:
         """
         Returns the mask array for the free parameters.
@@ -133,7 +194,7 @@ class Tokenizer:
         return self.mask
 
 
-    def get_conditioning_vector(self) -> np.ndarray:
+    def get_fixed_defaults(self) -> np.ndarray:
         """
         Returns the conditioning vector for the free parameters.
 
@@ -143,4 +204,4 @@ class Tokenizer:
             Conditioning vector for the fixed and default values for all parameters.
             This vector aligns with the global parameter schema.
         """
-        return self.conditioning_vector
+        return self.fixed_defaults
