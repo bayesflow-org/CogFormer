@@ -29,7 +29,7 @@ class StandardDDM(Model):
         v_base = params["v"]
         a = params["a"]
         z_frac = params["z"]
-        t_nd = params["t"]
+        t_nd = params["tau"]
         eta = params["eta"]
         sigma = params["sigma"]
 
@@ -78,7 +78,7 @@ class CollapsingBoundDDM(StandardDDM):
         v_base = params["v"]
         a = params["a"]
         z_frac = params["z"]
-        t_nd = params["t"]
+        t_nd = params["tau"]
         eta = params["eta"]
         sigma = params["sigma"]
         angle = params["angle"]
