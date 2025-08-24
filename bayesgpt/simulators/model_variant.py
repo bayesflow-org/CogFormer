@@ -1,4 +1,7 @@
 import numpy as np
+from typing import Union, Optional
+from collections.abc import Mapping
+
 from .model import Model
 from ..utils.simulator_utils import Tokenizer
 
@@ -18,54 +21,65 @@ class ModelVariant:
         Configuration object that manages sampling, value fixing, and masking of parameters.
     """
 
-    def __init__(
-        self,
-        name: str,
-        model: type[Model],
-        tokenizer: Tokenizer
-    ):
+    def __init__(self, name: str, model: type[Model], tokenizer: Tokenizer):
         self.name = name
         self.model: Model = model()
         self.tokenizer = tokenizer
         self.parameter_names = list(tokenizer.parameter_names)
 
-
-    def sample(self, batch_size: int) -> dict[str, np.ndarray]:
+    def sample(
+        self, batch_size: int, context: Optional[np.ndarray] = None
+    ) -> dict[str, Union[np.ndarray, Mapping[str, np.ndarray]]]:
         """
         Simulate data and return full parameter vectors.
+
+        Parameters
+        ----------
+        batch_size : int
+            Number of simulations to run.
+        context : np.ndarray, optional
+            Context array to condition parameter sampling.
 
         Returns
         -------
         dict with keys:
-        - "sim_data" : np.ndarray of shape (batch_size, ...)
-            Simulation outputs.
-        - "full_params" : np.ndarray of shape(batch_size, num_parameters)
+        - "sim_data" : np.ndarray or Mapping[str, np.ndarray]
+            Simulation outputs (array if model returns array, mapping if model returns mapping).
+        - "full_params" : np.ndarray of shape (batch_size, num_parameters)
             Sampled set of parameters.
+        - "inference_conditions" : np.ndarray
+            Concatenated inference conditions (masks, base values, etc.).
         """
 
         # Sample and collect params
-        sampled_parameters = self.tokenizer.sample(batch_size)
+        sampled_parameters = self.tokenizer.sample(batch_size, context)
         params_dicts = [
             self.tokenizer.combine(sampled_parameters, i) for i in range(batch_size)
         ]
 
         # Run simulator
         sims = []
-
         for params in params_dicts:
             out = self.model.simulate(params, batch_size=1)
-
             if isinstance(out, np.ndarray) and out.ndim >= 1 and out.shape[0] == 1:
                 sims.append(out.squeeze(axis=0))
             else:
                 sims.append(out)
 
-        sim_data = np.stack(sims, axis=0)
+        # Handle array or mapping outputs
+        if isinstance(sims[0], np.ndarray):
+            sim_data = np.stack(sims, axis=0)
+        else:
+            # Assume mapping output; stack each key's arrays
+            sim_data = {
+                key: np.stack([sim[key] for sim in sims], axis=0)
+                for key in sims[0].keys()
+            }
 
         # Build full set of parameters
-
-        base_values = np.tile(self.tokenizer.get_base_values(), (batch_size, 1)).astype(np.float32)
-
+        base_values = np.tile(self.tokenizer.get_base_values(), (batch_size, 1)).astype(
+            np.float32
+        )
         full_params = base_values.copy()
 
         for j, name in enumerate(self.parameter_names):
@@ -73,17 +87,14 @@ class ModelVariant:
                 full_params[:, j] = sampled_parameters[name].astype(np.float32)
 
         inference_conditions = self.tokenizer.build_inference_conditions(
-            batch_size=batch_size,
-            include_variant=False,
-            include_context=False
+            batch_size=batch_size, include_variant=False, include_context=False
         )
 
         return {
             "sim_data": sim_data,
             "full_params": full_params,
-            "inference_conditions": inference_conditions
+            "inference_conditions": inference_conditions,
         }
-
 
     def get_infer_mask(self, batch_size: int) -> np.ndarray:
         """
@@ -97,7 +108,6 @@ class ModelVariant:
         mask = self.tokenizer.get_infer_mask()
         return np.tile(mask, (batch_size, 1)).astype(np.float32)
 
-
     def get_active_mask(self, batch_size: int) -> np.ndarray:
         """
         Returns a repeated binary mask for which parameters are free.
@@ -109,7 +119,6 @@ class ModelVariant:
         """
         mask = self.tokenizer.get_active_mask()
         return np.tile(mask, (batch_size, 1)).astype(np.float32)
-
 
     def get_base_values(self, batch_size: int) -> np.ndarray:
         """
@@ -123,13 +132,12 @@ class ModelVariant:
         base_values = self.tokenizer.get_base_values()
         return np.tile(base_values, (batch_size, 1)).astype(np.float32)
 
-
     def build_inference_conditions(
-            self,
-            batch_size: int,
-            *,
-            variant_encoder: np.ndarray = None,
-            context_encoder: np.ndarray = None
+        self,
+        batch_size: int,
+        *,
+        variant_encoder: np.ndarray = None,
+        context_encoder: np.ndarray = None,
     ) -> dict[str, np.ndarray]:
         """
         Build inference conditions including optional variant/context encoders.
@@ -139,5 +147,5 @@ class ModelVariant:
             variant_encoder=variant_encoder,
             context_encoder=context_encoder,
             include_variant=variant_encoder is not None,
-            include_context=context_encoder is not None
+            include_context=context_encoder is not None,
         )
