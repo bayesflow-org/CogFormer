@@ -46,7 +46,9 @@ class SuperDDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
-    def simulate(self, params: dict[str, float], batch_size: int) -> dict[str, np.ndarray]:
+    def simulate(
+        self, params: dict[str, float], batch_size: int
+    ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials.
 
@@ -103,9 +105,15 @@ class SuperDDM(Model):
         s_tau = params.get("s_tau", 0.0)
 
         # Draw per-trial z and tau (as arrays)
-        z_arr = np.random.normal(z, s_z, batch_size) if s_z > 0 else np.full(batch_size, z)
+        z_arr = (
+            np.random.normal(z, s_z, batch_size) if s_z > 0 else np.full(batch_size, z)
+        )
         z_arr = np.clip(z_arr, 1e-3, 1 - 1e-3)
-        tau_arr = np.random.normal(tau, s_tau, batch_size) if s_tau > 0 else np.full(batch_size, tau)
+        tau_arr = (
+            np.random.normal(tau, s_tau, batch_size)
+            if s_tau > 0
+            else np.full(batch_size, tau)
+        )
         tau_arr = np.maximum(tau_arr, 1e-3)
 
         # Handle drift configuration
@@ -132,8 +140,17 @@ class SuperDDM(Model):
                 v_segments = np.tile(v_schedule[None, :], (batch_size, 1))
 
             result = _simulate_schedule_ddm(
-                v_segments, seg_switch, a, z_arr, tau_arr, sigma, angle,
-                self.dt, self.max_steps, batch_size, K
+                v_segments,
+                seg_switch,
+                a,
+                z_arr,
+                tau_arr,
+                sigma,
+                angle,
+                self.dt,
+                self.max_steps,
+                batch_size,
+                K,
             )
         else:
             # Across-trial variability with multiple drift rates and their probabilities
@@ -156,10 +173,22 @@ class SuperDDM(Model):
                     v_arr += np.random.normal(0, s_v, batch_size)
             else:
                 v = params["v"]
-                v_arr = np.random.normal(v, s_v, batch_size) if s_v > 0 else np.full(batch_size, v)
+                v_arr = (
+                    np.random.normal(v, s_v, batch_size)
+                    if s_v > 0
+                    else np.full(batch_size, v)
+                )
 
             result = _simulate_super_ddm(
-                v_arr, a, z_arr, tau_arr, sigma, angle, self.dt, self.max_steps, batch_size
+                v_arr,
+                a,
+                z_arr,
+                tau_arr,
+                sigma,
+                angle,
+                self.dt,
+                self.max_steps,
+                batch_size,
             )
 
         return {"rts": result[:, 0], "choices": result[:, 1]}

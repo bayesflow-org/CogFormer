@@ -16,7 +16,9 @@ class StandardDDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
-    def simulate(self, params: dict[str, float], batch_size: int) -> dict[str, np.ndarray]:
+    def simulate(
+        self, params: dict[str, float], batch_size: int
+    ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials.
 
@@ -82,7 +84,6 @@ def _simulate_standard_ddm(
         - rts: reaction time for each trial
         - choices: choices for each trial
     """
-
 
     rts = np.zeros(batch_size)
     choices = np.zeros(batch_size)

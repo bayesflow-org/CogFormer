@@ -11,7 +11,9 @@ class CollapsingBoundDDM(StandardDDM):
     dynamic thresholds: B(t) = a - angle * t.
     """
 
-    def simulate(self, params: dict[str, float], batch_size: int) -> dict[str, np.ndarray]:
+    def simulate(
+        self, params: dict[str, float], batch_size: int
+    ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials with collapsing bounds.
 
