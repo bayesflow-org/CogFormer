@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Optional
+from typing import Optional, Union
 from collections.abc import Callable
 
 
@@ -36,7 +36,7 @@ class Tokenizer:
         self,
         parameter_names: list[str],
         free_parameters: dict[str, Callable[[int, Optional[np.ndarray]], np.ndarray]],
-        fixed_parameters: dict[str, float],
+        fixed_parameters: dict[str, Union[float, np.ndarray]],
         fallback_value: float = 0.0,
     ):
         self.parameter_names = list(parameter_names)
@@ -53,12 +53,13 @@ class Tokenizer:
 
         # Initialize base_values for fixed and default parameters
         self.base_values = []
+        self.array_parameters = set()
         for name in self.parameter_names:
             if name in fixed_parameters:
                 value = fixed_parameters[name]
                 if isinstance(value, np.ndarray):
-                    # Flatten array for base_values to maintain consistent shape
-                    self.base_values.append(value.flatten())
+                    self.array_parameters.add(name)
+                    self.base_values.append(np.array([fallback_value]))
                 else:
                     self.base_values.append(np.array([value]))
             else:
@@ -77,18 +78,6 @@ class Tokenizer:
                 if (n in self.free_parameters or n in self.fixed_parameters)
                 else 0.0
                 for n in self.parameter_names
-            ],
-            dtype=np.float32,
-        )
-
-        # Add conditioning so that fixed parameters get default values
-        # if otherwise undefined.
-        self.base_values = np.array(
-            [
-                [
-                    fixed_parameters.get(name, fallback_value)
-                    for name in self.parameter_names
-                ]
             ],
             dtype=np.float32,
         )
