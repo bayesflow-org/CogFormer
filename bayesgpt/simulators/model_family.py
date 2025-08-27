@@ -85,7 +85,7 @@ class NestedModelFamily:
             raise KeyError(f"Variant '{name}' not found in the model family.")
         del self.variants[name]
 
-    def collect_all_variants(
+    def add_all_variants(
         self,
         variants: List[
             Tuple[
@@ -109,6 +109,12 @@ class NestedModelFamily:
             self.add_variant(
                 name, model, free_parameters, fixed_parameters, fallback_value
             )
+
+    def remove_all_variants(self):
+        """
+        Removes all variants from the model family.
+        """
+        self.variants.clear()
 
     def sample(
         self, variant_name: str, batch_size: int, context: Optional[np.ndarray] = None
