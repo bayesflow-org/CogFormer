@@ -1,41 +1,23 @@
 import keras
-from keras import ops, layers, Model
-from typing import Optional, Tuple
+
+from collections.abc import Sequence
+
+from bayesflow.types import Tensor
+from bayesflow.utils.serialization import serializable
+from bayesflow.networks.summary_network import SummaryNetwork
 
 
-class Simformer(Model):
+@serializable("bayesflow.networks")
+class Simformer(SummaryNetwork):
     """
-    A Keras 3 implementation of a Simformer-like architecture for
-    simulation-based inference.
+    Implements a flexible version of Simformer [1] where an all-in-one
+    transformer encoder can be interfaced with other diffusion models
+    (i.e., [2]) as inference network.
 
-    This architecture is implemented in Keras, and handles joint diffusion
-    on parameters (theta) and data (x) with flexible conditioning.
+    [1] Gloeckler et al. (2024), All-in-one simulation-based inference, https://arxiv.org/abs/2404.09636
 
-    Assumptions:
-    -   sim_data is a np.ndarray of shape (batch_size, data_dim).
-        If a Mapping, preprocess to flat array.
-    -   M_C = 1 for conditioned variables (fixed/no noise),
-        0 for variables to sample (add noise).
-    -   infer_mask from data is inverted to M_C for params (M_C = 1 - infer_mask).
-    -   x is typically conditioned (M_C_x = 1 for posterior), but flexible.
-    -   inference_conditions are embedded as an extra token.
-
-    Parameters
-    ----------
-    num_params : int
-        Number of parameters in the global schema.
-    data_dim : int
-        Dimensionality of the simulation data (x).
-    condition_dim : int
-        Dimensionality of additional inference conditions (e.g., full_conditions.shape[-1]).
-    embed_dim : int, optional
-        Embedding dimension for id, value, and condition.
-    num_layers : int, optional
-        Number of transformer layers.
-    num_heads : int, optional
-        Number of attention heads.
-    num_diffusion_steps : int, optional
-        Number of diffusion steps for training and sampling.
+    [2] Song et al. (2021), Score-Based Generative Modeling through Stochastic Differential Equations,
+    https://arxiv.org/abs/2106.06548
     """
 
     def __init__(
@@ -49,6 +31,24 @@ class Simformer(Model):
         num_diffusion_steps: int = 1000,
         **kwargs,
     ):
+        """
+        Parameters
+        ----------
+        num_params : int
+            Number of parameters in the global schema.
+        data_dim : int
+            Dimensionality of the simulation data (x).
+        condition_dim : int
+            Dimensionality of additional inference conditions (e.g., full_conditions.shape[-1]).
+        embed_dim : int, optional
+            Embedding dimension for id, value, and condition.
+        num_layers : int, optional
+            Number of transformer layers.
+        num_heads : int, optional
+            Number of attention heads.
+        num_diffusion_steps : int, optional
+            Number of diffusion steps for training and sampling.
+        """
         super().__init__(**kwargs)
         self.num_params = num_params
         self.data_dim = data_dim
@@ -59,159 +59,154 @@ class Simformer(Model):
         self.num_extra = 1 if condition_dim > 0 else 0
         self.total_tokens = self.num_vars + self.num_extra
         self.num_diffusion_steps = num_diffusion_steps
-
-        # Embeddings
-        self.id_embedding = layers.Embedding(
-            self.total_tokens, embed_dim, name="id_embedding"
-        )
-        self.condition_embedding = layers.Embedding(
-            2, embed_dim, name="condition_embedding"
-        )
-        self.value_linear_layers = [
-            layers.Dense(embed_dim, name=f"value_linear_layer_{i}")
-            for i in range(num_params)
-        ] + [
-            layers.Dense(
-                embed_dim, name="value_linear_layer_x", input_shape=(data_dim,)
-            )
-        ]
-        if condition_dim > 0:
-            self.conditional_linear_layer = layers.Dense(
-                embed_dim, name="conditional_linear_layer", input_shape=(condition_dim,)
-            )
-        else:
-            self.conditional_linear_layer = None
-
-        # Time embedding for diffusion
-        self.time_embedding = keras.Sequential(
-            [
-                layers.Dense(embed_dim, input_shape=(1,), name="time_dense1"),
-                layers.Activation("silu", name="time_silu"),
-                layers.Dense(embed_dim, name="time_dense2"),
-            ],
-            name="time_embedding",
-        )
-
-        # Transformer
-        transformer_layers = [
-            layers.TransformerEncoderLayer(
-                d_model=self.token_dim,
-                num_heads=num_heads,
-                dff=self.token_dim * 4,
-                dropout=0.1,
-                name=f"transformer_layer_{i}",
-            )
-            for i in range(num_layers)
-        ]
-        self.transformer = keras.Sequential(transformer_layers, name="transformer")
-
-        # Score projectors
-        self.score_linear_layers = [
-            layers.Dense(1, name=f"score_linear_{i}") for i in range(num_params)
-        ] + [layers.Dense(data_dim, name="score_linear_x")]
-
-        # Diffusion schedule (variance preserving)
-        betas = ops.linspace(1e-4, 0.02, num_diffusion_steps)
-        self.alphas = 1.0 - betas
-        self.alpha_bars = ops.cumprod(self.alphas, axis=0)
-
-        # Define model inputs and outputs
-        z_shape = (None, num_params + data_dim)
-        t_shape = (None,)
-        M_C_shape = (None, self.num_vars)
-        cond_shape = (None, condition_dim) if condition_dim > 0 else None
-        inputs = [
-            keras.Input(shape=z_shape, name="z"),
-            keras.Input(shape=t_shape, name="t"),
-            keras.Input(shape=M_C_shape, name="M_C"),
-            keras.Input(shape=cond_shape, name="cond") if cond_shape else None,
-        ]
-        inputs = [i for i in inputs if i is not None]
-        outputs = self.call(inputs, training=False)
-        super().__init__(inputs=inputs, outputs=outputs)
-
-    def call(
-        self,
-        inputs: Tuple[
-            keras.KerasTensor,
-            keras.KerasTensor,
-            keras.KerasTensor,
-            Optional[keras.KerasTensor],
-        ],
-        training: bool = False,
-    ) -> keras.KerasTensor:
-        """
-        Predicts the score for the noised joint z = cat(theta, x.flatten(-1)).
+#
+#         # Embeddings
+#         self.id_embedding = layers.Embedding(
+#             self.total_tokens, embed_dim, name="id_embedding"
+#         )
+#         self.condition_embedding = layers.Embedding(
+#             2, embed_dim, name="condition_embedding"
+#         )
+#         self.value_linear_layers = [
+#             layers.Dense(embed_dim, name=f"value_linear_layer_{i}")
+#             for i in range(num_params)
+#         ] + [
+#             layers.Dense(
+#                 embed_dim, name="value_linear_layer_x", input_shape=(data_dim,)
+#             )
+#         ]
+#         if condition_dim > 0:
+#             self.conditional_linear_layer = layers.Dense(
+#                 embed_dim, name="conditional_linear_layer", input_shape=(condition_dim,)
+#             )
+#         else:
+#             self.conditional_linear_layer = None
+#
+#         # Time embedding for diffusion
+#         self.time_embedding = keras.Sequential(
+#             [
+#                 layers.Dense(embed_dim, input_shape=(1,), name="time_dense1"),
+#                 layers.Activation("silu", name="time_silu"),
+#                 layers.Dense(embed_dim, name="time_dense2"),
+#             ],
+#             name="time_embedding",
+#         )
+#
+#         # Transformer
+#         transformer_layers = [
+#             layers.TransformerEncoderLayer(
+#                 d_model=self.token_dim,
+#                 num_heads=num_heads,
+#                 dff=self.token_dim * 4,
+#                 dropout=0.1,
+#                 name=f"transformer_layer_{i}",
+#             )
+#             for i in range(num_layers)
+#         ]
+#         self.transformer = keras.Sequential(transformer_layers, name="transformer")
+#
+#         # Score projectors
+#         self.score_linear_layers = [
+#             layers.Dense(1, name=f"score_linear_{i}") for i in range(num_params)
+#         ] + [layers.Dense(data_dim, name="score_linear_x")]
+#
+#         # Diffusion schedule (variance preserving)
+#         betas = ops.linspace(1e-4, 0.02, num_diffusion_steps)
+#         self.alphas = 1.0 - betas
+#         self.alpha_bars = ops.cumprod(self.alphas, axis=0)
+#
+#         # Define model inputs and outputs
+#         z_shape = (None, num_params + data_dim)
+#         t_shape = (None,)
+#         M_C_shape = (None, self.num_vars)
+#         cond_shape = (None, condition_dim) if condition_dim > 0 else None
+#         inputs = [
+#             keras.Input(shape=z_shape, name="z"),
+#             keras.Input(shape=t_shape, name="t"),
+#             keras.Input(shape=M_C_shape, name="M_C"),
+#             keras.Input(shape=cond_shape, name="cond") if cond_shape else None,
+#         ]
+#         inputs = [i for i in inputs if i is not None]
+#         outputs = self.call(inputs, training=False)
+#         super().__init__(inputs=inputs, outputs=outputs)
+#
+    def call(self, input_set: Tensor, training: bool = False, **kwargs) -> Tensor:
+        """Compresses the input sequence into a summary vector of size `summary_dim`.
 
         Parameters
         ----------
-        inputs : Tuple of (z, t, M_C, cond):
-            - z: Tensor (batch_size, num_params + data_dim), noised joint vector.
-            - t: Tensor (batch_size,), diffusion timesteps.
-            - M_C: Tensor (batch_size, num_vars), condition mask (1 = conditioned, 0 = to sample).
-            - cond: Tensor (batch_size, condition_dim), optional inference conditions.
+        input_set  : Tensor (e.g., np.ndarray, tf.Tensor, ...)
+            Input of shape (batch_size, set_size, input_dim)
+        training   : boolean, optional (default - False)
+            Passed to the optional internal dropout and spectral normalization
+            layers to distinguish between train and test time behavior.
+        **kwargs   : dict, optional (default - {})
+            Additional keyword arguments passed to the internal attention layer,
+            such as ``attention_mask`` or ``return_attention_scores``
 
         Returns
         -------
-        KerasTensor (batch_size, num_params + data_dim)
-            Predicted score.
+        out : Tensor
+            Output of shape (batch_size, set_size, output_dim)
         """
-        z, t, M_C, condition = inputs
-        batch_size = ops.shape(z)[0]
-        tokens = []
-        pos = 0
 
-        for i in range(self.num_vars):
-            if i < self.num_params:
-                dim_v = 1
-            else:
-                dim_v = self.data_dim
-            value = z[:, pos : pos + dim_v]
-            value_embedding = self.value_linear_layers[i](value)
-            id_embedding = self.id_embedding(ops.full((batch_size,), i, dtype="int32"))
-            condition_embedding = self.condition_embedding(ops.cast(M_C[:, i], "int32"))
-            token = ops.concatenate(
-                [id_embedding, value_embedding, condition_embedding], axis=-1
-            )
-            tokens.append(token)
-            pos += dim_v
-
-        # Add condition token if present
-        if self.conditional_linear_layer is not None and condition is not None:
-            conditional_value_embedding = self.conditional_linear_layer(condition)
-            conditional_id_embedding = self.id_embedding(
-                ops.full((batch_size,), self.num_vars, dtype="int32")
-            )
-            conditional_condition_embedding = self.condition_embedding(
-                ops.ones((batch_size,), dtype="int32")
-            )
-            cond_token = ops.concatenate(
-                [
-                    conditional_id_embedding,
-                    conditional_value_embedding,
-                    conditional_condition_embedding,
-                ],
-                axis=-1,
-            )
-            tokens.append(cond_token)
-
-        tokens = ops.stack(tokens, axis=1)  # (batch_size, total_tokens, token_dim)
-
-        # Add time embedding (broadcast to all tokens)
-        time_embedding = self.time_embedding(
-            ops.expand_dims(t, -1)
-        )  # (batch_size, embed_dim)
-        tokens = tokens + ops.expand_dims(time_embedding, 1)  # Broadcast
-
-        out = self.transformer(
-            tokens, training=training
-        )  # (batch_size, total_tokens, token_dim)
-
-        # Extract scores for variables (ignore extra cond token)
-        scores = []
-        for i in range(self.num_vars):
-            out_i = out[:, i]
-            score_i = self.score_linear_layers[i](out_i)
-            scores.append(score_i)
-        score = ops.concatenate(scores, axis=-1)
-        return score
+        raise NotImplementedError
+#         z, t, M_C, condition = inputs
+#         batch_size = ops.shape(z)[0]
+#         tokens = []
+#         pos = 0
+#
+#         for i in range(self.num_vars):
+#             if i < self.num_params:
+#                 dim_v = 1
+#             else:
+#                 dim_v = self.data_dim
+#             value = z[:, pos : pos + dim_v]
+#             value_embedding = self.value_linear_layers[i](value)
+#             id_embedding = self.id_embedding(ops.full((batch_size,), i, dtype="int32"))
+#             condition_embedding = self.condition_embedding(ops.cast(M_C[:, i], "int32"))
+#             token = ops.concatenate(
+#                 [id_embedding, value_embedding, condition_embedding], axis=-1
+#             )
+#             tokens.append(token)
+#             pos += dim_v
+#
+#         # Add condition token if present
+#         if self.conditional_linear_layer is not None and condition is not None:
+#             conditional_value_embedding = self.conditional_linear_layer(condition)
+#             conditional_id_embedding = self.id_embedding(
+#                 ops.full((batch_size,), self.num_vars, dtype="int32")
+#             )
+#             conditional_condition_embedding = self.condition_embedding(
+#                 ops.ones((batch_size,), dtype="int32")
+#             )
+#             cond_token = ops.concatenate(
+#                 [
+#                     conditional_id_embedding,
+#                     conditional_value_embedding,
+#                     conditional_condition_embedding,
+#                 ],
+#                 axis=-1,
+#             )
+#             tokens.append(cond_token)
+#
+#         tokens = ops.stack(tokens, axis=1)  # (batch_size, total_tokens, token_dim)
+#
+#         # Add time embedding (broadcast to all tokens)
+#         time_embedding = self.time_embedding(
+#             ops.expand_dims(t, -1)
+#         )  # (batch_size, embed_dim)
+#         tokens = tokens + ops.expand_dims(time_embedding, 1)  # Broadcast
+#
+#         out = self.transformer(
+#             tokens, training=training
+#         )  # (batch_size, total_tokens, token_dim)
+#
+#         # Extract scores for variables (ignore extra cond token)
+#         scores = []
+#         for i in range(self.num_vars):
+#             out_i = out[:, i]
+#             score_i = self.score_linear_layers[i](out_i)
+#             scores.append(score_i)
+#         score = ops.concatenate(scores, axis=-1)
+#         return score
