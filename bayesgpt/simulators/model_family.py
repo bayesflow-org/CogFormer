@@ -49,14 +49,8 @@ class NestedModelFamily:
             Default value for unspecified parameters.
         """
         # Update global schema if new parameters are introduced
-        new_params = [
-            p for p in free_parameters.keys() if p not in self.parameter_names
-        ]
-        new_params += [
-            p for p in fixed_parameters.keys() if p not in self.parameter_names
-        ]
-        if new_params:
-            self.parameter_names.extend(new_params)
+        new_params = set(free_parameters.keys()) | set(fixed_parameters.keys()) - set(self.parameter_names)
+        self.parameter_names.extend(new_params)
 
         tokenizer = Tokenizer(
             parameter_names=self.parameter_names,
@@ -141,10 +135,23 @@ class NestedModelFamily:
         - inference_conditions : np.ndarray
             Concatenated inference conditions (masks, base values, etc.).
         """
+        # Sanity check
+        if variant_name not in self.variants:
+            raise KeyError(f"Variant '{variant_name}' not found in the model family.")
+
         # Sample data from model variants
         variant = self.variants[variant_name]
         samples = variant.sample(batch_size=batch_size, context=context)
         output = samples
+
+        # Check for non-terminating trials
+        sim_data = output["sim_data"]
+        if isinstance(sim_data, np.ndarray):
+            nan_count = np.isnan(sim_data).sum()
+        else:
+            nan_count = sum(np.isnan(sim_data[key]).sum() for key in sim_data)
+        if nan_count > 0:
+            print(f"Warning: {variant_name} has {nan_count} non-terminating trials")
 
         # Get variant encoder
         variant_encoder = self.get_variant_encoder(
@@ -176,6 +183,9 @@ class NestedModelFamily:
         np.ndarray of shape (batch_size, num_parameters)
             Mask where 1.0 indicates a free parameter.
         """
+        if variant_name not in self.variants:
+            raise KeyError(f"Variant '{variant_name}' not found in the model family.")
+
         return self.variants[variant_name].get_infer_mask(batch_size)
 
     def get_variant_encoder(self, variant_name: str, batch_size: int) -> np.ndarray:
@@ -194,6 +204,9 @@ class NestedModelFamily:
         np.ndarray of shape (batch_size, num_variants)
             One-hot vector encoding model identity.
         """
+        if variant_name not in self.variants:
+            raise KeyError(f"Variant '{variant_name}' not found in the model family.")
+
         variant_names = self.variant_names
         idx = variant_names.index(variant_name)
         encoder = np.zeros((batch_size, len(variant_names)), dtype=np.float32)

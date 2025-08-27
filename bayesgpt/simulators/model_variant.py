@@ -53,33 +53,13 @@ class ModelVariant:
 
         # Sample and collect params
         sampled_parameters = self.tokenizer.sample(batch_size, context)
-        params_dicts = [
-            self.tokenizer.combine(sampled_parameters, i) for i in range(batch_size)
-        ]
+        params_dict = self.tokenizer.combine(sampled_parameters, batch_size)
 
         # Run simulator
-        sims = []
-        for params in params_dicts:
-            out = self.model.simulate(params, batch_size=1)
-            if isinstance(out, np.ndarray) and out.ndim >= 1 and out.shape[0] == 1:
-                sims.append(out.squeeze(axis=0))
-            else:
-                sims.append(out)
-
-        # Handle array or mapping outputs
-        if isinstance(sims[0], np.ndarray):
-            sim_data = np.stack(sims, axis=0)
-        else:
-            # Assume mapping output; stack each key's arrays
-            sim_data = {
-                key: np.stack([sim[key] for sim in sims], axis=0)
-                for key in sims[0].keys()
-            }
+        sim_data = self.model.simulate(params_dict, batch_size)
 
         # Build full set of parameters
-        base_values = np.tile(self.tokenizer.get_base_values(), (batch_size, 1)).astype(
-            np.float32
-        )
+        base_values = np.tile(self.tokenizer.get_base_values(), (batch_size, 1)).astype(np.float32)
         full_params = base_values.copy()
 
         for j, name in enumerate(self.parameter_names):

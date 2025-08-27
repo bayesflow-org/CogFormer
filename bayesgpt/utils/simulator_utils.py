@@ -51,6 +51,20 @@ class Tokenizer:
                 f"The following parameters cannot be both fixed and free: {overlap}"
             )
 
+        # Initialize base_values for fixed and default parameters
+        self.base_values = []
+        for name in self.parameter_names:
+            if name in fixed_parameters:
+                value = fixed_parameters[name]
+                if isinstance(value, np.ndarray):
+                    # Flatten array for base_values to maintain consistent shape
+                    self.base_values.append(value.flatten())
+                else:
+                    self.base_values.append(np.array([value]))
+            else:
+                self.base_values.append(np.array([fallback_value]))
+        self.base_values = np.concatenate(self.base_values, axis=0).astype(np.float32)
+
         # Binary infer masks for the parameters (1.0 for free parameters, 0.0 otherwise)
         self.infer_mask = np.array(
             [1.0 if name in free_parameters else 0.0 for name in self.parameter_names],
@@ -106,7 +120,9 @@ class Tokenizer:
         }
 
     def combine(
-        self, sample_parameters: dict[str, np.ndarray], index: int
+        self,
+        sample_parameters: dict[str, np.ndarray],
+        batch_size: int = None
     ) -> dict[str, float]:
         """
         Combines sampled parameters along with the fixed and default parameters
@@ -116,21 +132,25 @@ class Tokenizer:
         ----------
         sample_parameters : dict of {str: np.ndarray}
             A batch of sampled free parameters. Each array should have shape (batch_size,).
-        index : int
-            The index of the sample to extract from the batch.
+        batch_size : int, optional
+            If provided, returns a single parameter dict for the entire batch.
 
         Returns
         -------
         dict of {str: float}
             A dictionary containing the full parameter set for a single simulation.
         """
+
+        if batch_size is None:
+            raise ValueError("batch_size must be provided for batch simulation")
+
         full_parameters = {}
 
         for i, name in enumerate(self.parameter_names):
             if self.active_mask[i] == 0.0:
                 continue
             if self.infer_mask[i] == 1.0:
-                full_parameters[name] = float(sample_parameters[name][index])
+                full_parameters[name] = float(sample_parameters[name][0])
             elif name in self.fixed_parameters:
                 full_parameters[name] = self.fixed_parameters[name]
             else:
@@ -174,15 +194,9 @@ class Tokenizer:
         - full_embeddings: all of the above concatenated for training purposes.
         """
         # Batch infer_mask and conditions
-        batched_infer_mask = np.tile(self.infer_mask, (batch_size, 1)).astype(
-            np.float32
-        )
-        batched_active_mask = np.tile(self.active_mask, (batch_size, 1)).astype(
-            np.float32
-        )
-        batched_base_values = np.tile(self.base_values, (batch_size, 1)).astype(
-            np.float32
-        )
+        batched_infer_mask = np.tile(self.infer_mask, (batch_size, 1)).astype(np.float32)
+        batched_active_mask = np.tile(self.active_mask, (batch_size, 1)).astype(np.float32)
+        batched_base_values = np.tile(self.base_values, (batch_size, 1)).astype(np.float32)
 
         # Make a list of inference conditions to be concatenated as embeddings
         full_conditions = [batched_infer_mask, batched_active_mask, batched_base_values]
@@ -202,9 +216,7 @@ class Tokenizer:
                 inference_conditions["context"] = context_encoder.astype(np.float32)
                 full_conditions.append(context_encoder)
 
-        inference_conditions["full_conditions"] = np.concatenate(
-            full_conditions, axis=1
-        )
+        inference_conditions["full_conditions"] = np.concatenate(full_conditions, axis=1)
         return inference_conditions
 
     def get_infer_mask(self) -> np.ndarray:
