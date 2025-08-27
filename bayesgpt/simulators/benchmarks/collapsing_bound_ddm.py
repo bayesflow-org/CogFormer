@@ -29,7 +29,23 @@ class CollapsingBoundDDM(StandardDDM):
         dict[str, np.ndarray]
             Dictionary with keys 'rts' and 'choices', each mapping to an array
             of shape (batch_size,) containing response times and choices.
+        Raises
+        ------
+        ValueError
+            If required parameters are missing or have invalid values.
         """
+
+        # Sanity check
+        required_params = ["v", "a", "z", "tau", "s_v", "sigma", "angle"]
+
+        if not all(k in params for k in required_params):
+            raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
+        if params["a"] <= 0 or params["sigma"] <= 0 or not (0 < params["z"] < 1):
+            raise ValueError("Invalid parameter values: a, sigma must be > 0, 0 < z < 1")
+        if params["tau"] < 0 or params["s_v"] < 0 or params["angle"] < 0:
+            raise ValueError("Invalid parameter values: tau, s_v, angle must be >= 0")
+
+        # Unpack params
         v = params["v"]
         a = params["a"]
         z = params["z"]
@@ -38,6 +54,7 @@ class CollapsingBoundDDM(StandardDDM):
         sigma = params["sigma"]
         angle = params["angle"]
 
+        # Simulate
         result = _simulate_collapsing_bound_ddm(
             v, a, z, tau, s_v, sigma, angle, self.dt, self.max_steps, batch_size
         )
@@ -84,9 +101,11 @@ def _simulate_collapsing_bound_ddm(
         - choices: choices for each trial
     """
 
+    # Create buffers
     rts = np.zeros(batch_size)
     choices = np.zeros(batch_size)
 
+    # Simulate
     for i in prange(batch_size):
         vi = np.random.normal(v, s_v)
         x = (2 * z - 1.0) * a  # symmetric init between -a and +a
@@ -110,4 +129,8 @@ def _simulate_collapsing_bound_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
 
-    return np.stack([rts, choices], axis=1)
+    # Store results
+    result = np.zeros((batch_size, 2))
+    result[:, 0] = rts
+    result[:, 1] = choices
+    return result

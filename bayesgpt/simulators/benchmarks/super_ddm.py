@@ -57,7 +57,7 @@ class SuperDDM(Model):
         params : dict[str, float]
             Dictionary containing model parameters:
             v : float
-                Mean drift rate (required if no multiple drifts specified).
+                Mean drift rate (required_params if no multiple drifts specified).
             a : float
                 Boundary separation (>0).
             z : float
@@ -91,8 +91,20 @@ class SuperDDM(Model):
         dict[str, np.ndarray]
             Dictionary with keys 'rts' and 'choices', each mapping to an array
             of shape (batch_size,) containing response times and choices.
+        Raises
+        ------
+        ValueError
+            If required_params parameters are missing or have invalid values.
         """
-        # Required parameters
+        required_params = ["a", "z", "tau", "sigma"]
+        if not all(k in params for k in required_params):
+            raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
+        if params["a"] <= 0 or params["sigma"] <= 0 or not (0 < params["z"] < 1):
+            raise ValueError("Invalid parameter values: a, sigma must be > 0, 0 < z < 1")
+        if params["tau"] < 0:
+            raise ValueError("Invalid parameter values: tau must be >= 0")
+        
+        # required parameters
         a = params["a"]
         z = params["z"]
         tau = params["tau"]
@@ -132,7 +144,7 @@ class SuperDDM(Model):
 
             # Keep track of within-trial switching regime
             K = len(v_schedule)
-            seg_switch = np.cumsum(t_schedule)
+            segment_switch = np.cumsum(t_schedule)
 
             if s_v > 0:
                 v_segments = np.random.normal(v_schedule[None, :], s_v, (batch_size, K))
@@ -141,7 +153,7 @@ class SuperDDM(Model):
 
             result = _simulate_schedule_ddm(
                 v_segments,
-                seg_switch,
+                segment_switch,
                 a,
                 z_arr,
                 tau_arr,
@@ -212,7 +224,7 @@ def _simulate_super_ddm(
     Parameters
     ----------
     v : float
-        Mean drift rate (required if no multiple drifts specified).
+        Mean drift rate (required_params if no multiple drifts specified).
     a : float
         Boundary separation (>0).
     z : float
@@ -264,13 +276,16 @@ def _simulate_super_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
 
-    return np.stack([rts, choices], axis=1)
+    result = np.zeros((batch_size, 2))
+    result[:, 0] = rts
+    result[:, 1] = choices
+    return result
 
 
 @njit
 def _simulate_schedule_ddm(
     v: np.ndarray,
-    seg_switch: np.ndarray,
+    segment_switch: np.ndarray,
     a: float,
     z: np.ndarray,
     tau: np.ndarray,
@@ -287,7 +302,7 @@ def _simulate_schedule_ddm(
     Parameters
     ----------
     v : float
-        Mean drift rate (required if no multiple drifts specified).
+        Mean drift rate (required_params if no multiple drifts specified).
     a : float
         Boundary separation (>0).
     z : float
@@ -322,7 +337,7 @@ def _simulate_schedule_ddm(
         t = 0.0
         tau_i = tau[i]
         seg_idx = 0
-        next_switch = seg_switch[0] if num_segments > 0 else np.inf
+        next_switch = segment_switch[0] if num_segments > 0 else np.inf
 
         for _ in range(max_steps):
             t += dt
@@ -330,7 +345,7 @@ def _simulate_schedule_ddm(
 
             if seg_idx < num_segments - 1 and t > next_switch - 1e-6:
                 seg_idx += 1
-                next_switch = seg_switch[seg_idx]
+                next_switch = segment_switch[seg_idx]
 
             vi = v[i, seg_idx]
             x += vi * dt + sigma * np.sqrt(dt) * np.random.normal()
@@ -347,4 +362,7 @@ def _simulate_schedule_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
 
-    return np.stack([rts, choices], axis=1)
+    result = np.zeros((batch_size, 2))
+    result[:, 0] = rts
+    result[:, 1] = choices
+    return result

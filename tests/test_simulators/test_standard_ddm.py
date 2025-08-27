@@ -3,6 +3,7 @@ import numpy as np
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import StandardDDM
 
+
 def test_standard_ddm():
     model_family = NestedModelFamily(["v", "a", "z", "tau", "s_v", "sigma"])
     model_family.add_variant(
