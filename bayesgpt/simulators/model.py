@@ -15,6 +15,6 @@ class Model(ABC):
 
     @abstractmethod
     def simulate(
-        self, params: dict[str, float], batch_size: int
+        self, params: dict[str, float], batch_size: int, num_samples: int
     ) -> Union[np.ndarray, Mapping[str, np.ndarray]]:
         pass

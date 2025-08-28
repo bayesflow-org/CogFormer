@@ -139,7 +139,7 @@ class Tokenizer:
             if self.active_mask[i] == 0.0:
                 continue
             if self.infer_mask[i] == 1.0:
-                full_parameters[name] = float(sample_parameters[name][0])
+                full_parameters[name] = sample_parameters[name]
             elif name in self.fixed_parameters:
                 full_parameters[name] = self.fixed_parameters[name]
             else:

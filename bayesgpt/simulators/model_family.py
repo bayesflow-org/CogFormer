@@ -30,6 +30,7 @@ class NestedModelFamily:
         model: type[Model],
         free_parameters: dict[str, Callable[[int, Optional[np.ndarray]], np.ndarray]],
         fixed_parameters: dict[str, float],
+        num_samples: int = 1,
         fallback_value: float = 0.0,
     ):
         """
@@ -45,6 +46,8 @@ class NestedModelFamily:
             Sampling functions for free parameters, accepting batch_size and context.
         fixed_parameters : dict
             Fixed values for some parameters.
+        num_samples : int
+            Number of samples to generate.
         fallback_value : float
             Default value for unspecified parameters.
         """
@@ -59,7 +62,7 @@ class NestedModelFamily:
             fallback_value=fallback_value,
         )
 
-        self.variants[name] = ModelVariant(name=name, model=model, tokenizer=tokenizer)
+        self.variants[name] = ModelVariant(name=name, model=model, tokenizer=tokenizer, num_samples=num_samples)
 
     def remove_variant(self, name: str):
         """

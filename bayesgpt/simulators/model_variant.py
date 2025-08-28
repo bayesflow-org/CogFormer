@@ -21,11 +21,12 @@ class ModelVariant:
         Configuration object that manages sampling, value fixing, and masking of parameters.
     """
 
-    def __init__(self, name: str, model: type[Model], tokenizer: Tokenizer):
+    def __init__(self, name: str, model: type[Model], tokenizer: Tokenizer, num_samples):
         self.name = name
         self.model: Model = model()
         self.tokenizer = tokenizer
         self.parameter_names = list(tokenizer.parameter_names)
+        self.num_samples = num_samples
 
     def sample(
         self, batch_size: int, context: Optional[np.ndarray] = None
@@ -56,7 +57,7 @@ class ModelVariant:
         params_dict = self.tokenizer.combine(sampled_parameters, batch_size)
 
         # Run simulator
-        sim_data = self.model.simulate(params_dict, batch_size)
+        sim_data = self.model.simulate(params_dict, batch_size, self.num_samples)
 
         # Build full set of parameters
         base_values = np.tile(self.tokenizer.get_base_values(), (batch_size, 1)).astype(np.float32)

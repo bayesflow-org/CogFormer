@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Union
 from numba import njit, prange
 from ..model import Model
 
@@ -17,7 +18,9 @@ class StandardDDM(Model):
         self.max_steps = max_steps
 
     def simulate(
-        self, params: dict[str, float], batch_size: int
+        self,
+        params: dict[str, Union[float, np.ndarray]],
+        num_trials: int = 1
     ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials.
@@ -26,14 +29,14 @@ class StandardDDM(Model):
         ----------
         params : dict[str, float]
             Dictionary containing model parameters: v, a, z, tau, s_v, sigma.
-        batch_size : int
+        num_trials : int
             Number of trials to simulate.
 
         Returns
         -------
         dict[str, np.ndarray]
             Dictionary with keys 'rts' and 'choices', each mapping to an array
-            of shape (batch_size,) containing response times and choices.
+            of shape (num_trials,) containing response times and choices.
 
         Raises
         ------
@@ -45,9 +48,17 @@ class StandardDDM(Model):
         required_params = ["v", "a", "z", "tau", "s_v", "sigma"]
         if not all(k in params for k in required_params):
             raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
-        if params["a"] <= 0 or params["sigma"] <= 0 or not (0 < params["z"] < 1):
+
+        # Convert parameters to arrays if scalars
+        params = {k: np.full(num_trials, v) if np.isscalar(v) else v for k, v in params.items()}
+
+        if not all(p.shape == (num_trials,) for p in params.values()):
+            raise ValueError("All parameters must be scalars or arrays of shape (num_trials,)")
+        
+        # Validate
+        if np.any(params["a"] <= 0) or np.any(params["sigma"] <= 0) or np.any((params["z"] <= 0) | (params["z"] >= 1)):
             raise ValueError("Invalid parameter values: a, sigma must be > 0, 0 < z < 1")
-        if params["tau"] < 0 or params["s_v"] < 0:
+        if np.any(params["tau"] < 0) or np.any(params["s_v"]) < 0:
             raise ValueError("Invalid parameter values: tau, s_v must be >= 0")
 
         # Unpack params
@@ -60,22 +71,22 @@ class StandardDDM(Model):
 
         # Simulate
         result = _simulate_standard_ddm(
-            v, a, z, tau, s_v, sigma, self.dt, self.max_steps, batch_size
+            v, a, z, tau, s_v, sigma, self.dt, self.max_steps, num_trials
         )
         return {"rts": result[:, 0], "choices": result[:, 1]}
 
 
 @njit
 def _simulate_standard_ddm(
-    v: float,
-    a: float,
-    z: float,
-    tau: float,
-    s_v: float,
-    sigma: float,
+    v: float | np.ndarray,
+    a: float | np.ndarray,
+    z: float | np.ndarray,
+    tau: float | np.ndarray,
+    s_v: float | np.ndarray,
+    sigma: float | np.ndarray,
     dt: float,
     max_steps: int,
-    batch_size: int,
+    num_trials: int,
 ) -> np.ndarray:
     """
     Internal function to simulate the standard DDM.
@@ -97,17 +108,17 @@ def _simulate_standard_ddm(
 
     Returns
     -------
-    np.ndarray of shape (batch_size, 2) for the following simulated data:
+    np.ndarray of shape (num_trials, 2) for the following simulated data:
         - rts: reaction time for each trial
         - choices: choices for each trial
     """
 
     # Create buffers
-    rts = np.zeros(batch_size)
-    choices = np.zeros(batch_size)
+    rts = np.zeros(num_trials)
+    choices = np.zeros(num_trials)
 
     # Simulate
-    for i in prange(batch_size):
+    for i in prange(num_trials):
         vi = np.random.normal(v, s_v)
         x = z * a
         t = 0.0
@@ -128,7 +139,7 @@ def _simulate_standard_ddm(
             choices[i] = np.nan
 
     # Store results
-    result = np.zeros((batch_size, 2))
+    result = np.zeros((num_trials, 2))
     result[:, 0] = rts
     result[:, 1] = choices
     return result
