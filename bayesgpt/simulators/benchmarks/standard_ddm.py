@@ -93,17 +93,17 @@ def _simulate_standard_ddm(
 
     Parameters
     ----------
-    v : float
+    v : float or np.ndarray
         Drift rate.
-    a : float
+    a : float or np.ndarray
         Boundary separation.
-    z : float
+    z : float or np.ndarray
         Starting point as fraction of boundary (0 < z < 1).
-    tau : float
+    tau : float or np.ndarray
         Non-decision time.
-    s_v : float
+    s_v : float or np.ndarray
         Drift variability.
-    sigma : float
+    sigma : float or np.ndarray
         Diffusion noise.
 
     Returns
@@ -123,7 +123,7 @@ def _simulate_standard_ddm(
         x = z * a
         t = 0.0
 
-        for _ in range(max_steps):
+        for step in range(max_steps):
             x += vi * dt + sigma * np.sqrt(dt) * np.random.normal()
             t += dt
             if x >= a:

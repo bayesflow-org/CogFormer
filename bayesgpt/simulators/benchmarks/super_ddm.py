@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Union
 from numba import njit, prange
 from ..model import Model
 
@@ -47,7 +48,9 @@ class SuperDDM(Model):
         self.max_steps = max_steps
 
     def simulate(
-        self, params: dict[str, float], batch_size: int
+        self,
+        params: dict[str, Union[float, np.ndarray]],
+        num_trials: int = 1
     ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials.
