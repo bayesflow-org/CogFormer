@@ -19,9 +19,17 @@ class ModelVariant:
         A callable class implementing a `.simulate(params: dict, batch_size: int)` method.
     tokenizer : Tokenizer
         Configuration object that manages sampling, value fixing, and masking of parameters.
+    num_samples: int
+        Number of samples to generate.
     """
 
-    def __init__(self, name: str, model: type[Model], tokenizer: Tokenizer, num_samples):
+    def __init__(
+        self,
+        name: str,
+        model: type[Model],
+        tokenizer: Tokenizer,
+        num_samples: int
+    ):
         self.name = name
         self.model: Model = model()
         self.tokenizer = tokenizer
@@ -29,7 +37,9 @@ class ModelVariant:
         self.num_samples = num_samples
 
     def sample(
-        self, batch_size: int, context: Optional[np.ndarray] = None
+        self,
+        batch_size: int,
+        context: Optional[np.ndarray] = None
     ) -> dict[str, Union[np.ndarray, Mapping[str, np.ndarray]]]:
         """
         Simulate data and return full parameter vectors.
