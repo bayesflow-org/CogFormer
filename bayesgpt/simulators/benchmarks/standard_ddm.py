@@ -20,7 +20,9 @@ class StandardDDM(Model):
     def simulate(
         self,
         params: dict[str, Union[float, np.ndarray]],
-        num_trials: int = 1
+        num_samples: int = 1,
+        batch_size: int = 1,
+        flatten: bool = True,
     ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials.
@@ -29,8 +31,12 @@ class StandardDDM(Model):
         ----------
         params : dict[str, float]
             Dictionary containing model parameters: v, a, z, tau, s_v, sigma.
-        num_trials : int
+        batch_size : int
+            Number of batches to simulate, where each batch corresponds to a single participant.
+        num_samples : int
             Number of trials to simulate.
+        flatten : bool
+            Whether to flatten the simulated data.
 
         Returns
         -------
@@ -50,10 +56,11 @@ class StandardDDM(Model):
             raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
 
         # Convert parameters to arrays if scalars
-        params = {k: np.full(num_trials, v) if np.isscalar(v) else v for k, v in params.items()}
+        params = {k: np.full(num_samples, v) if np.isscalar(v) else v for k, v in params.items()}
+        print(params)
 
-        if not all(p.shape == (num_trials,) for p in params.values()):
-            raise ValueError("All parameters must be scalars or arrays of shape (num_trials,)")
+        if not all(p.shape == (num_samples,) for p in params.values()):
+            raise ValueError("All parameters must be scalars or arrays of shape (num_samples,)")
         
         # Validate
         if np.any(params["a"] <= 0) or np.any(params["sigma"] <= 0) or np.any((params["z"] <= 0) | (params["z"] >= 1)):
@@ -69,15 +76,26 @@ class StandardDDM(Model):
         s_v = params["s_v"]
         sigma = params["sigma"]
 
+
         # Simulate
-        result = _simulate_standard_ddm(
-            v, a, z, tau, s_v, sigma, self.dt, self.max_steps, num_trials
-        )
-        return {"rts": result[:, 0], "choices": result[:, 1]}
+        rts = []
+        choices = []
+
+        for i in range(batch_size):
+            result = simulate_standard_ddm(
+                v, a, z, tau, s_v, sigma, self.dt, self.max_steps, num_samples
+            )
+            rts.append(result[:, 0])
+            choices.append(result[:, 1])
+
+        rts = np.array(rts).flatten() if flatten else np.array(rts)
+        choices = np.array(choices) if flatten else np.array(choices)
+
+        return {"rts": rts, "choices": choices}
 
 
 @njit
-def _simulate_standard_ddm(
+def simulate_standard_ddm(
     v: float | np.ndarray,
     a: float | np.ndarray,
     z: float | np.ndarray,
@@ -86,7 +104,7 @@ def _simulate_standard_ddm(
     sigma: float | np.ndarray,
     dt: float,
     max_steps: int,
-    num_trials: int,
+    num_trials: int | tuple,
 ) -> np.ndarray:
     """
     Internal function to simulate the standard DDM.
@@ -105,6 +123,12 @@ def _simulate_standard_ddm(
         Drift variability.
     sigma : float or np.ndarray
         Diffusion noise.
+    dt : float
+        Interval per time step.
+    max_steps : int
+        Maximum number of simulation steps.
+    num_trials : int or tuple
+        Number of trials to simulate.
 
     Returns
     -------

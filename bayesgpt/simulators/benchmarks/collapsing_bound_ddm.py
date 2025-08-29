@@ -14,7 +14,11 @@ class CollapsingBoundDDM(StandardDDM):
     """
 
     def simulate(
-        self, params: dict[str, Union[float, np.ndarray]], num_trials: int
+        self,
+        params: dict[str, Union[float, np.ndarray]],
+        batch_size: int = 1,
+        num_samples: int = 1,
+        flatten: bool = True,
     ) -> dict[str, np.ndarray]:
         """
         Simulate response times and choices for a batch of trials with collapsing bounds.
@@ -23,8 +27,12 @@ class CollapsingBoundDDM(StandardDDM):
         ----------
         params : dict[str, float]
             Dictionary containing model parameters: v, a, z, tau, s_v, sigma, angle.
-        num_trials : int
+        batch_size : int
+            Number of batches to simulate, where each batch corresponds to a single participant.
+        num_samples : int
             Number of trials to simulate.
+        flatten : bool
+            Whether to flatten the simulated data.
 
         Returns
         -------
@@ -39,13 +47,14 @@ class CollapsingBoundDDM(StandardDDM):
 
         # Sanity check
         required_params = ["v", "a", "z", "tau", "s_v", "sigma", "angle"]
+
         if not all(k in params for k in required_params):
             raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
 
         params = {
-            k: np.full(num_trials, v) if np.isscalar(v) else v for k, v in params.items()
+            k: np.full(num_samples, v) if np.isscalar(v) else v for k, v in params.items()
         }
-        if not all(p.shape == (num_trials,) for p in params.values()):
+        if not all(p.shape == (num_samples,) for p in params.values()):
             raise ValueError("All parameters must be scalars or arrays of shape (num_trials,)")
 
         # Validate
@@ -64,14 +73,24 @@ class CollapsingBoundDDM(StandardDDM):
         angle = params["angle"]
 
         # Simulate
-        result = _simulate_collapsing_bound_ddm(
-            v, a, z, tau, s_v, sigma, angle, self.dt, self.max_steps, num_trials
-        )
-        return {"rts": result[:, 0], "choices": result[:, 1]}
+        rts = []
+        choices = []
+
+        for i in range(batch_size):
+            result = simulate_collapsing_bound_ddm(
+                v, a, z, tau, s_v, sigma, angle, self.dt, self.max_steps, num_samples
+            )
+            rts.append(result[:, 0])
+            choices.append(result[:, 1])
+
+        rts = np.array(rts).flatten() if flatten else np.array(rts)
+        choices = np.array(choices) if flatten else np.array(choices)
+
+        return {"rts": rts, "choices": choices}
 
 
 @njit
-def _simulate_collapsing_bound_ddm(
+def simulate_collapsing_bound_ddm(
     v: float | np.ndarray,
     a: float | np.ndarray,
     z: float | np.ndarray,
@@ -102,6 +121,12 @@ def _simulate_collapsing_bound_ddm(
         Diffusion noise.
     angle : float or np.ndarray
         Collapse rate. If 0, reduces to standard DDM.
+    dt : float
+        Interval per time step.
+    max_steps : int
+        Maximum number of simulation steps.
+    num_trials : int or tuple
+        Number of trials to simulate.
 
     Returns
     -------
