@@ -228,47 +228,26 @@ class SuperDDM(Model):
 
 @njit
 def simulate_super_ddm(
-    v: np.ndarray, 
-    a: np.ndarray, 
-    z: np.ndarray, 
-    tau: np.ndarray, 
+    v: np.ndarray,
+    a: np.ndarray,
+    z: np.ndarray,
+    tau: np.ndarray,
     s_v: np.ndarray,
-    sigma: np.ndarray, 
-    angle: np.ndarray, 
-    s_z: np.ndarray, 
+    sigma: np.ndarray,
+    angle: np.ndarray,
+    s_z: np.ndarray,
     s_tau: np.ndarray,
-    dt: float, 
-    max_steps: int, 
+    dt: float,
+    max_steps: int,
     num_trials: int
 ) -> np.ndarray:
-    """
-    Simulate SuperDDM with single or mixture drift for num_trials trials.
-
-    Parameters
-    ----------
-    v : np.ndarray
-        Drift rate or components, shape (num_trials,) or (num_trials, num_components).
-    a, z, tau, s_v, sigma, angle, s_z, s_tau : np.ndarray
-        Parameters of shape (num_trials,).
-    dt : float
-        Time step.
-    max_steps : int
-        Maximum simulation steps.
-    num_trials : int
-        Number of trials.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_trials, 2) with columns [rts, choices].
-    """
-
     result = np.zeros((num_trials, 2))
     rts, choices = result[:, 0], result[:, 1]
     for i in prange(num_trials):
-        v_i = np.random.normal(np.mean(v[i]) if v.shape != (num_trials,) else v[i], s_v[i])
+        v_i = np.random.normal(np.mean(v[i]) if v.ndim > 1 else v[i], s_v[i])
         z_i = np.random.normal(z[i], s_z[i])
-        z_i = np.clip(z_i, 0.001, 0.999)
+        # Replace np.clip with scalar min/max
+        z_i = max(min(z_i, 0.999), 0.001)
         tau_i = np.random.normal(tau[i], s_tau[i])
         tau_i = max(tau_i, 0.0)
         x = z_i * a[i]
