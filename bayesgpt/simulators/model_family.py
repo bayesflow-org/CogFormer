@@ -4,7 +4,7 @@ from typing import Union, Optional, List, Tuple, Type
 
 from .model import Model
 from .model_variant import ModelVariant
-from ..utils.tokenizer import Tokenizer
+from simulators.tokenizer import Tokenizer
 
 
 class NestedModelFamily:

@@ -3,7 +3,7 @@ from typing import Union, Optional
 from collections.abc import Mapping
 
 from .model import Model
-from ..utils.tokenizer import Tokenizer
+from simulators.tokenizer import Tokenizer
 
 
 class ModelVariant:
