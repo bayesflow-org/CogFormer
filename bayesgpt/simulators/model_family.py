@@ -24,12 +24,13 @@ class NestedModelFamily:
         self.parameter_names = list(parameter_names)
         self.variants: dict[str, ModelVariant] = {}
 
+    # noinspection PyTypeChecker
     def add_variant(
         self,
         name: str,
         model: type[Model],
-        fixed_parameters: dict[str, Union[float, np.ndarray, Callable[[int], np.ndarray]]],
-        free_parameters: dict[str, Callable[[int, Optional[np.ndarray]], np.ndarray]],
+        fixed_parameters: Mapping[str, Union[float, np.ndarray, Callable[[int], np.ndarray]]],
+        free_parameters: Mapping[str, Callable[[int, Optional[np.ndarray]], np.ndarray]],
         num_samples: int = 1,
     ):
         """
@@ -54,8 +55,8 @@ class NestedModelFamily:
         tokenizer = Tokenizer(
             parameter_names=self.parameter_names,
             variant_parameters=set(free_parameters.keys()) | set(fixed_parameters.keys()),
-            free_parameters=free_parameters,
-            fixed_parameters=fixed_parameters
+            fixed_parameters=fixed_parameters,
+            free_parameters=free_parameters
         )
 
         self.variants[name] = ModelVariant(name=name, model=model, tokenizer=tokenizer, num_samples=num_samples)

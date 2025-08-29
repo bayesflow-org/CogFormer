@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Optional, Union, Callable, Dict, Tuple
+from collections.abc import Mapping
 import matplotlib.pyplot as plt
 
 class Tokenizer:
@@ -39,8 +40,8 @@ class Tokenizer:
         *,
         parameter_names: list[str],
         variant_parameters: set[str],
-        fixed_parameters: dict[str, Union[float, np.ndarray, Callable[[int], np.ndarray]]] | None = None,
-        free_parameters: dict[str, Callable[[int, Optional[np.ndarray]], np.ndarray]] | None = None,
+        fixed_parameters: Mapping[str, Union[float, np.ndarray, Callable[[int], np.ndarray]]] | None = None,
+        free_parameters: Mapping[str, Callable[[int, Optional[np.ndarray]], np.ndarray]] | None = None,
         parameter_dims: dict[str, int] | None = None,
         constraints: dict[str, Callable[[np.ndarray], np.ndarray]] | None = None,
         context_shape: tuple[int, ...] | None = None,
