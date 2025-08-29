@@ -4,7 +4,7 @@ from typing import Union, Optional, List, Tuple, Type
 
 from .model import Model
 from .model_variant import ModelVariant
-from ..utils.simulator_utils import Tokenizer
+from ..utils.tokenizer import Tokenizer
 
 
 class NestedModelFamily:
@@ -28,10 +28,9 @@ class NestedModelFamily:
         self,
         name: str,
         model: type[Model],
+        fixed_parameters: dict[str, Union[float, np.ndarray, Callable[[int], np.ndarray]]],
         free_parameters: dict[str, Callable[[int, Optional[np.ndarray]], np.ndarray]],
-        fixed_parameters: dict[str, float],
         num_samples: int = 1,
-        fallback_value: float = 0.0,
     ):
         """
         Adds a new variant to the model family.
@@ -41,25 +40,22 @@ class NestedModelFamily:
         name : str
             Name of the variant.
         model : type
-            Model class implementing simulate(params: dict, batch_size: int) -> np.ndarray or Mapping
+            Model class implementing simulate(params: dict, batch_size: int, num_samples: int) -> np.ndarray or Mapping
         free_parameters : dict
             Sampling functions for free parameters, accepting batch_size and context.
         fixed_parameters : dict
             Fixed values for some parameters.
         num_samples : int
             Number of samples to generate.
-        fallback_value : float
-            Default value for unspecified parameters.
         """
-        # Update global schema if new parameters are introduced
         new_params = set(free_parameters.keys()) | set(fixed_parameters.keys()) - set(self.parameter_names)
         self.parameter_names.extend(new_params)
 
         tokenizer = Tokenizer(
             parameter_names=self.parameter_names,
+            variant_parameters=set(free_parameters.keys()) | set(fixed_parameters.keys()),
             free_parameters=free_parameters,
-            fixed_parameters=fixed_parameters,
-            fallback_value=fallback_value,
+            fixed_parameters=fixed_parameters
         )
 
         self.variants[name] = ModelVariant(name=name, model=model, tokenizer=tokenizer, num_samples=num_samples)
@@ -104,7 +100,7 @@ class NestedModelFamily:
         """
         for name, model, free_parameters, fixed_parameters, fallback_value in variants:
             self.add_variant(
-                name, model, free_parameters, fixed_parameters, fallback_value
+                name, model, free_parameters, fixed_parameters, num_samples=1
             )
 
     def remove_all_variants(self):
@@ -136,18 +132,15 @@ class NestedModelFamily:
         - full_params : np.ndarray
             Values of sampled and fixed parameters.
         - inference_conditions : np.ndarray
-            Concatenated inference conditions (masks, base values, etc.).
+            Concatenated inference conditions (mask, base values, etc.).
         """
-        # Sanity check
         if variant_name not in self.variants:
             raise KeyError(f"Variant '{variant_name}' not found in the model family.")
 
-        # Sample data from model variants
         variant = self.variants[variant_name]
         samples = variant.sample(batch_size=batch_size, context=context)
         output = samples
 
-        # Check for non-terminating trials
         sim_data = output["sim_data"]
         if isinstance(sim_data, np.ndarray):
             nan_count = np.isnan(sim_data).sum()
@@ -156,23 +149,19 @@ class NestedModelFamily:
         if nan_count > 0:
             print(f"Warning: {variant_name} has {nan_count} non-terminating trials")
 
-        # Get variant encoder
-        variant_encoder = self.get_variant_encoder(
-            variant_name=variant_name, batch_size=batch_size
-        )
+        one_hot_variant = self.get_variant_encoder(variant_name=variant_name, batch_size=batch_size)
         inference_conditions = variant.build_inference_conditions(
             batch_size=batch_size,
-            variant_encoder=variant_encoder,
-            context_encoder=context,
+            one_hot_variant=one_hot_variant,
+            context=context,
         )
 
         output["inference_conditions"] = inference_conditions["full_conditions"]
-
         return output
 
-    def get_infer_mask(self, variant_name: str, batch_size: int) -> np.ndarray:
+    def get_mask(self, variant_name: str, batch_size: int) -> np.ndarray:
         """
-        Returns the binary parameter mask for a given variant.
+        Returns the tri-state parameter mask for a given variant.
 
         Parameters
         ----------
@@ -184,12 +173,12 @@ class NestedModelFamily:
         Returns
         -------
         np.ndarray of shape (batch_size, num_parameters)
-            Mask where 1.0 indicates a free parameter.
+            Tri-state mask where -1.0 indicates inactive, 0.0 fixed, and 1.0 free parameters.
         """
         if variant_name not in self.variants:
             raise KeyError(f"Variant '{variant_name}' not found in the model family.")
 
-        return self.variants[variant_name].get_infer_mask(batch_size)
+        return self.variants[variant_name].get_mask(batch_size)
 
     def get_variant_encoder(self, variant_name: str, batch_size: int) -> np.ndarray:
         """
