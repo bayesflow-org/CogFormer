@@ -1,6 +1,6 @@
 import numpy as np
 from collections.abc import Callable, Mapping
-from typing import Union, Optional, List, Tuple, Type
+from typing import Union, Optional, List, Tuple, Type, Literal
 
 from .model import Model
 from .model_variant import ModelVariant
@@ -111,7 +111,12 @@ class NestedModelFamily:
         self.variants.clear()
 
     def sample(
-        self, variant_name: str, batch_size: int, context: Optional[np.ndarray] = None
+        self,
+        variant_name: str,
+        batch_size: int,
+        context: Optional[np.ndarray] = None,
+        *,
+        flatten: bool = True
     ) -> dict[str, Union[np.ndarray, Mapping[str, np.ndarray]]]:
         """
         Samples a batch of simulations from a specified variant.
@@ -124,6 +129,8 @@ class NestedModelFamily:
             Number of simulations to run.
         context : np.ndarray, optional
             Context array to condition parameter sampling.
+        flatten: bool, optional
+            Whether to flatten samples.
 
         Returns
         -------
@@ -139,7 +146,7 @@ class NestedModelFamily:
             raise KeyError(f"Variant '{variant_name}' not found in the model family.")
 
         variant = self.variants[variant_name]
-        samples = variant.sample(batch_size=batch_size, context=context)
+        samples = variant.sample(batch_size=batch_size, context=context, flatten=flatten)
         output = samples
 
         sim_data = output["sim_data"]

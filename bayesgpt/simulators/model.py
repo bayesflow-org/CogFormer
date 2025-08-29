@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Union
+from typing import Union, Literal
 import numpy as np
 
 class Model(ABC):
@@ -13,7 +13,8 @@ class Model(ABC):
         self,
         params: dict[str, np.ndarray],
         batch_size: int,
-        num_samples: int
+        num_samples: int,
+        flatten: bool = True
     ) -> Union[np.ndarray, Mapping[str, np.ndarray]]:
         """
         Simulate data from the model.
@@ -26,6 +27,8 @@ class Model(ABC):
             Number of simulations to run.
         num_samples : int
             Number of samples per simulation (e.g., trials in DDM).
+        flatten : bool
+            Whether to flatten the simulated data.
 
         Returns
         -------

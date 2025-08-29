@@ -39,7 +39,9 @@ class ModelVariant:
     def sample(
         self,
         batch_size: int,
-        context: Optional[np.ndarray] = None
+        context: Optional[np.ndarray] = None,
+        *,
+        flatten: bool = True,
     ) -> dict[str, Union[np.ndarray, Mapping[str, np.ndarray]]]:
         """
         Simulate data and return full parameter vectors.
@@ -50,6 +52,8 @@ class ModelVariant:
             Number of simulations to run.
         context : np.ndarray, optional
             Context array to condition parameter sampling.
+        flatten : bool, optional
+            Whether to flatten the simulated data.
 
         Returns
         -------
@@ -66,7 +70,7 @@ class ModelVariant:
         params_dict = self.tokenizer.combine(sampled_parameters, batch_size)
 
         # Run simulator
-        sim_data = self.model.simulate(params_dict, batch_size, self.num_samples)
+        sim_data = self.model.simulate(params_dict, batch_size, self.num_samples, flatten=flatten)
 
         # Build full set of parameters
         base_values = self.tokenizer.get_base_values(batch_size=1)
