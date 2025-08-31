@@ -27,7 +27,7 @@ class SuperDDM(Model):
     def simulate(
         self,
         params: dict[str, Union[float, np.ndarray]],
-        num_trials: int = 1,
+        num_samples: int = 1,
         context: Optional[np.ndarray] = None,
         context_modulation: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
     ) -> dict[str, np.ndarray]:
@@ -50,10 +50,10 @@ class SuperDDM(Model):
             - p_components : array, probabilities for mixture components (sums to 1, default uniform).
             - v_schedule : array, drift rates for within-trial piecewise-constant segments.
             - t_schedule : array, durations (seconds) for each segment (>0).
-        num_trials : int, optional
+        num_samples : int, optional
             Number of trials to simulate, by default 1.
         context : np.ndarray, optional
-            Context array (shape: (num_trials,)) to modulate drift rates, e.g., task difficulty.
+            Context array (shape: (num_samples,)) to modulate drift rates, e.g., task difficulty.
         context_modulation : callable, optional
             Function to modulate drift rates: f(v, context) -> modulated_v.
 
@@ -61,9 +61,9 @@ class SuperDDM(Model):
         -------
         dict[str, np.ndarray]
             Dictionary with keys:
-            - 'rts': Response times (shape: (num_trials,)).
-            - 'choices': Choices (0 or 1, shape: (num_trials,)).
-            - 'context': Input context (if provided, shape: (num_trials,)).
+            - 'rts': Response times (shape: (num_samples,)).
+            - 'choices': Choices (0 or 1, shape: (num_samples,)).
+            - 'context': Input context (if provided, shape: (num_samples,)).
 
         Raises
         ------
@@ -76,17 +76,17 @@ class SuperDDM(Model):
         >>> params = {"v": 0.5, "a": 1.0, "z": 0.5, "tau": 0.1, "sigma": 1.0,
         ...           "angle": 0.0, "s_v": 0.1, "s_z": 0.0, "s_tau": 0.0}
         >>> context = np.random.uniform(0.5, 1.5, 100)
-        >>> result = model.simulate(params, num_trials=100, context=context,
+        >>> result = model.simulate(params, num_samples=100, context=context,
         ...                         context_modulation=lambda v, c: v * c)
         """
         # Process and validate input parameters
-        params = self._process_parameters(params, num_trials)
-        self._validate_parameters(params, num_trials)
+        params = self._process_parameters(params, num_samples)
+        self._validate_parameters(params, num_samples)
 
         # Modulate drift rates with context if provided
         if context is not None and context_modulation is not None:
-            if context.shape != (num_trials,):
-                raise ValueError(f"Context must have shape ({num_trials},), got {context.shape}")
+            if context.shape != (num_samples,):
+                raise ValueError(f"Context must have shape ({num_samples},), got {context.shape}")
             if "v_schedule" in params:
                 params["v_schedule"] = context_modulation(params["v_schedule"], context[:, None])
             elif "v_components" in params:
@@ -109,12 +109,14 @@ class SuperDDM(Model):
                 s_tau=params["s_tau"],
                 dt=self.dt,
                 max_steps=self.max_steps,
-                num_trials=num_trials,
+                num_samples=num_samples,
             )
         else:
             v = params.get("v_components", params.get("v"))
+            p = params.get("p_components", None)
             result = simulate_super_ddm(
                 v=v,
+                p=p,
                 a=params["a"],
                 z=params["z"],
                 tau=params["tau"],
@@ -125,7 +127,7 @@ class SuperDDM(Model):
                 s_tau=params["s_tau"],
                 dt=self.dt,
                 max_steps=self.max_steps,
-                num_trials=num_trials,
+                num_samples=num_samples,
             )
 
         # Construct output with optional context
@@ -134,11 +136,10 @@ class SuperDDM(Model):
             output["context"] = context
         return output
 
-
     def _process_parameters(
         self,
         params: dict[str, Union[float, np.ndarray]],
-        num_trials: int
+        num_samples: int
     ) -> dict[str, np.ndarray]:
         """Process parameters to arrays of consistent shape.
 
@@ -146,13 +147,13 @@ class SuperDDM(Model):
         ----------
         params : dict[str, Union[float, np.ndarray]]
             Input parameters to process.
-        num_trials : int
+        num_samples : int
             Number of trials.
 
         Returns
         -------
         dict[str, np.ndarray]
-            Processed parameters with shapes (num_trials,) or (num_trials, num_segments).
+            Processed parameters with shapes (num_samples,) or (num_samples, num_segments).
 
         Raises
         ------
@@ -172,38 +173,38 @@ class SuperDDM(Model):
 
         # Handle parameter aliases
         if "z_arr" in params:
-            params["z"] = np.full(num_trials, params["z_arr"]) if np.isscalar(params["z_arr"]) else params["z_arr"]
+            params["z"] = np.full(num_samples, params["z_arr"]) if np.isscalar(params["z_arr"]) else params["z_arr"]
             del params["z_arr"]
         if "tau_arr" in params:
-            params["tau"] = np.full(num_trials, params["tau_arr"]) if np.isscalar(params["tau_arr"]) else params["tau_arr"]
+            params["tau"] = np.full(num_samples, params["tau_arr"]) if np.isscalar(params["tau_arr"]) else params["tau_arr"]
             del params["tau_arr"]
 
         # Broadcast scalar parameters to arrays
         for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
             if key in params:
-                params[key] = np.full(num_trials, params[key]) if np.isscalar(params[key]) else params[key]
+                params[key] = np.full(num_samples, params[key]) if np.isscalar(params[key]) else params[key]
 
         # Handle mixture or scheduled drifts
         if "v_components" in params:
             params["v_components"] = (
-                np.full((num_trials, params["v_components"].shape[-1]), params["v_components"])
+                np.full((num_samples, params["v_components"].shape[-1]), params["v_components"])
                 if params["v_components"].ndim == 1
                 else params["v_components"]
             )
             if "p_components" in params:
                 params["p_components"] = (
-                    np.full((num_trials, params["v_components"].shape[-1]), params["p_components"])
+                    np.full((num_samples, params["v_components"].shape[-1]), params["p_components"])
                     if params["p_components"].ndim == 1
                     else params["p_components"]
                 )
         if "v_schedule" in params:
             params["v_schedule"] = (
-                np.full((num_trials, params["v_schedule"].shape[-1]), params["v_schedule"])
+                np.full((num_samples, params["v_schedule"].shape[-1]), params["v_schedule"])
                 if params["v_schedule"].ndim == 1
                 else params["v_schedule"]
             )
             params["t_schedule"] = (
-                np.full((num_trials, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0))
+                np.full((num_samples, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0))
                 if "t_schedule" not in params or params["t_schedule"].ndim == 1
                 else params["t_schedule"]
             )
@@ -213,7 +214,7 @@ class SuperDDM(Model):
     def _validate_parameters(
         self,
         params_array: dict[str, np.ndarray],
-        num_trials: int
+        num_samples: int
     ) -> None:
         """Validate parameter shapes and values.
 
@@ -221,7 +222,7 @@ class SuperDDM(Model):
         ----------
         params_array : dict[str, np.ndarray]
             Processed parameters to validate.
-        num_trials : int
+        num_samples : int
             Number of trials.
 
         Raises
@@ -232,11 +233,11 @@ class SuperDDM(Model):
         # Validate parameter shapes
         for key, param in params_array.items():
             if key in ["v_components", "v_schedule", "t_schedule", "p_components"]:
-                if param.shape[0] != num_trials:
-                    raise ValueError(f"{key} must have shape (num_trials, num_segments)")
+                if param.shape[0] != num_samples:
+                    raise ValueError(f"{key} must have shape (num_samples, num_segments)")
             else:
-                if param.shape != (num_trials,):
-                    raise ValueError(f"{key} must have shape (num_trials,)")
+                if param.shape != (num_samples,):
+                    raise ValueError(f"{key} must have shape (num_samples,)")
         if "t_schedule" in params_array and params_array["t_schedule"].shape != params_array["v_schedule"].shape:
             raise ValueError("t_schedule must have same shape as v_schedule")
         if "p_components" in params_array and params_array["p_components"].shape != params_array["v_components"].shape:
@@ -252,10 +253,10 @@ class SuperDDM(Model):
         if "p_components" in params_array and np.any(params_array["p_components"] < 0):
             raise ValueError("p_components must be >= 0")
 
-
 @njit
 def simulate_super_ddm(
     v: np.ndarray,
+    p: np.ndarray,
     a: np.ndarray,
     z: np.ndarray,
     tau: np.ndarray,
@@ -266,48 +267,50 @@ def simulate_super_ddm(
     s_tau: np.ndarray,
     dt: float,
     max_steps: int,
-    num_trials: int
+    num_samples: int
 ) -> np.ndarray:
     """Simulate DDM with single or mixture drift rates.
 
     Parameters
     ----------
     v : np.ndarray
-        Drift rate(s), shape (num_trials,) or (num_trials, num_components).
+        Drift rate(s), shape (num_samples,) or (num_samples, num_components).
+    p : np.ndarray
+        Probabilities for mixture components, shape (num_samples, num_components) or None.
     a, z, tau, s_v, sigma, angle, s_z, s_tau : np.ndarray
-        Parameters, shape (num_trials,).
+        Parameters, shape (num_samples,).
     dt : float
         Time step.
     max_steps : int
         Maximum simulation steps.
-    num_trials : int
+    num_samples : int
         Number of trials.
 
     Returns
     -------
     np.ndarray
-        Array of shape (num_trials, 2) with columns [rts, choices].
+        Array of shape (num_samples, 2) with columns [rts, choices].
     """
-    # Buffer
-    result = np.zeros((num_trials, 2))
+    result = np.zeros((num_samples, 2))
     rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate
-    for i in prange(num_trials):
+    for i in prange(num_samples):
         # Select drift rate (single or random choice from components)
-        v_i = v[i] if v.ndim == 1 else np.random.choice(v[i])
+        if v.ndim == 1:
+            v_i = v[i]
+        else:
+            # Use uniform probabilities if p is None, else use provided probabilities
+            p_i = np.ones(v.shape[1]) / v.shape[1] if p is None else p[i]
+            v_i = weighted_choice(v[i], p_i)  # Replace np.random.choice
         v_i = np.random.normal(v_i, s_v[i])
-
         # Sample starting point and non-decision time
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 1.0 - 1e-3), 1e-3)
+        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
         tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
         x = z_i * a[i]
         t = 0.0
-
         for step in range(max_steps):
             # Compute time-dependent boundary
             bound = max(a[i] * (1.0 - angle[i] * t), 0.0)
-            x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal()
+            x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal(loc=0.0, scale=1.0)
             t += dt
             if x >= bound:
                 rts[i] = t + tau_i
@@ -320,7 +323,6 @@ def simulate_super_ddm(
         else:
             rts[i] = np.nan
             choices[i] = np.nan
-
     return result
 
 
@@ -338,59 +340,51 @@ def simulate_schedule_ddm(
     s_tau: np.ndarray,
     dt: float,
     max_steps: int,
-    num_trials: int
+    num_samples: int
 ) -> np.ndarray:
     """Simulate DDM with scheduled drift rates.
 
     Parameters
     ----------
     v_schedule, t_schedule : np.ndarray
-        Drift and time schedules, shape (num_trials, num_segments).
+        Drift and time schedules, shape (num_samples, num_segments).
     a, z, tau, s_v, sigma, angle, s_z, s_tau : np.ndarray
-        Parameters, shape (num_trials,).
+        Parameters, shape (num_samples,).
     dt : float
         Time step.
     max_steps : int
         Maximum simulation steps.
-    num_trials : int
+    num_samples : int
         Number of trials.
 
     Returns
     -------
     np.ndarray
-        Array of shape (num_trials, 2) with columns [rts, choices].
+        Array of shape (num_samples, 2) with columns [rts, choices].
     """
-    # Buffer
-    result = np.zeros((num_trials, 2))
+    result = np.zeros((num_samples, 2))
     rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate
-    for i in prange(num_trials):
+    for i in prange(num_samples):
         # Sample starting point and non-decision time
         z_i = max(min(np.random.normal(z[i], s_z[i]), 1.0 - 1e-3), 1e-3)
         tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
         x = z_i * a[i]
         t = 0.0
-
-        # Keeping track of schedule
         step = 0
         v_index = 0
         v = v_schedule[i, v_index]
         t_next = t_schedule[i, v_index] if t_schedule.shape[1] > v_index else np.inf
-
         while step < max_steps:
             # Update drift rate based on schedule
             if t >= t_next:
                 v_index += 1
                 v = v_schedule[i, v_index] if v_index < v_schedule.shape[1] else v
                 t_next = t_schedule[i, v_index] if v_index < t_schedule.shape[1] else np.inf
-
             # Compute time-dependent boundary
             bound = max(a[i] * (1.0 - angle[i] * t), 0.0)
-            x += np.random.normal(v, s_v[i]) * dt + sigma[i] * np.sqrt(dt) * np.random.normal()
+            x += np.random.normal(v, s_v)
             t += dt
             step += 1
-
             if x >= bound:
                 rts[i] = t + tau_i
                 choices[i] = 1
@@ -403,3 +397,27 @@ def simulate_schedule_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
     return result
+
+@njit
+def weighted_choice(options: np.ndarray, probs: np.ndarray) -> float:
+    """Numba-compatible weighted random choice from an array of options.
+
+    Parameters
+    ----------
+    options : np.ndarray
+        Array of values to choose from.
+    probs : np.ndarray
+        Probabilities for each option (must sum to 1).
+
+    Returns
+    -------
+    float
+        Selected value from options.
+    """
+    r = np.random.random()
+    cumsum = 0.0
+    for i in range(len(probs)):
+        cumsum += probs[i]
+        if r <= cumsum:
+            return options[i]
+    return options[-1]  # Fallback to last option if numerical issues occur
