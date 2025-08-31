@@ -25,60 +25,12 @@ class SuperDDM(Model):
         self.max_steps = max_steps
 
     def simulate(
-        self,
-        params: dict[str, Union[float, np.ndarray]],
-        num_samples: int = 1,
-        context: Optional[np.ndarray] = None,
-        context_modulation: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
+            self,
+            params: dict[str, Union[float, np.ndarray]],
+            num_samples: int = 1,
+            context: Optional[np.ndarray] = None,
+            context_modulation: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None
     ) -> dict[str, np.ndarray]:
-        """Simulate response times and choices for multiple trials.
-
-        Parameters
-        ----------
-        params : dict[str, Union[float, np.ndarray]]
-            Model parameters:
-            - v : float or array, mean drift rate (required if no v_components or v_schedule).
-            - a : float or array, boundary separation (>0).
-            - z : float or array, starting point fraction (0 < z < 1).
-            - tau : float or array, non-decision time (>=0).
-            - sigma : float or array, diffusion noise (>0).
-            - angle : float or array, collapse rate (>=0, default=0 for fixed bounds).
-            - s_v : float or array, drift variability (>=0, default=0).
-            - s_z : float or array, starting point variability (>=0, default=0).
-            - s_tau : float or array, non-decision time variability (>=0, default=0).
-            - v_components : array, drift rates for mixture model (select one per trial).
-            - p_components : array, probabilities for mixture components (sums to 1, default uniform).
-            - v_schedule : array, drift rates for within-trial piecewise-constant segments.
-            - t_schedule : array, durations (seconds) for each segment (>0).
-        num_samples : int, optional
-            Number of trials to simulate, by default 1.
-        context : np.ndarray, optional
-            Context array (shape: (num_samples,)) to modulate drift rates, e.g., task difficulty.
-        context_modulation : callable, optional
-            Function to modulate drift rates: f(v, context) -> modulated_v.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary with keys:
-            - 'rts': Response times (shape: (num_samples,)).
-            - 'choices': Choices (0 or 1, shape: (num_samples,)).
-            - 'context': Input context (if provided, shape: (num_samples,)).
-
-        Raises
-        ------
-        ValueError
-            If parameters are missing, invalid, or have incorrect shapes.
-
-        Examples
-        --------
-        >>> model = SuperDDM(dt=0.01, max_steps=1000)
-        >>> params = {"v": 0.5, "a": 1.0, "z": 0.5, "tau": 0.1, "sigma": 1.0,
-        ...           "angle": 0.0, "s_v": 0.1, "s_z": 0.0, "s_tau": 0.0}
-        >>> context = np.random.uniform(0.5, 1.5, 100)
-        >>> result = model.simulate(params, num_samples=100, context=context,
-        ...                         context_modulation=lambda v, c: v * c)
-        """
         # Process and validate input parameters
         params = self._process_parameters(params, num_samples)
         self._validate_parameters(params, num_samples)
@@ -88,11 +40,11 @@ class SuperDDM(Model):
             if context.shape != (num_samples,):
                 raise ValueError(f"Context must have shape ({num_samples},), got {context.shape}")
             if "v_schedule" in params:
-                params["v_schedule"] = context_modulation(params["v_schedule"], context[:, None])
+                params["v_schedule"] = context_modulation(params["v_schedule"], context[:, None]).astype(np.float32)
             elif "v_components" in params:
-                params["v_components"] = context_modulation(params["v_components"], context[:, None])
+                params["v_components"] = context_modulation(params["v_components"], context[:, None]).astype(np.float32)
             else:
-                params["v"] = context_modulation(params["v"], context)
+                params["v"] = context_modulation(params["v"], context).astype(np.float32)
 
         # Run appropriate simulation based on drift type
         if "v_schedule" in params:
@@ -173,40 +125,43 @@ class SuperDDM(Model):
 
         # Handle parameter aliases
         if "z_arr" in params:
-            params["z"] = np.full(num_samples, params["z_arr"]) if np.isscalar(params["z_arr"]) else params["z_arr"]
+            params["z"] = np.full(num_samples, params["z_arr"]).astype(np.float32) if np.isscalar(params["z_arr"]) \
+                else params["z_arr"].astype(np.float32)
             del params["z_arr"]
         if "tau_arr" in params:
-            params["tau"] = np.full(num_samples, params["tau_arr"]) if np.isscalar(params["tau_arr"]) else params["tau_arr"]
+            params["tau"] = np.full(num_samples, params["tau_arr"]).astype(np.float32) if np.isscalar(params["tau_arr"]) \
+                else params["tau_arr"].astype(np.float32)
             del params["tau_arr"]
 
         # Broadcast scalar parameters to arrays
         for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
             if key in params:
-                params[key] = np.full(num_samples, params[key]) if np.isscalar(params[key]) else params[key]
+                params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
+                    else params[key].astype(np.float32)
 
         # Handle mixture or scheduled drifts
         if "v_components" in params:
             params["v_components"] = (
-                np.full((num_samples, params["v_components"].shape[-1]), params["v_components"])
+                np.full((num_samples, params["v_components"].shape[-1]), params["v_components"]).astype(np.float32)
                 if params["v_components"].ndim == 1
-                else params["v_components"]
+                else params["v_components"].astype(np.float32)
             )
             if "p_components" in params:
                 params["p_components"] = (
-                    np.full((num_samples, params["v_components"].shape[-1]), params["p_components"])
+                    np.full((num_samples, params["v_components"].shape[-1]), params["p_components"]).astype(np.float32)
                     if params["p_components"].ndim == 1
-                    else params["p_components"]
+                    else params["p_components"].astype(np.float32)
                 )
         if "v_schedule" in params:
             params["v_schedule"] = (
-                np.full((num_samples, params["v_schedule"].shape[-1]), params["v_schedule"])
+                np.full((num_samples, params["v_schedule"].shape[-1]), params["v_schedule"]).astype(np.float32)
                 if params["v_schedule"].ndim == 1
-                else params["v_schedule"]
+                else params["v_schedule"].astype(np.float32)
             )
             params["t_schedule"] = (
-                np.full((num_samples, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0))
+                np.full((num_samples, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0)).astype(np.float32)
                 if "t_schedule" not in params or params["t_schedule"].ndim == 1
-                else params["t_schedule"]
+                else params["t_schedule"].astype(np.float32)
             )
 
         return params
@@ -293,24 +248,42 @@ def simulate_super_ddm(
     """
     result = np.zeros((num_samples, 2))
     rts, choices = result[:, 0], result[:, 1]
-    for i in prange(num_samples):
+    for i in range(num_samples):
+        # Ensure scalar parameters
+        a_i = float(a[i])
+        sigma_i = float(sigma[i])
+        angle_i = float(angle[i])
+        s_v_i = float(s_v[i])
+        s_z_i = float(s_z[i])
+        s_tau_i = float(s_tau[i])
+        z_i = float(max(min(np.random.normal(float(z[i]), s_z_i), 0.999), 0.001))
+        tau_i = float(max(np.random.normal(float(tau[i]), s_tau_i), 0.0))
+
         # Select drift rate (single or random choice from components)
         if v.ndim == 1:
-            v_i = v[i]
+            v_i = float(v[i])
         else:
-            # Use uniform probabilities if p is None, else use provided probabilities
-            p_i = np.ones(v.shape[1]) / v.shape[1] if p is None else p[i]
-            v_i = weighted_choice(v[i], p_i)  # Replace np.random.choice
-        v_i = np.random.normal(v_i, s_v[i])
-        # Sample starting point and non-decision time
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
-        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
-        x = z_i * a[i]
+            num_components = v.shape[1]
+            p_i = np.ones(num_components).astype(np.float32) / num_components if p is None else p[i]
+            p_i = p_i / np.sum(p_i)  # Normalize probabilities
+            r = np.random.random()
+            cumsum = 0.0
+            selected_idx = 0
+            for j in range(num_components):
+                cumsum += float(p_i[j])
+                if r <= cumsum:
+                    selected_idx = j
+                    break
+            v_i = float(v[i, selected_idx])
+        v_i = float(np.random.normal(v_i, s_v_i))
+
+        # Initialize decision variable
+        x = z_i * a_i
         t = 0.0
         for step in range(max_steps):
             # Compute time-dependent boundary
-            bound = max(a[i] * (1.0 - angle[i] * t), 0.0)
-            x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal(loc=0.0, scale=1.0)
+            bound = max(a_i * (1.0 - angle_i * t), 0.0)
+            x += v_i * dt + sigma_i * np.sqrt(dt) * np.random.normal()
             t += dt
             if x >= bound:
                 rts[i] = t + tau_i
@@ -324,7 +297,6 @@ def simulate_super_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
     return result
-
 
 @njit
 def simulate_schedule_ddm(
@@ -362,14 +334,14 @@ def simulate_schedule_ddm(
     np.ndarray
         Array of shape (num_samples, 2) with columns [rts, choices].
     """
-    result = np.zeros((num_samples, 2))
+    result = np.zeros((num_samples, 2), dtype=np.float32)
     rts, choices = result[:, 0], result[:, 1]
     for i in prange(num_samples):
         # Sample starting point and non-decision time
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 1.0 - 1e-3), 1e-3)
-        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
+        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
+        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.)
         x = z_i * a[i]
-        t = 0.0
+        t = 0.
         step = 0
         v_index = 0
         v = v_schedule[i, v_index]
@@ -381,7 +353,7 @@ def simulate_schedule_ddm(
                 v = v_schedule[i, v_index] if v_index < v_schedule.shape[1] else v
                 t_next = t_schedule[i, v_index] if v_index < t_schedule.shape[1] else np.inf
             # Compute time-dependent boundary
-            bound = max(a[i] * (1.0 - angle[i] * t), 0.0)
+            bound = max(a[i] * (1. - angle[i] * t), 0.)
             x += np.random.normal(v, s_v)
             t += dt
             step += 1
@@ -397,27 +369,3 @@ def simulate_schedule_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
     return result
-
-@njit
-def weighted_choice(options: np.ndarray, probs: np.ndarray) -> float:
-    """Numba-compatible weighted random choice from an array of options.
-
-    Parameters
-    ----------
-    options : np.ndarray
-        Array of values to choose from.
-    probs : np.ndarray
-        Probabilities for each option (must sum to 1).
-
-    Returns
-    -------
-    float
-        Selected value from options.
-    """
-    r = np.random.random()
-    cumsum = 0.0
-    for i in range(len(probs)):
-        cumsum += probs[i]
-        if r <= cumsum:
-            return options[i]
-    return options[-1]  # Fallback to last option if numerical issues occur
