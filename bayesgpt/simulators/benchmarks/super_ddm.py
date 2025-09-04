@@ -66,7 +66,7 @@ class SuperDDM(Model):
         else:
             v = params.get("v_components", params.get("v"))
             p = params.get("p_components", None)
-            result = simulate_super_ddm(
+            result = simulate_mixture_ddm(
                 v=v,
                 p=p,
                 a=params["a"],
@@ -208,60 +208,40 @@ class SuperDDM(Model):
         if "p_components" in params_array and np.any(params_array["p_components"] < 0):
             raise ValueError("p_components must be >= 0")
 
-@njit
-def simulate_super_ddm(
-    v: np.ndarray,
-    p: np.ndarray,
-    a: np.ndarray,
-    z: np.ndarray,
-    tau: np.ndarray,
-    s_v: np.ndarray,
-    sigma: np.ndarray,
-    angle: np.ndarray,
-    s_z: np.ndarray,
-    s_tau: np.ndarray,
+@njit(parallel=True)
+def simulate_mixture_ddm(
+    v: float | np.ndarray,
+    p: float | np.ndarray,
+    a: float | np.ndarray,
+    z: float | np.ndarray,
+    tau: float | np.ndarray,
+    s_v: float | np.ndarray,
+    sigma: float | np.ndarray,
+    angle: float | np.ndarray,
+    s_z: float | np.ndarray,
+    s_tau: float | np.ndarray,
     dt: float,
     max_steps: int,
     num_samples: int
 ) -> np.ndarray:
-    """Simulate DDM with single or mixture drift rates.
-
-    Parameters
-    ----------
-    v : np.ndarray
-        Drift rate(s), shape (num_samples,) or (num_samples, num_components).
-    p : np.ndarray
-        Probabilities for mixture components, shape (num_samples, num_components) or None.
-    a, z, tau, s_v, sigma, angle, s_z, s_tau : np.ndarray
-        Parameters, shape (num_samples,).
-    dt : float
-        Time step.
-    max_steps : int
-        Maximum simulation steps.
-    num_samples : int
-        Number of trials.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) with columns [rts, choices].
-    """
-    result = np.zeros((num_samples, 2))
+    result = np.zeros((num_samples, 2), dtype=np.float32)
     rts, choices = result[:, 0], result[:, 1]
-    for i in range(num_samples):
-        # Ensure scalar parameters
-        a_i = float(a[i])
-        sigma_i = float(sigma[i])
-        angle_i = float(angle[i])
-        s_v_i = float(s_v[i])
-        s_z_i = float(s_z[i])
-        s_tau_i = float(s_tau[i])
-        z_i = float(max(min(np.random.normal(float(z[i]), s_z_i), 0.999), 0.001))
-        tau_i = float(max(np.random.normal(float(tau[i]), s_tau_i), 0.0))
+    for i in prange(num_samples):
+        a_i = a[i]
+        sigma_i = sigma[i]
+        angle_i = angle[i]
+        s_v_i = s_v[i]
+        s_z_i = s_z[i]
+        s_tau_i = s_tau[i]
+        # Replace list-based min/max with scalar comparisons
+        z_i_sample = np.random.normal(z[i], s_z_i)
+        z_i = z_i_sample if z_i_sample < 0.999 else 0.999
+        z_i = z_i if z_i > 0.001 else 0.001
+        tau_i = max(np.random.normal(tau[i], s_tau_i), 0.0)
 
         # Select drift rate (single or random choice from components)
         if v.ndim == 1:
-            v_i = float(v[i])
+            v_i = v[i]
         else:
             num_components = v.shape[1]
             p_i = np.ones(num_components).astype(np.float32) / num_components if p is None else p[i]
@@ -281,7 +261,6 @@ def simulate_super_ddm(
         x = z_i * a_i
         t = 0.0
         for step in range(max_steps):
-            # Compute time-dependent boundary
             bound = max(a_i * (1.0 - angle_i * t), 0.0)
             x += v_i * dt + sigma_i * np.sqrt(dt) * np.random.normal()
             t += dt
@@ -298,7 +277,7 @@ def simulate_super_ddm(
             choices[i] = np.nan
     return result
 
-@njit
+@njit(parallel=True)
 def simulate_schedule_ddm(
     v_schedule: np.ndarray,
     t_schedule: np.ndarray,
@@ -314,47 +293,27 @@ def simulate_schedule_ddm(
     max_steps: int,
     num_samples: int
 ) -> np.ndarray:
-    """Simulate DDM with scheduled drift rates.
-
-    Parameters
-    ----------
-    v_schedule, t_schedule : np.ndarray
-        Drift and time schedules, shape (num_samples, num_segments).
-    a, z, tau, s_v, sigma, angle, s_z, s_tau : np.ndarray
-        Parameters, shape (num_samples,).
-    dt : float
-        Time step.
-    max_steps : int
-        Maximum simulation steps.
-    num_samples : int
-        Number of trials.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) with columns [rts, choices].
-    """
     result = np.zeros((num_samples, 2), dtype=np.float32)
     rts, choices = result[:, 0], result[:, 1]
     for i in prange(num_samples):
-        # Sample starting point and non-decision time
         z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
         tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.)
         x = z_i * a[i]
         t = 0.
         step = 0
         v_index = 0
-        v = v_schedule[i, v_index]
+        v = np.random.normal(v_schedule[i, v_index], s_v[i])  # Sample v once per segment
         t_next = t_schedule[i, v_index] if t_schedule.shape[1] > v_index else np.inf
         while step < max_steps:
-            # Update drift rate based on schedule
             if t >= t_next:
                 v_index += 1
-                v = v_schedule[i, v_index] if v_index < v_schedule.shape[1] else v
-                t_next = t_schedule[i, v_index] if v_index < t_schedule.shape[1] else np.inf
-            # Compute time-dependent boundary
+                if v_index < v_schedule.shape[1]:
+                    v = np.random.normal(v_schedule[i, v_index], s_v[i])
+                    t_next = t_schedule[i, v_index]
+                else:
+                    t_next = np.inf
             bound = max(a[i] * (1. - angle[i] * t), 0.)
-            x += np.random.normal(v, s_v)
+            x += v * dt + sigma[i] * np.sqrt(dt) * np.random.normal(0.0, 1.0)
             t += dt
             step += 1
             if x >= bound:
