@@ -180,7 +180,7 @@ class SuperDDM(Model):
               'rt_quantiles': (L,),
               'rt_quantiles_by_choice': (2, L) or all-NaN if by_choice=False,
               'dt_quantiles': (L,) only if tau provided,
-              'dtq_by_choice': (2, L) only if tau provided and by_choice=True
+              'dt_quantiles_by_choice': (2, L) only if tau provided and by_choice=True
             }
         """
         rts = outputs["rts"].astype(np.float32, copy=False)
