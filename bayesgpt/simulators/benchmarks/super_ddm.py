@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Iterable
 from numba import njit, prange
 from ..model import Model
 
@@ -98,15 +98,15 @@ class SuperDDM(Model):
             violate model constraints.
         """
         # Process and validate input parameters
-        params = self._process_parameters(params, num_samples)
-        self._validate_parameters(params, num_samples)
+        params = _process_parameters(params, num_samples)
+        _validate_parameters(params, num_samples)
 
         # Modulate parameters with context if provided
         if context is not None and modulation is not None:
             if context.shape != (num_samples,):
                 raise ValueError(f"context must have shape ({num_samples},), got {context.shape}")
             params = modulation(params, context)
-            self._validate_parameters(params, num_samples)  # Re-validate after modulation
+            _validate_parameters(params, num_samples)  # Re-validate after modulation
 
         # Run appropriate simulation based on drift type
         if "v_schedule" in params:
@@ -150,126 +150,89 @@ class SuperDDM(Model):
             output["context"] = context
         return output
 
-    def _process_parameters(
-        self,
-        params: dict[str, Union[float, np.ndarray]],
-        num_samples: int
+    @staticmethod
+    def summarize(
+            outputs: dict[str, np.ndarray],
+            quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
+            by_choice: bool = True,
+            tau: Optional[np.ndarray] = None,
     ) -> dict[str, np.ndarray]:
-        """Process parameters to arrays of consistent shape.
+        """
+        Summarize RTs with robust quantiles (and optional decision-time RT−tau).
 
         Parameters
         ----------
-        params : dict[str, Union[float, np.ndarray]]
-            Same as in the simulate method.
-        num_samples : int
-            Number of trials.
+        outputs : dict[str, np.ndarray]
+            Dict from `simulate`, must contain 'rts' and 'choices' (float arrays).
+        quantile_levels : Iterable[float], optional
+            Quantile levels in [0,1], by default (0.1, 0.3, 0.5, 0.7, 0.9).
+        by_choice : bool, optional
+            If True, compute quantiles separately for choice 0 and 1.
+        tau : np.ndarray, optional
+            Per-trial non-decision times (same shape as outputs['rts']) to also
+            compute decision-time quantiles over max(rts - tau, 0).
 
         Returns
         -------
         dict[str, np.ndarray]
-            Processed parameters with shapes (num_samples,) or
-            (num_samples, num_segments) for multi-dimensional parameters.
-
-        Raises
-        ------
-        ValueError
-            If required parameters are missing or have invalid values.
+            {
+              'invalid_rate': float32,
+              'rt_quantiles': (L,),
+              'rt_quantiles_by_choice': (2, L) or all-NaN if by_choice=False,
+              'dt_quantiles': (L,) only if tau provided,
+              'dtq_by_choice': (2, L) only if tau provided and by_choice=True
+            }
         """
-        # Check for required parameters
-        required_params = ["a", "s_v", "sigma", "angle", "s_z", "s_tau"]
-        if not any(k in params for k in ["v", "v_components", "v_schedule"]):
-            raise ValueError("One of 'v', 'v_components', or 'v_schedule' must be provided")
-        if not any(k in params for k in ["z", "z_arr"]):
-            raise ValueError("One of 'z' or 'z_arr' must be provided")
-        if not any(k in params for k in ["tau", "tau_arr"]):
-            raise ValueError("One of 'tau' or 'tau_arr' must be provided")
-        if not all(k in params for k in required_params):
-            raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
+        rts = outputs["rts"].astype(np.float32, copy=False)
+        choices = outputs["choices"].astype(np.float32, copy=False)
 
-        # Handle parameter aliases
-        if "z_arr" in params:
-            params["z"] = np.full(num_samples, params["z_arr"]).astype(np.float32) if np.isscalar(params["z_arr"]) \
-                else params["z_arr"].astype(np.float32)
-            del params["z_arr"]
-        if "tau_arr" in params:
-            params["tau"] = np.full(num_samples, params["tau_arr"]).astype(np.float32) if np.isscalar(params["tau_arr"]) \
-                else params["tau_arr"].astype(np.float32)
-            del params["tau_arr"]
+        q = np.asarray(tuple(quantile_levels), dtype=np.float32)
+        num_levels = q.size
 
-        # Broadcast scalar parameters to arrays
-        for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
-            if key in params:
-                params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
-                    else params[key].astype(np.float32)
+        # Valid RT mask (exclude non-terminations)
+        valid = ~np.isnan(rts)
+        n = rts.size
+        n_valid = int(valid.sum())
+        invalid_rate = np.float32(1.0 - (n_valid / n if n > 0 else np.nan))
 
-        # Handle mixture or scheduled drifts
-        if "v_components" in params:
-            params["v_components"] = (
-                np.full((num_samples, params["v_components"].shape[-1]), params["v_components"]).astype(np.float32)
-                if params["v_components"].ndim == 1
-                else params["v_components"].astype(np.float32)
-            )
-            if "p_components" in params:
-                params["p_components"] = (
-                    np.full((num_samples, params["v_components"].shape[-1]), params["p_components"]).astype(np.float32)
-                    if params["p_components"].ndim == 1
-                    else params["p_components"].astype(np.float32)
-                )
-        if "v_schedule" in params:
-            params["v_schedule"] = (
-                np.full((num_samples, params["v_schedule"].shape[-1]), params["v_schedule"]).astype(np.float32)
-                if params["v_schedule"].ndim == 1
-                else params["v_schedule"].astype(np.float32)
-            )
-            params["t_schedule"] = (
-                np.full((num_samples, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0)).astype(np.float32)
-                if "t_schedule" not in params or params["t_schedule"].ndim == 1
-                else params["t_schedule"].astype(np.float32)
-            )
+        def _q(xmask: np.ndarray, x: np.ndarray) -> np.ndarray:
+            if not np.any(xmask):
+                return np.full((num_levels,), np.nan, dtype=np.float32)
+            return np.quantile(x[xmask], q, method="linear").astype(np.float32)
 
-        return params
+        # RT quantiles
+        rt_quantiles = _q(valid, rts)
 
-    def _validate_parameters(
-        self,
-        params_array: dict[str, np.ndarray],
-        num_samples: int
-    ) -> None:
-        """Validate parameter shapes and values.
+        # RT by choice
+        if by_choice:
+            rt_quantiles_by_choice = np.vstack([
+                _q(valid & (choices == 0), rts),
+                _q(valid & (choices == 1), rts),
+            ]).astype(np.float32)
+        else:
+            rt_quantiles_by_choice = np.full((2, num_levels), np.nan, dtype=np.float32)
 
-        Parameters
-        ----------
-        params_array : dict[str, np.ndarray]
-            Processed parameters to validate.
-        num_samples : int
-            Number of trials.
+        out = {
+            "invalid_rate": invalid_rate,
+            "rt_quantiles": rt_quantiles,
+            "rt_quantiles_by_choice": rt_quantiles_by_choice,
+        }
 
-        Raises
-        ------
-        ValueError
-            If parameters have invalid shapes or values.
-        """
-        # Validate parameter shapes
-        for key, param in params_array.items():
-            if key in ["v_components", "v_schedule", "t_schedule", "p_components"]:
-                if param.shape[0] != num_samples:
-                    raise ValueError(f"{key} must have shape (num_samples, num_segments)")
-            else:
-                if param.shape != (num_samples,):
-                    raise ValueError(f"{key} must have shape (num_samples,)")
-        if "t_schedule" in params_array and params_array["t_schedule"].shape != params_array["v_schedule"].shape:
-            raise ValueError("t_schedule must have same shape as v_schedule")
-        if "p_components" in params_array and params_array["p_components"].shape != params_array["v_components"].shape:
-            raise ValueError("p_components must have same shape as v_components")
+        # Optional decision time (RT - tau), clipped at 0
+        if tau is not None:
+            tau = tau.astype(np.float32, copy=False)
+            dt = np.clip(rts - tau, 0.0, None)
+            valid_dt = valid & ~np.isnan(tau)
+            dt_quantiles = _q(valid_dt, dt)
+            out["dt_quantiles"] = dt_quantiles
+            if by_choice:
+                out["dt_quantiles_by_choice"] = np.vstack([
+                    _q(valid_dt & (choices == 0), dt),
+                    _q(valid_dt & (choices == 1), dt),
+                ]).astype(np.float32)
 
-        # Validate parameter values
-        if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
-            raise ValueError("a, sigma must be > 0")
-        if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
-            raise ValueError("s_v, angle, s_z, s_tau must be >= 0")
-        if "z" in params_array and np.any((params_array["z"] <= 0) | (params_array["z"] >= 1)):
-            raise ValueError("0 < z < 1")
-        if "p_components" in params_array and np.any(params_array["p_components"] < 0):
-            raise ValueError("p_components must be >= 0")
+        return out
+
 
 @njit(parallel=True)
 def simulate_mixture_ddm(
@@ -451,8 +414,8 @@ def simulate_schedule_ddm(
         s_tau_i = s_tau[i]
 
         # Sample starting point and non-decision time
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
-        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.)
+        z_i = max(min(np.random.normal(z[i], s_z_i), 0.999), 0.001)
+        tau_i = max(np.random.normal(tau[i], s_tau_i), 0.)
 
         # Initialize decision variable and drift schedule
         x = z_i * a_i
@@ -492,3 +455,122 @@ def simulate_schedule_ddm(
             rts[i] = np.nan
             choices[i] = np.nan
     return result
+
+def _process_parameters(
+        params: dict[str, Union[float, np.ndarray]],
+    num_samples: int
+) -> dict[str, np.ndarray]:
+    """Process parameters to arrays of consistent shape.
+
+    Parameters
+    ----------
+    params : dict[str, Union[float, np.ndarray]]
+        Same as in the simulate method.
+    num_samples : int
+        Number of trials.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Processed parameters with shapes (num_samples,) or
+        (num_samples, num_segments) for multidimensional parameters.
+
+    Raises
+    ------
+    ValueError
+        If required parameters are missing or have invalid values.
+    """
+    # Check for required parameters
+    required_params = ["a", "s_v", "sigma", "angle", "s_z", "s_tau"]
+    if not any(k in params for k in ["v", "v_components", "v_schedule"]):
+        raise ValueError("One of 'v', 'v_components', or 'v_schedule' must be provided")
+    if not any(k in params for k in ["z", "z_arr"]):
+        raise ValueError("One of 'z' or 'z_arr' must be provided")
+    if not any(k in params for k in ["tau", "tau_arr"]):
+        raise ValueError("One of 'tau' or 'tau_arr' must be provided")
+    if not all(k in params for k in required_params):
+        raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
+
+    # Handle parameter aliases
+    if "z_arr" in params:
+        params["z"] = np.full(num_samples, params["z_arr"]).astype(np.float32) if np.isscalar(params["z_arr"]) \
+            else params["z_arr"].astype(np.float32)
+        del params["z_arr"]
+    if "tau_arr" in params:
+        params["tau"] = np.full(num_samples, params["tau_arr"]).astype(np.float32) if np.isscalar(params["tau_arr"]) \
+            else params["tau_arr"].astype(np.float32)
+        del params["tau_arr"]
+
+    # Broadcast scalar parameters to arrays
+    for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
+        if key in params:
+            params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
+                else params[key].astype(np.float32)
+
+    # Handle mixture or scheduled drifts
+    if "v_components" in params:
+        params["v_components"] = (
+            np.full((num_samples, params["v_components"].shape[-1]), params["v_components"]).astype(np.float32)
+            if params["v_components"].ndim == 1
+            else params["v_components"].astype(np.float32)
+        )
+        if "p_components" in params:
+            params["p_components"] = (
+                np.full((num_samples, params["v_components"].shape[-1]), params["p_components"]).astype(np.float32)
+                if params["p_components"].ndim == 1
+                else params["p_components"].astype(np.float32)
+            )
+    if "v_schedule" in params:
+        params["v_schedule"] = (
+            np.full((num_samples, params["v_schedule"].shape[-1]), params["v_schedule"]).astype(np.float32)
+            if params["v_schedule"].ndim == 1
+            else params["v_schedule"].astype(np.float32)
+        )
+        params["t_schedule"] = (
+            np.full((num_samples, params["v_schedule"].shape[-1]), params.get("t_schedule", 0.0)).astype(np.float32)
+            if "t_schedule" not in params or params["t_schedule"].ndim == 1
+            else params["t_schedule"].astype(np.float32)
+        )
+
+    return params
+
+def _validate_parameters(
+        params_array: dict[str, np.ndarray],
+    num_samples: int
+) -> None:
+    """Validate parameter shapes and values.
+
+    Parameters
+    ----------
+    params_array : dict[str, np.ndarray]
+        Processed parameters to validate.
+    num_samples : int
+        Number of trials.
+
+    Raises
+    ------
+    ValueError
+        If parameters have invalid shapes or values.
+    """
+    # Validate parameter shapes
+    for key, param in params_array.items():
+        if key in ["v_components", "v_schedule", "t_schedule", "p_components"]:
+            if param.shape[0] != num_samples:
+                raise ValueError(f"{key} must have shape (num_samples, num_segments)")
+        else:
+            if param.shape != (num_samples,):
+                raise ValueError(f"{key} must have shape (num_samples,)")
+    if "t_schedule" in params_array and params_array["t_schedule"].shape != params_array["v_schedule"].shape:
+        raise ValueError("t_schedule must have same shape as v_schedule")
+    if "p_components" in params_array and params_array["p_components"].shape != params_array["v_components"].shape:
+        raise ValueError("p_components must have same shape as v_components")
+
+    # Validate parameter values
+    if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
+        raise ValueError("a, sigma must be > 0")
+    if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
+        raise ValueError("s_v, angle, s_z, s_tau must be >= 0")
+    if "z" in params_array and np.any((params_array["z"] <= 0) | (params_array["z"] >= 1)):
+        raise ValueError("0 < z < 1")
+    if "p_components" in params_array and np.any(params_array["p_components"] < 0):
+        raise ValueError("p_components must be >= 0")
