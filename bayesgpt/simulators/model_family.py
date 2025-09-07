@@ -1,14 +1,138 @@
 import numpy as np
-from collections.abc import Callable, Mapping
-from typing import Union, Optional, List, Tuple, Type, Literal
+from joblib import Parallel, delayed
+from typing import Tuple, Type, List, Optional, Callable, Dict, Union
+from collections.abc import Mapping
 
 from .model import Model
 from .model_variant import ModelVariant
-from simulators.tokenizer import Tokenizer
-
+from .tokenizer import Tokenizer
 
 class NestedModelFamily:
     """
+    Manages batch simulations across multiple model variants with Joblib.
+    """
+
+    def __init__(self, variants: List[ModelVariant], n_jobs: int = -1):
+        """Initialize with list of model variants and number of parallel jobs.
+
+        Parameters
+        ----------
+        variants : List[ModelVariant]
+            List of model variants to simulate.
+        n_jobs : int, optional
+            Number of parallel jobs for Joblib (-1 uses all available cores).
+        """
+        self.variants = variants
+        self.variant_names = [v.name for v in variants]
+        self.n_jobs = n_jobs
+
+    def _sample_one_variant(
+        self,
+        variant: ModelVariant,
+        num_samples: int,
+        context: Optional[np.ndarray]
+    ) -> Dict[str, np.ndarray]:
+        """Sample parameters for a single variant."""
+        sampled = variant.tokenizer.sample(context=context)
+        return variant.tokenizer.combine(sampled)
+
+    def batch_sample(
+        self,
+        num_samples_per_variant: Union[int, List[int]],
+        context: Optional[Union[np.ndarray, List[np.ndarray]]] = None
+    ) -> Dict[str, List[Dict[str, np.ndarray]]]:
+        """Batch-sample parameters for all variants."""
+        if isinstance(num_samples_per_variant, int):
+            num_samples = [num_samples_per_variant] * len(self.variants)
+        else:
+            num_samples = num_samples_per_variant
+
+        params = Parallel(n_jobs=self.n_jobs)(
+            delayed(self._sample_one_variant)(v, n, context if not isinstance(context, list) else context[i])
+            for i, (v, n) in enumerate(zip(self.variants, num_samples))
+        )
+        return {"parameters": params}  # List of dicts, shape (num_variants, num_samples, ...)
+
+    def _simulate_one_variant(
+        self,
+        variant: ModelVariant,
+        n_samples: int,
+        context: Optional[np.ndarray],
+        modulation: Optional[Union[Callable, Dict[str, Callable]]]
+    ) -> Dict[str, Union[np.ndarray, str]]:
+        """Simulate a single variant with optional modulation."""
+        mod_fn = modulation if not isinstance(modulation, dict) else modulation.get(variant.name, lambda x, y: x)
+        result = variant.sample(context=context)
+        params = mod_fn(result["full_params"], context) if context is not None else result["full_params"]
+        return {
+            "sim_data": result["sim_data"],
+            "full_params": params,
+            "inference_conditions": result["inference_conditions"],
+            "variant_name": variant.name
+        }
+
+    def batch_simulate(
+        self,
+        num_samples_per_variant: Union[int, List[int]],
+        context: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
+        modulation: Optional[Union[Callable, Dict[str, Callable]]] = None
+    ) -> Dict[str, np.ndarray]:
+        """Run batched simulations across variants with Joblib and vectorized outputs."""
+        if isinstance(num_samples_per_variant, int):
+            num_samples = [num_samples_per_variant] * len(self.variants)
+        else:
+            num_samples = num_samples_per_variant
+
+        results = Parallel(n_jobs=self.n_jobs)(
+            delayed(self._simulate_one_variant)(v, n, context if not isinstance(context, list) else context[i], modulation)
+            for i, (v, n) in enumerate(zip(self.variants, num_samples))
+        )
+
+        # Vectorize outputs
+        sim_data = np.stack([r["sim_data"] for r in results])  # Shape: (num_variants, num_samples, ...)
+        full_params = np.stack([r["full_params"] for r in results])  # Shape: (num_variants, num_samples, total_slots)
+        inference_conditions = np.stack([r["inference_conditions"] for r in results])  # Shape: (num_variants, num_samples, condition_dim)
+        variant_indices = np.arange(len(self.variants), dtype=np.int32)[:, None]  # Shape: (num_variants, 1)
+        output = {
+            "sim_data": sim_data,
+            "full_params": full_params,
+            "inference_conditions": inference_conditions,
+            "variant_names": self.variant_names,
+            "variant_indices": variant_indices,
+        }
+        if context is not None:
+            output["context"] = np.stack(context) if isinstance(context, list) else context
+        return output
+
+    def _default_summary(self, variant_out: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """Default summary statistics for a single variant output."""
+        rts = variant_out["rts"]
+        valid = ~np.isnan(rts)
+        quantiles = np.quantile(rts[valid], [0.1, 0.3, 0.5, 0.7, 0.9], method="linear") if valid.any() else np.full(5, np.nan)
+        return {
+            "quantiles": quantiles,
+            "mean": np.mean(rts[valid]) if valid.any() else np.nan,
+            "invalid_rate": 1.0 - valid.mean(),
+            "variance": np.var(rts[valid]) if valid.any() else np.nan
+        }
+
+    def summarize(
+        self,
+        outputs: Dict[str, np.ndarray],
+        summary_fn: Optional[Callable] = None
+    ) -> Dict[str, List[Dict[str, np.ndarray]]]:
+        """Compute summary statistics across variant outputs."""
+        summary_fn = summary_fn or self._default_summary
+        stats = Parallel(n_jobs=self.n_jobs)(
+            delayed(summary_fn)(variant_out) for variant_out in outputs["sim_data"]
+        )
+        return {"summary_stats": stats}  # List of dicts, shape (num_variants, num_stats)
+
+
+
+class LegacyModelFamily:
+    """
+    [This version of NestedModelFamily is considered now as legacy.]
     A collection of related model variants sharing a common interface.
 
     Useful for flexible simulation, inference, and benchmarking workflows
