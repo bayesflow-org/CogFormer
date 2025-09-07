@@ -48,7 +48,7 @@ class ModelVariant:
         Parameters
         ----------
         context : np.ndarray, optional
-            Context array to condition parameter sampling, shape (context_shape,).
+            Context array to condition parameter sampling, shape (num_samples,).
 
         Returns
         -------
@@ -59,10 +59,16 @@ class ModelVariant:
             - 'inference_conditions': Concatenated inference conditions, shape (num_parameters,).
             - 'variant_name': Variant identifier (str).
         """
-
         # Sample parameters for a single simulation
         sampled_parameters = self.tokenizer.sample(context=context)
         params_dict = self.tokenizer.combine(sampled_parameters)  # Combine into model-compatible dictionary
+
+        # Broadcast scalar or (1,) parameters to (num_samples,)
+        for key, value in params_dict.items():
+            if np.isscalar(value) or (isinstance(value, np.ndarray) and value.shape == (1,)):
+                params_dict[key] = np.full(self.num_samples, np.asarray(value).item(), dtype=np.float32)
+            elif isinstance(value, np.ndarray):
+                params_dict[key] = value.astype(np.float32)
 
         # Run simulation with num_samples trials
         sim_data = self.model.simulate(params_dict, num_samples=self.num_samples, context=context)
@@ -114,7 +120,7 @@ class ModelVariant:
 
     def build_inference_conditions(
         self,
-        variant_encoder: Optional[np.ndarray] = None,
+        one_hot_variant: Optional[np.ndarray] = None,
         context: Optional[np.ndarray] = None,
     ) -> dict[str, np.ndarray]:
         """
@@ -122,7 +128,7 @@ class ModelVariant:
 
         Parameters
         ----------
-        variant_encoder : np.ndarray, optional
+        one_hot_variant : np.ndarray, optional
             One-hot encoded variant identifier, shape (num_variants,).
         context : np.ndarray, optional
             Context variables, shape (context_shape,).
@@ -143,8 +149,8 @@ class ModelVariant:
             If context or variant encoder shapes are invalid.
         """
         return self.tokenizer.build_inference_conditions(
-            one_hot_variant=variant_encoder,
+            one_hot_variant=one_hot_variant,
             context=context,
-            include_variant=variant_encoder is not None,
+            include_variant=one_hot_variant is not None,
             include_context=context is not None
         )
