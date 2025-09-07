@@ -8,32 +8,17 @@ from .model_variant import ModelVariant
 from .tokenizer import Tokenizer
 
 class NestedModelFamily:
-    """
-    Manages batch simulations across multiple model variants with Joblib.
-    """
+    """Manages batch simulations across multiple model variants with Joblib."""
 
     def __init__(self, variants: List[ModelVariant], n_jobs: int = -1):
-        """Initialize with list of model variants and number of parallel jobs.
-
-        Parameters
-        ----------
-        variants : List[ModelVariant]
-            List of model variants to simulate.
-        n_jobs : int, optional
-            Number of parallel jobs for Joblib (-1 uses all available cores).
-        """
+        """Initialize with list of model variants and number of parallel jobs."""
         self.variants = variants
         self.variant_names = [v.name for v in variants]
         self.n_jobs = n_jobs
 
-    def _sample_one_variant(
-        self,
-        variant: ModelVariant,
-        num_samples: int,
-        context: Optional[np.ndarray]
-    ) -> Dict[str, np.ndarray]:
+    def _sample_one_variant(self, variant: ModelVariant, n_samples: int, context: Optional[np.ndarray]) -> Dict[str, np.ndarray]:
         """Sample parameters for a single variant."""
-        sampled = variant.tokenizer.sample(context=context)
+        sampled = variant.tokenizer.sample(num_samples=n_samples, context=context)
         return variant.tokenizer.combine(sampled)
 
     def batch_sample(
@@ -51,24 +36,25 @@ class NestedModelFamily:
             delayed(self._sample_one_variant)(v, n, context if not isinstance(context, list) else context[i])
             for i, (v, n) in enumerate(zip(self.variants, num_samples))
         )
-        return {"parameters": params}  # List of dicts, shape (num_variants, num_samples, ...)
+        return {"parameters": params}
 
     def _simulate_one_variant(
         self,
         variant: ModelVariant,
-        n_samples: int,
+        num_samples: int,
         context: Optional[np.ndarray],
         modulation: Optional[Union[Callable, Dict[str, Callable]]]
-    ) -> Dict[str, Union[np.ndarray, str]]:
+    ) -> Dict[str, Union[Dict, np.ndarray, str]]:
         """Simulate a single variant with optional modulation."""
         mod_fn = modulation if not isinstance(modulation, dict) else modulation.get(variant.name, lambda x, y: x)
-        result = variant.sample(context=context)
+        result = variant.sample(num_samples=num_samples, context=context)
         params = mod_fn(result["full_params"], context) if context is not None else result["full_params"]
         return {
             "sim_data": result["sim_data"],
             "full_params": params,
             "inference_conditions": result["inference_conditions"],
-            "variant_name": variant.name
+            "variant_name": result["variant_name"],
+            "sampled_parameters": result["sampled_parameters"]
         }
 
     def batch_simulate(
@@ -76,8 +62,8 @@ class NestedModelFamily:
         num_samples_per_variant: Union[int, List[int]],
         context: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
         modulation: Optional[Union[Callable, Dict[str, Callable]]] = None
-    ) -> Dict[str, np.ndarray]:
-        """Run batched simulations across variants with Joblib and vectorized outputs."""
+    ) -> Dict[str, Union[np.ndarray, List[str]]]:
+        """Run batched simulations across variants with Joblib."""
         if isinstance(num_samples_per_variant, int):
             num_samples = [num_samples_per_variant] * len(self.variants)
         else:
@@ -89,14 +75,26 @@ class NestedModelFamily:
         )
 
         # Vectorize outputs
-        sim_data = np.stack([r["sim_data"] for r in results])  # Shape: (num_variants, num_samples, ...)
-        full_params = np.stack([r["full_params"] for r in results])  # Shape: (num_variants, num_samples, total_slots)
-        inference_conditions = np.stack([r["inference_conditions"] for r in results])  # Shape: (num_variants, num_samples, condition_dim)
+        sim_data_list = [r["sim_data"] for r in results]
+        # Assume sim_data is a dictionary with at least two primary arrays (e.g., rts, choices)
+        sim_data_arrays = []
+        for sim_data in sim_data_list:
+            # Get the first two keys (assuming at least two arrays, e.g., rts and choices)
+            keys = list(sim_data.keys())[:2]
+            if len(keys) < 2:
+                raise ValueError(f"sim_data must contain at least two arrays; got {keys}")
+            # Stack the two arrays along the last axis
+            sim_data_arrays.append(np.stack([sim_data[keys[0]], sim_data[keys[1]]], axis=-1))
+        sim_data = np.stack(sim_data_arrays)  # Shape: (num_variants, num_samples, 2)
+        full_params = np.stack([r["full_params"] for r in results])  # Shape: (num_variants, total_slots)
+        inference_conditions = np.stack([r["inference_conditions"] for r in results])  # Shape: (num_variants, condition_dim)
+        sampled_parameters = np.array([r["sampled_parameters"] for r in results], dtype=object)  # Shape: (num_variants,)
         variant_indices = np.arange(len(self.variants), dtype=np.int32)[:, None]  # Shape: (num_variants, 1)
         output = {
             "sim_data": sim_data,
             "full_params": full_params,
             "inference_conditions": inference_conditions,
+            "sampled_parameters": sampled_parameters,
             "variant_names": self.variant_names,
             "variant_indices": variant_indices,
         }
@@ -104,30 +102,30 @@ class NestedModelFamily:
             output["context"] = np.stack(context) if isinstance(context, list) else context
         return output
 
-    def _default_summary(self, variant_out: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+    def _default_summary(self, sim_data: Dict[str, np.ndarray], data_key: str = "rts") -> Dict[str, np.ndarray]:
         """Default summary statistics for a single variant output."""
-        rts = variant_out["rts"]
-        valid = ~np.isnan(rts)
-        quantiles = np.quantile(rts[valid], [0.1, 0.3, 0.5, 0.7, 0.9], method="linear") if valid.any() else np.full(5, np.nan)
+        data = sim_data.get(data_key, next(iter(sim_data.values())))  # Use first array if key not found
+        valid = ~np.isnan(data)
+        quantiles = np.quantile(data[valid], [0.1, 0.3, 0.5, 0.7, 0.9], method="linear") if valid.any() else np.full(5, np.nan)
         return {
             "quantiles": quantiles,
-            "mean": np.mean(rts[valid]) if valid.any() else np.nan,
+            "mean": np.mean(data[valid]) if valid.any() else np.nan,
             "invalid_rate": 1.0 - valid.mean(),
-            "variance": np.var(rts[valid]) if valid.any() else np.nan
+            "variance": np.var(data[valid]) if valid.any() else np.nan
         }
 
     def summarize(
         self,
         outputs: Dict[str, np.ndarray],
-        summary_fn: Optional[Callable] = None
+        summary_fn: Optional[Callable] = None,
+        data_key: str = "rts"
     ) -> Dict[str, List[Dict[str, np.ndarray]]]:
         """Compute summary statistics across variant outputs."""
-        summary_fn = summary_fn or self._default_summary
+        summary_fn = summary_fn or (lambda x: self._default_summary(x, data_key))
         stats = Parallel(n_jobs=self.n_jobs)(
             delayed(summary_fn)(variant_out) for variant_out in outputs["sim_data"]
         )
-        return {"summary_stats": stats}  # List of dicts, shape (num_variants, num_stats)
-
+        return {"summary_stats": stats}
 
 
 class LegacyModelFamily:

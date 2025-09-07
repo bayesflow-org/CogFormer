@@ -36,17 +36,20 @@ class ModelVariant:
         self.model: Model = model()  # Instantiate the model
         self.tokenizer = tokenizer
         self.parameter_names = list(tokenizer.parameter_names)  # All parameter names
-        self.num_samples = num_samples  # Trials per simulation
+        self.num_samples = num_samples  # Number of samples per simulation
 
     def sample(
-        self,
-        context: Optional[np.ndarray] = None
+            self,
+            num_samples: Optional[int] = None,
+            context: Optional[np.ndarray] = None
     ) -> dict[str, Union[np.ndarray, Mapping[str, np.ndarray], str]]:
         """
         Simulate data for a single model run with num_samples trials.
 
         Parameters
         ----------
+        num_samples : int, optional
+            Number of samples per simulation.
         context : np.ndarray, optional
             Context array to condition parameter sampling, shape (num_samples,).
 
@@ -58,20 +61,35 @@ class ModelVariant:
             - 'full_params': Sampled and fixed parameters, shape (num_parameters,).
             - 'inference_conditions': Concatenated inference conditions, shape (num_parameters,).
             - 'variant_name': Variant identifier (str).
+            - 'sampled_parameters': Dictionary of sampled free parameters, mapping names to arrays of shape (num_samples, dims[p]).
         """
+        num_samples = self.num_samples if num_samples is None else num_samples
+
         # Sample parameters for a single simulation
-        sampled_parameters = self.tokenizer.sample(context=context)
+        sampled_parameters = self.tokenizer.sample(context=context, num_samples=num_samples)
         params_dict = self.tokenizer.combine(sampled_parameters)  # Combine into model-compatible dictionary
 
-        # Broadcast scalar or (1,) parameters to (num_samples,)
+        # Ensure parameters are correctly shaped for SuperDDM
         for key, value in params_dict.items():
-            if np.isscalar(value) or (isinstance(value, np.ndarray) and value.shape == (1,)):
-                params_dict[key] = np.full(self.num_samples, np.asarray(value).item(), dtype=np.float32)
+            param_dim = self.tokenizer.get_parameter_dims(key)
+            if np.isscalar(value) or (isinstance(value, np.ndarray) and value.size == 1):
+                # Broadcast scalar or single-value parameters to (num_samples,)
+                params_dict[key] = np.full(num_samples, np.asarray(value).item(), dtype=np.float32)
             elif isinstance(value, np.ndarray):
-                params_dict[key] = value.astype(np.float32)
+                # Ensure multidimensional parameters maintain their shape (e.g., v_components, v_schedule)
+                if value.ndim == 1 and value.shape[0] == num_samples:
+                    params_dict[key] = value.astype(np.float32)
+                elif value.ndim == 2 and value.shape[0] == num_samples:
+                    params_dict[key] = value.astype(np.float32)
+                else:
+                    # Reshape to (num_samples, param_dim) if needed
+                    try:
+                        params_dict[key] = value.reshape(num_samples, param_dim).astype(np.float32)
+                    except ValueError:
+                        raise ValueError(f"Parameter {key} has incompatible shape {value.shape} for num_samples={num_samples} and dim={param_dim}")
 
         # Run simulation with num_samples trials
-        sim_data = self.model.simulate(params_dict, num_samples=self.num_samples, context=context)
+        sim_data = self.model.simulate(params_dict, num_samples=num_samples, context=context)
 
         # Build full parameter vector with fixed and sampled values
         base_values = self.tokenizer.get_base_values()  # Get fixed/default values
@@ -79,7 +97,10 @@ class ModelVariant:
         for name in self.parameter_names:
             sl = self.tokenizer.parameter_slices[name]
             if self.tokenizer.mask[sl][0] == 1.0:  # Free parameter
-                full_params[sl] = sampled_parameters.get(name, np.random.randn(sl.stop - sl.start)).astype(np.float32)
+                param_val = sampled_parameters.get(name, np.random.randn(num_samples, sl.stop - sl.start))
+                # Take mean across samples for multidimensional parameters to fit into full_params
+                full_params[sl] = np.mean(param_val, axis=0).astype(np.float32) if param_val.ndim > 1 else param_val[0].astype(np.float32)
+            # Fixed parameters are already in base_values
 
         # Get inference conditions for this simulation
         inference_conditions = self.tokenizer.build_inference_conditions(
@@ -92,7 +113,8 @@ class ModelVariant:
             "sim_data": sim_data,
             "full_params": full_params,
             "inference_conditions": inference_conditions["full_conditions"],
-            "variant_name": self.name
+            "variant_name": self.name,
+            "sampled_parameters": sampled_parameters
         }
 
     def get_mask(self) -> np.ndarray:

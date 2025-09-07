@@ -68,21 +68,24 @@ class Tokenizer:
         self.free_params = {n for n in self.used_params if n not in self.fixed_parameters}  # Free parameters
 
     def sample(
-        self,
-        context: Optional[np.ndarray] = None
+            self,
+            num_samples: int,
+            context: Optional[np.ndarray] = None
     ) -> dict[str, np.ndarray]:
         """
-        Sample all free parameters for a single simulation, applying constraints if provided.
+        Sample all free parameters for num_samples simulations, applying constraints if provided.
 
         Parameters
         ----------
+        num_samples : int
+            Number of samples to generate.
         context : np.ndarray, optional
             Conditioning array for samplers, shape (context_shape,).
 
         Returns
         -------
         dict of {str: np.ndarray}
-            Mapping from free parameter name to array of shape (dims[p],).
+            Mapping from free parameter name to array of shape (num_samples, dims[p]).
 
         Raises
         ------
@@ -97,33 +100,35 @@ class Tokenizer:
         out: dict[str, np.ndarray] = {}
         for name in self.free_params:
             dim = self.get_parameter_dims(name)
-            # Sample parameter using provided function or default to random normal
-            arr = self.free_parameters.get(name, lambda c: np.random.randn(dim))(context)
+            # Sample num_samples times, ensuring shape (num_samples, dim)
+            arr = np.array(
+                [self.free_parameters.get(name, lambda c: np.random.randn(dim))(context) for _ in range(num_samples)])
             arr = np.asarray(arr, dtype=np.float32)
-
+            if arr.shape != (num_samples, dim):
+                arr = arr.reshape(num_samples, dim)
             if name in self.constraints:
                 arr = self.constraints[name](arr)
-            if arr.shape != (dim,):
-                raise ValueError(f"Sampler for '{name}' must return shape ({dim},); got {arr.shape}")
+            if arr.shape != (num_samples, dim):
+                raise ValueError(f"Sampler for '{name}' must return shape ({num_samples}, {dim}); got {arr.shape}")
             out[name] = arr
         return out
 
     def combine(
-        self,
-        sampled: dict[str, np.ndarray]
+            self,
+            sampled: dict[str, np.ndarray]
     ) -> dict[str, np.ndarray]:
         """
-        Build a dictionary of parameter values for a single simulation.
+        Build a dictionary of parameter values for multiple simulations.
 
         Parameters
         ----------
         sampled : dict of {str: np.ndarray}
-            Samples for free parameters, shape (dims[p],).
+            Samples for free parameters, shape (num_samples, dims[p]).
 
         Returns
         -------
         dict of {str: np.ndarray}
-            Mapping from used parameter name to array of shape (dims[name],).
+            Mapping from used parameter name to array of shape (num_samples, dims[name]).
 
         Raises
         ------
@@ -131,19 +136,17 @@ class Tokenizer:
             If sampled or fixed parameter shapes are incorrect.
         """
         out: dict[str, np.ndarray] = {}
+        num_samples = next(iter(sampled.values())).shape[0] if sampled else 1
         for name in self.used_params:
-            # Get parameter dimensions
             dim = self.get_parameter_dims(name)
-
-            # Get mask
             slot_mask = self.mask[self.parameter_slices[name]][0]
             if slot_mask == 1.0:  # Free parameter
                 if name in sampled:
                     arr = np.asarray(sampled[name], dtype=np.float32)
-                    if arr.shape != (dim,):
-                        raise ValueError(f"Sample for '{name}' must have shape ({dim},); got {arr.shape}")
+                    if arr.shape != (num_samples, dim):
+                        raise ValueError(f"Sample for '{name}' must have shape ({num_samples}, {dim}); got {arr.shape}")
                 else:
-                    arr = np.random.randn(dim).astype(np.float32)  # Default to random normal
+                    arr = np.random.randn(num_samples, dim).astype(np.float32)
                 out[name] = arr
             elif slot_mask == 0.0:  # Fixed parameter
                 if callable(self.fixed_parameters[name]):
@@ -152,6 +155,8 @@ class Tokenizer:
                         raise ValueError(f"Fixed generator for '{name}' must return shape ({dim},)")
                 else:
                     arr = self.fixed_parameter_vectors[name].astype(np.float32)
+                # Broadcast fixed parameters to match num_samples
+                arr = np.repeat(arr[None, :], num_samples, axis=0)
                 out[name] = arr
         return out
 

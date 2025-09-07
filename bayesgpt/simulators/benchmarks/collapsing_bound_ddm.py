@@ -330,8 +330,11 @@ def _validate_parameters(
         If parameters have invalid shapes or values.
     """
     for key, param in params_array.items():
-        if param.shape != (num_samples,):
-            raise ValueError(f"{key} must have shape (num_samples,)")
+        if param.shape != num_samples:
+            if param.shape[0] == num_samples:
+                params_array[key] = param.squeeze()
+            else:
+                raise ValueError(f"{key} must have shape ({num_samples},), but instead have {param.shape}")
     if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
         raise ValueError("a, sigma must be > 0")
     if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):

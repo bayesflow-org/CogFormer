@@ -558,8 +558,11 @@ def _validate_parameters(
             if param.shape[0] != num_samples:
                 raise ValueError(f"{key} must have shape (num_samples, num_segments)")
         else:
-            if param.shape != (num_samples,):
-                raise ValueError(f"{key} must have shape (num_samples,)")
+            if param.shape != num_samples:
+                if param.shape[0] == num_samples:
+                    params_array[key] = param.squeeze()
+                else:
+                    raise ValueError(f"{key} must have shape ({num_samples},), but instead have {param.shape}")
     if "t_schedule" in params_array and params_array["t_schedule"].shape != params_array["v_schedule"].shape:
         raise ValueError("t_schedule must have same shape as v_schedule")
     if "p_components" in params_array and params_array["p_components"].shape != params_array["v_components"].shape:
