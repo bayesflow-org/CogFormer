@@ -6,8 +6,8 @@ from ..model import Model
 
 class StandardDDM(Model):
     """
-    Simulates response times and choices from a Drift Diffusion Model (DDM)
-    using Euler-Maruyama discretization with optional boundary collapse.
+    Simulates response times and choices from a classic Drift Diffusion Model (DDM)
+    with static boundaries using Euler-Maruyama discretization.
 
     Accumulation continues until evidence reaches upper or lower boundary.
     Returns both RT and binary choice (1 = upper, 0 = lower).
@@ -53,8 +53,6 @@ class StandardDDM(Model):
                 Drift rate noise, standard deviation of drift rate variability, >= 0.
             - sigma : float or np.ndarray
                 Diffusion noise, standard deviation of evidence accumulation noise, > 0.
-            - angle : float or np.ndarray
-                Boundary collapse rate, controls rate of boundary reduction, >= 0.
             - s_z : float or np.ndarray
                 Starting point noise, standard deviation of starting point variability, >= 0.
             - s_tau : float or np.ndarray
@@ -96,7 +94,6 @@ class StandardDDM(Model):
             tau=params["tau"],
             s_v=params["s_v"],
             sigma=params["sigma"],
-            angle=params["angle"],
             s_z=params["s_z"],
             s_tau=params["s_tau"],
             dt=self.dt,
@@ -202,7 +199,6 @@ def simulate_standard_ddm(
     tau: float | np.ndarray,
     s_v: float | np.ndarray,
     sigma: float | np.ndarray,
-    angle: float | np.ndarray,
     s_z: float | np.ndarray,
     s_tau: float | np.ndarray,
     dt: float,
@@ -210,7 +206,7 @@ def simulate_standard_ddm(
     num_samples: int
 ) -> np.ndarray:
     """
-    Internal function to simulate the standard DDM with optional boundary collapse.
+    Internal function to simulate the standard DDM with static boundaries.
 
     Parameters
     ----------
@@ -226,8 +222,6 @@ def simulate_standard_ddm(
         Drift rate noise standard deviation, shape (num_samples,), >= 0.
     sigma : float or np.ndarray
         Diffusion noise standard deviation, shape (num_samples,), > 0.
-    angle : float or np.ndarray
-        Boundary collapse rate, shape (num_samples,), >= 0.
     s_z : float or np.ndarray
         Starting point noise standard deviation, shape (num_samples,), >= 0.
     s_tau : float or np.ndarray
@@ -261,7 +255,7 @@ def simulate_standard_ddm(
 
         # Simulation loop
         for step in range(max_steps):
-            bound = max(a[i] * (1.0 - angle[i] * t), 0.0)
+            bound = a[i]  # Static boundary
             x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal()
             t += dt
             if x >= bound:
@@ -298,7 +292,7 @@ def _process_parameters(
         Processed parameters with shapes (num_samples,).
     """
     # Check for required parameters
-    required_params = ["v", "a", "s_v", "sigma", "angle", "s_z", "s_tau"]
+    required_params = ["v", "a", "s_v", "sigma", "s_z", "s_tau"]
     if not any(k in params for k in ["z", "z_arr"]):
         raise ValueError("One of 'z' or 'z_arr' must be provided")
     if not any(k in params for k in ["tau", "tau_arr"]):
@@ -317,7 +311,7 @@ def _process_parameters(
         del params["tau_arr"]
 
     # Broadcast scalar parameters to arrays
-    for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
+    for key in ["v", "a", "z", "tau", "s_v", "sigma", "s_z", "s_tau"]:
         if key in params:
             params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
                 else params[key].astype(np.float32)
@@ -348,7 +342,7 @@ def _validate_parameters(
             raise ValueError(f"{key} must have shape (num_samples,)")
     if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
         raise ValueError("a, sigma must be > 0")
-    if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
-        raise ValueError("s_v, angle, s_z, s_tau must be >= 0")
+    if np.any(params_array["s_v"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
+        raise ValueError("s_v, s_z, s_tau must be >= 0")
     if np.any((params_array["z"] <= 0) | (params_array["z"] >= 1)):
         raise ValueError("0 < z < 1")
