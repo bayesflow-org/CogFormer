@@ -117,7 +117,6 @@ class SuperDDM(Model):
                 z=params["z"],
                 tau=params["tau"],
                 s_v=params["s_v"],
-                sigma=params["sigma"],
                 angle=params["angle"],
                 s_z=params["s_z"],
                 s_tau=params["s_tau"],
@@ -135,7 +134,6 @@ class SuperDDM(Model):
                 z=params["z"],
                 tau=params["tau"],
                 s_v=params["s_v"],
-                sigma=params["sigma"],
                 angle=params["angle"],
                 s_z=params["s_z"],
                 s_tau=params["s_tau"],
@@ -242,10 +240,10 @@ def simulate_mixture_ddm(
     z: float | np.ndarray,
     tau: float | np.ndarray,
     s_v: float | np.ndarray,
-    sigma: float | np.ndarray,
     angle: float | np.ndarray,
     s_z: float | np.ndarray,
     s_tau: float | np.ndarray,
+    sigma: float | np.ndarray,
     dt: float,
     max_steps: int,
     num_samples: int
@@ -355,10 +353,10 @@ def simulate_schedule_ddm(
     z: float | np.ndarray,
     tau: float | np.ndarray,
     s_v: float | np.ndarray,
-    sigma: float | np.ndarray,
     angle: float | np.ndarray,
     s_z: float | np.ndarray,
     s_tau: float | np.ndarray,
+    sigma: float | np.ndarray,
     dt: float,
     max_steps: int,
     num_samples: int
@@ -481,14 +479,14 @@ def _process_parameters(
         If required parameters are missing or have invalid values.
     """
     # Check for required parameters
-    required_params = ["a", "s_v", "sigma", "angle", "s_z", "s_tau"]
+    required_params = ["a", "s_v", "angle", "s_z", "s_tau"]
     if not any(k in params for k in ["v", "v_components", "v_schedule"]):
         raise ValueError("One of 'v', 'v_components', or 'v_schedule' must be provided")
-    if not any(k in params for k in ["z", "z_arr"]):
+    elif not any(k in params for k in ["z", "z_arr"]):
         raise ValueError("One of 'z' or 'z_arr' must be provided")
-    if not any(k in params for k in ["tau", "tau_arr"]):
+    elif not any(k in params for k in ["tau", "tau_arr"]):
         raise ValueError("One of 'tau' or 'tau_arr' must be provided")
-    if not all(k in params for k in required_params):
+    elif not all(k in params for k in required_params):
         raise ValueError(f"Missing parameters: {set(required_params) - set(params)}")
 
     # Handle parameter aliases
@@ -502,7 +500,7 @@ def _process_parameters(
         del params["tau_arr"]
 
     # Broadcast scalar parameters to arrays
-    for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
+    for key in ["v", "a", "z", "tau", "s_v", "angle", "s_z", "s_tau"]:
         if key in params:
             params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
                 else params[key].astype(np.float32)
@@ -571,7 +569,8 @@ def _validate_parameters(
     # Validate parameter values
     if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
         raise ValueError("a, sigma must be > 0")
-    if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
+    if (np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0)
+            or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0)):
         raise ValueError("s_v, angle, s_z, s_tau must be >= 0")
     if "z" in params_array and np.any((params_array["z"] <= 0) | (params_array["z"] >= 1)):
         raise ValueError("0 < z < 1")
