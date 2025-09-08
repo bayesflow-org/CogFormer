@@ -3,9 +3,9 @@ from typing import Optional, Union, Callable, Dict, Tuple
 from collections.abc import Mapping
 
 
-class Tokenizer:
+class ContextManager:
     """
-    Tri-state tokenizer over a global superset of parameters with optional
+    Tri-state context manager over a global superset of parameters with optional
     per-parameter dimensionality.
 
     This class builds a flattened representation of parameters for a single simulation,
@@ -324,7 +324,8 @@ class Tokenizer:
         inference_conditions["full_conditions"] = np.concatenate(full_conditions)
         return inference_conditions
 
-    def get_mask(self) -> np.ndarray:
+    @property
+    def mask(self) -> np.ndarray:
         """
         Returns the tri-state mask for parameter roles.
 
@@ -335,7 +336,8 @@ class Tokenizer:
         """
         return self.mask
 
-    def get_base_values(self) -> np.ndarray:
+    @property
+    def base_values(self) -> np.ndarray:
         """
         Returns the conditioning vector with fixed/default values.
 
