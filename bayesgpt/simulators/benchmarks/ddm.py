@@ -58,14 +58,14 @@ def simulate_standard_ddm(
 def simulate_collapsing_bound_ddm(
     v: np.ndarray,
     a: np.ndarray,
-    zr: float,
     tau: float,
-    s_v: float,
-    angle: float,
     s_tau: float,
-    sigma: float,
-    dt: float,
-    max_steps: int,
+    s_v: float,
+    decay: float,
+    zr: float = 0.5,
+    sigma: float = 1.,
+    dt: float = 0.001,
+    max_steps: int = 10000,
 ) -> np.ndarray:
 
     num_samples = v.shape[0]
@@ -79,13 +79,13 @@ def simulate_collapsing_bound_ddm(
         tau_i = max(np.random.normal(tau, s_tau), 0.0)
 
         # Initialize decision variable (symmetric around 0)
-        x = zr[i] * a[i]
+        x = zr * a[i]
         t = tau_i
 
         # Simulation loop
         for step in range(max_steps):
             t += dt
-            bound = max(a[i] - angle * t, 1e-3)
+            bound = max(a[i] - decay * t, 1e-3)
             x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
             if x >= bound:
                 rts[i] = t
@@ -110,7 +110,7 @@ def simulate_mixture_ddm(
     z: float,
     tau: float,
     s_v: float,
-    angle: float,
+    decay: float,
     s_z: float,
     s_tau: float,
     sigma: float,
@@ -158,7 +158,7 @@ def simulate_mixture_ddm(
 
         # Run simulation loop
         for step in range(max_steps):
-            bound = max(a * (1.0 - angle * t), 0.0)
+            bound = max(a * (1.0 - decay * t), 0.0)
             x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
             t += dt
             if x >= bound:
@@ -182,7 +182,7 @@ def simulate_schedule_ddm(
     z: float,
     tau: float,
     s_v: float,
-    angle: float,
+    decay: float,
     s_z: float,
     s_tau: float,
     sigma: float,
@@ -222,7 +222,7 @@ def simulate_schedule_ddm(
                     t_next = np.inf
 
             # Update decision variable and boundary
-            bound = max(a * (1. - angle * t), 0.)
+            bound = max(a * (1. - decay * t), 0.)
             x += v * dt + sigma * np.sqrt(dt) * np.random.normal(0.0, 1.0)
             t += dt
             step += 1
