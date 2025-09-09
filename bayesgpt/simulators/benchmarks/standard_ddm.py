@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Union, Optional, Callable, Iterable
 from ..model import Model
-from simulators.benchmarks import simulate_standard_ddm
+from .ddm import simulate_standard_ddm
 from simulators import ContextManager
 
 
