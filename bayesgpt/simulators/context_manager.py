@@ -56,9 +56,9 @@ class ContextManager:
         return regressors, regressed_parameters
 
     def sample(
-            self,
-            num_samples: int,
-            context: Optional[np.ndarray] = None
+        self,
+        num_samples: int,
+        context: Optional[np.ndarray] = None
     ) -> dict[str, np.ndarray]:
         """
         Sample all free parameters for num_samples simulations, applying constraints if provided.
@@ -102,8 +102,8 @@ class ContextManager:
         return out
 
     def combine(
-            self,
-            sampled: dict[str, np.ndarray]
+        self,
+        sampled: dict[str, np.ndarray]
     ) -> dict[str, np.ndarray]:
         """
         Build a dictionary of parameter values for multiple simulations.

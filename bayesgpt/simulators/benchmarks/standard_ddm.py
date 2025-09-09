@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Union, Optional, Callable, Iterable
-from numba import njit, prange
 from ..model import Model
+from simulators.benchmarks import simulate_standard_ddm
 
 
 class StandardDDM(Model):
@@ -75,9 +75,6 @@ class StandardDDM(Model):
         ValueError
             If context shape is invalid, required parameters are missing, or parameters violate constraints.
         """
-        # Process and validate parameters
-        params = _process_parameters(params, num_samples)
-        _validate_parameters(params, num_samples)
 
         # Modulate parameters with context if provided
         if context is not None and modulation is not None:
@@ -103,9 +100,9 @@ class StandardDDM(Model):
 
         # Construct output
         output = {"rts": result[:, 0], "choices": result[:, 1]}
-        if context is not None:
-            output["context"] = context
+        output["context"] = context
         return output
+
 
     @staticmethod
     def summarize(
@@ -189,88 +186,6 @@ class StandardDDM(Model):
                 ]).astype(np.float32)
 
         return out
-
-
-@njit(parallel=True)
-def simulate_standard_ddm(
-    v: float | np.ndarray,
-    a: float | np.ndarray,
-    z: float | np.ndarray,
-    tau: float | np.ndarray,
-    s_v: float | np.ndarray,
-    sigma: float | np.ndarray,
-    s_z: float | np.ndarray,
-    s_tau: float | np.ndarray,
-    dt: float,
-    max_steps: int,
-    num_samples: int
-) -> np.ndarray:
-    """
-    Internal function to simulate the standard DDM with static boundaries.
-
-    Parameters
-    ----------
-    v : float or np.ndarray
-        Drift rate, shape (num_samples,).
-    a : float or np.ndarray
-        Decision boundary, shape (num_samples,), > 0.
-    z : float or np.ndarray
-        Starting point, shape (num_samples,), 0 < z < 1.
-    tau : float or np.ndarray
-        Non-decision time, shape (num_samples,), >= 0.
-    s_v : float or np.ndarray
-        Drift rate noise standard deviation, shape (num_samples,), >= 0.
-    sigma : float or np.ndarray
-        Diffusion noise standard deviation, shape (num_samples,), > 0.
-    s_z : float or np.ndarray
-        Starting point noise standard deviation, shape (num_samples,), >= 0.
-    s_tau : float or np.ndarray
-        Non-decision time noise standard deviation, shape (num_samples,), >= 0.
-    dt : float
-        Interval per time step.
-    max_steps : int
-        Maximum number of simulation steps.
-    num_samples : int
-        Number of trials to simulate.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) containing reaction times (column 0) and choices (column 1).
-    """
-    # Initialize output arrays
-    result = np.zeros((num_samples, 2), dtype=np.float32)
-    rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate each trial
-    for i in prange(num_samples):
-        # Sample parameters with noise
-        v_i = np.random.normal(v[i], s_v[i])
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
-        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
-
-        # Initialize decision variable
-        x = z_i * a[i]
-        t = 0.0
-
-        # Simulation loop
-        for step in range(max_steps):
-            bound = a[i]  # Static boundary
-            x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal()
-            t += dt
-            if x >= bound:
-                rts[i] = t + tau_i
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t + tau_i
-                choices[i] = 0
-                break
-        else:
-            rts[i] = np.nan
-            choices[i] = np.nan
-
-    return result
 
 
 def _process_parameters(

@@ -1,27 +1,40 @@
 import numpy as np
 from typing import Union, Optional, Callable, Iterable
-from numba import njit, prange
-from .standard_ddm import StandardDDM
+from simulators import Model, ContextManager
+from simulators.benchmarks import simulate_collapsing_bound_ddm
 
 
-class CollapsingBoundDDM(StandardDDM):
+class CollapsingBoundDDM(Model):
     """
     Drift Diffusion Model with symmetric linearly collapsing bounds.
 
     Inherits from StandardDDM and overrides simulate logic to implement
     dynamic thresholds: B(t) = a - angle * t, with support for context modulation.
     """
+    def __init__(self, context_manager: ContextManager, dt: float = 0.001, max_steps: int = 10000):
+        """Initialize StandardDDM with simulation parameters.
+
+        Parameters
+        ----------
+        dt : float, optional
+            Time step for simulation in seconds, by default 0.001.
+        max_steps : int, optional
+            Maximum number of simulation steps, by default 10000.
+        """
+        self.dt = dt
+        self.max_steps = max_steps
+        self.context_manager = context_manager
 
     def simulate(
         self,
         params: dict[str, Union[float, np.ndarray]],
         num_samples: int = 1,
+        context_manager: ContextManager = None,
         context: Optional[np.ndarray] = None,
         modulation: Optional[Callable[[dict, np.ndarray], dict]] = None
     ) -> dict[str, np.ndarray]:
 
         # Generate design matrices and regressed parameter vectors
-        #TODO
         regressors, regressed_params = self.context_manager.generate_regressors(params, num_samples=num_samples)
 
         # Simulate
@@ -50,10 +63,10 @@ class CollapsingBoundDDM(StandardDDM):
 
     @staticmethod
     def summarize(
-            outputs: dict[str, np.ndarray],
-            quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
-            by_choice: bool = True,
-            tau: Optional[np.ndarray] = None,
+        outputs: dict[str, np.ndarray],
+        quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
+        by_choice: bool = True,
+        tau: Optional[np.ndarray] = None,
     ) -> dict[str, np.ndarray]:
         """
         Summarize RTs with robust quantiles (and optional decision-time RT−tau).
@@ -132,52 +145,7 @@ class CollapsingBoundDDM(StandardDDM):
         return out
 
 
-@njit(parallel=True)
-def simulate_collapsing_bound_ddm(
-    v: np.ndarray,
-    a: np.ndarray,
-    zr: float,
-    tau: float,
-    s_v: float,
-    angle: float,
-    s_tau: float,
-    sigma: float,
-    dt: float,
-    max_steps: int,
-) -> np.ndarray:
 
-    num_samples = v.shape[0]
-    result = np.zeros((num_samples, 2), dtype=np.float32)
-    rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate each trial
-    for i in prange(num_samples):
-        # Sample parameters with noise
-        v_i = np.random.normal(v[i], s_v[i])
-        tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
-
-        # Initialize decision variable (symmetric around 0)
-        x = zr[i] * a[i]
-        t = tau_i
-
-        # Simulation loop
-        for step in range(max_steps):
-            t += dt
-            bound = max(a[i] - angle[i] * t, 1e-3)
-            x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
-            if x >= bound:
-                rts[i] = t
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t
-                choices[i] = 0
-                break
-        else:
-            rts[i] = -1.
-            choices[i] = -1.
-
-    return result
 
 def _process_parameters(
     params: dict[str, Union[float, np.ndarray]],
@@ -221,7 +189,18 @@ def _process_parameters(
         if key in params:
             params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
                 else params[key].astype(np.float32)
+    def __init__(self, dt: float = 0.001, max_steps: int = 10000):
+        """Initialize StandardDDM with simulation parameters.
 
+        Parameters
+        ----------
+        dt : float, optional
+            Time step for simulation in seconds, by default 0.001.
+        max_steps : int, optional
+            Maximum number of simulation steps, by default 10000.
+        """
+        self.dt = dt
+        self.max_steps = max_steps
     return params
 
 
@@ -251,7 +230,10 @@ def _validate_parameters(
                 raise ValueError(f"{key} must have shape ({num_samples},), but instead have {param.shape}")
     if np.any(params_array["a"] <= 0) or np.any(params_array["sigma"] <= 0):
         raise ValueError("a, sigma must be > 0")
-    if np.any(params_array["s_v"] < 0) or np.any(params_array["angle"] < 0) or np.any(params_array["s_z"] < 0) or np.any(params_array["s_tau"] < 0):
+    if (np.any(params_array["s_v"] < 0)
+    or np.any(params_array["angle"] < 0)
+    or np.any(params_array["s_z"] < 0)
+    or np.any(params_array["s_tau"] < 0)):
         raise ValueError("s_v, angle, s_z, s_tau must be >= 0")
     if np.any((params_array["z"] <= 0) | (params_array["z"] >= 1)):
         raise ValueError("0 < z < 1")

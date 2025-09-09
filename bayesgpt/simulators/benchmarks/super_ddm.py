@@ -1,7 +1,8 @@
 import numpy as np
 from typing import Union, Optional, Callable, Iterable
-from numba import njit, prange
 from ..model import Model
+from simulators import ContextManager
+from simulators.benchmarks import simulate_mixture_ddm, simulate_schedule_ddm
 
 
 class SuperDDM(Model):
@@ -18,7 +19,7 @@ class SuperDDM(Model):
         Maximum number of simulation steps, by default 10000.
     """
 
-    def __init__(self, dt: float = 0.001, max_steps: int = 10000):
+    def __init__(self, context_manager: ContextManager, dt: float = 0.001, max_steps: int = 10000):
         """Initialize SuperDDM with simulation parameters.
 
         Parameters
@@ -28,85 +29,17 @@ class SuperDDM(Model):
         max_steps : int, optional
             Maximum number of simulation steps, by default 10000.
         """
+        self.context_manager = context_manager
         self.dt = dt
         self.max_steps = max_steps
 
     def simulate(
-            self,
-            params: dict[str, Union[float, np.ndarray]],
-            num_samples: int = 1,
-            context: Optional[np.ndarray] = None,
-            modulation: Optional[Callable[[dict, np.ndarray], dict]] = None
+        self,
+        params: dict[str, Union[float, np.ndarray]],
+        num_samples: int = 1,
+        context: Optional[np.ndarray] = None,
+        modulation: Optional[Callable[[dict, np.ndarray], dict]] = None
     ) -> dict[str, np.ndarray]:
-        """Simulate data for a single model run with specified parameters.
-
-        Parameters
-        ----------
-        params : dict[str, Union[float, np.ndarray]]
-            Parameters for simulation, with arrays of shape (dims,) or scalars.
-            Must include:
-            - a : float or np.ndarray
-                Decision boundary (threshold), controls decision caution, > 0.
-            - s_v : float or np.ndarray
-                Drift rate noise, standard deviation of drift rate variability, >= 0.
-            - sigma : float or np.ndarray
-                Diffusion noise, standard deviation of evidence accumulation noise, > 0.
-            - angle : float or np.ndarray
-                Boundary collapse rate, controls rate of boundary reduction over time, >= 0.
-            - s_z : float or np.ndarray
-                Starting point noise, standard deviation of starting point variability, >= 0.
-            - s_tau : float or np.ndarray
-                Non-decision time noise, standard deviation of non-decision time variability, >= 0.
-            Must include one of:
-            - v : float or np.ndarray
-                Single drift rate for all trials, determines evidence accumulation speed.
-            - v_components : np.ndarray
-                Drift rates for mixture model, shape (num_samples, num_components).
-            - v_schedule : np.ndarray
-                Drift rates for scheduled model, shape (num_samples, num_segments).
-            Optional:
-            - z or z_arr : float or np.ndarray
-                Starting point, relative to boundaries (0 < z < 1).
-            - tau or tau_arr : float or np.ndarray
-                Non-decision time, time before evidence accumulation, >= 0.
-            - p_components : np.ndarray
-                Mixture probabilities for v_components, shape (num_samples, num_components).
-            - t_schedule : np.ndarray
-                Time points for v_schedule changes, shape (num_samples, num_segments).
-        num_samples : int, optional
-            Number of samples (trials) per simulation, by default 1.
-        context : np.ndarray, optional
-            Array of external conditions (e.g., task difficulty, stimulus strength) for each trial,
-            shape (num_samples,). Can influence model parameters via modulation and is included
-            in the output for use in downstream tasks like neural network training.
-        modulation : Callable[[dict, np.ndarray], dict], optional
-            Function to adjust model parameters based on context. Takes the params dictionary
-            and context array as input and returns an updated params dictionary. Must ensure
-            all modified parameters respect model constraints (e.g., a > 0, 0 < z < 1).
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary containing simulated data with keys 'rts' (reaction times),
-            'choices' (binary choices), and optionally 'context'. Arrays are of
-            shape (num_samples,) in np.float32.
-
-        Raises
-        ------
-        ValueError
-            If context shape is invalid, required parameters are missing, or modulated parameters
-            violate model constraints.
-        """
-        # Process and validate input parameters
-        params = _process_parameters(params, num_samples)
-        _validate_parameters(params, num_samples)
-
-        # Modulate parameters with context if provided
-        if context is not None and modulation is not None:
-            if context.shape != (num_samples,):
-                raise ValueError(f"context must have shape ({num_samples},), got {context.shape}")
-            params = modulation(params, context)
-            _validate_parameters(params, num_samples)  # Re-validate after modulation
 
         # Run appropriate simulation based on drift type
         if "v_schedule" in params:
@@ -144,16 +77,16 @@ class SuperDDM(Model):
 
         # Construct output with optional context
         output = {"rts": result[:, 0], "choices": result[:, 1]}
-        if context is not None:
-            output["context"] = context
+
+        output["context"] = context
         return output
 
     @staticmethod
     def summarize(
-            outputs: dict[str, np.ndarray],
-            quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
-            by_choice: bool = True,
-            tau: Optional[np.ndarray] = None,
+        outputs: dict[str, np.ndarray],
+        quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
+        by_choice: bool = True,
+        tau: Optional[np.ndarray] = None,
     ) -> dict[str, np.ndarray]:
         """
         Summarize RTs with robust quantiles (and optional decision-time RT−tau).
@@ -231,228 +164,6 @@ class SuperDDM(Model):
 
         return out
 
-
-@njit(parallel=True)
-def simulate_mixture_ddm(
-    v: float | np.ndarray,
-    p: float | np.ndarray,
-    a: float | np.ndarray,
-    z: float | np.ndarray,
-    tau: float | np.ndarray,
-    s_v: float | np.ndarray,
-    angle: float | np.ndarray,
-    s_z: float | np.ndarray,
-    s_tau: float | np.ndarray,
-    sigma: float | np.ndarray,
-    dt: float,
-    max_steps: int,
-    num_samples: int
-) -> np.ndarray:
-    """Simulate a drift diffusion model with mixture drift rates.
-
-    Parameters
-    ----------
-    v : float or np.ndarray
-        Drift rate for single drift model or component drift rates for mixture model,
-        shape (num_samples,) or (num_samples, num_components).
-    p : float or np.ndarray, optional
-        Mixture probabilities for v_components, shape (num_samples, num_components).
-    a : float or np.ndarray
-        Decision boundary, shape (num_samples,), > 0.
-    z : float or np.ndarray
-        Starting point, shape (num_samples,), 0 < z < 1.
-    tau : float or np.ndarray
-        Non-decision time, shape (num_samples,), >= 0.
-    s_v : float or np.ndarray
-        Drift rate noise standard deviation, shape (num_samples,), >= 0.
-    sigma : float or np.ndarray
-        Diffusion noise standard deviation, shape (num_samples,), > 0.
-    angle : float or np.ndarray
-        Boundary collapse rate, shape (num_samples,), >= 0.
-    s_z : float or np.ndarray
-        Starting point noise standard deviation, shape (num_samples,), >= 0.
-    s_tau : float or np.ndarray
-        Non-decision time noise standard deviation, shape (num_samples,), >= 0.
-    dt : float
-        Time step for simulation (seconds).
-    max_steps : int
-        Maximum number of simulation steps.
-    num_samples : int
-        Number of trials to simulate.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) containing reaction times (column 0) and choices (column 1).
-    """
-    # Initialize output arrays
-    result = np.zeros((num_samples, 2), dtype=np.float32)
-    rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate each trial
-    for i in prange(num_samples):
-        # Extract parameters for the trial
-        a_i = a[i]
-        sigma_i = sigma[i]
-        angle_i = angle[i]
-        s_v_i = s_v[i]
-        s_z_i = s_z[i]
-        s_tau_i = s_tau[i]
-
-        # Sample starting point and non-decision time
-        z_i_sample = np.random.normal(z[i], s_z_i)
-        z_i = z_i_sample if z_i_sample < 0.999 else 0.999
-        z_i = z_i if z_i > 0.001 else 0.001
-        tau_i = max(np.random.normal(tau[i], s_tau_i), 0.0)
-
-        # Select drift rate (single or random choice from components)
-        if v.ndim == 1:
-            v_i = v[i]
-        else:
-            num_components = v.shape[1]
-            p_i = np.ones(num_components).astype(np.float32) / num_components if p is None else p[i]
-            p_i = p_i / np.sum(p_i)  # Normalize probabilities
-            r = np.random.random()
-            cumsum = 0.0
-            selected_idx = 0
-            for j in range(num_components):
-                cumsum += float(p_i[j])
-                if r <= cumsum:
-                    selected_idx = j
-                    break
-            v_i = float(v[i, selected_idx])
-        v_i = float(np.random.normal(v_i, s_v_i))
-
-        # Initialize decision variable
-        x = z_i * a_i
-        t = 0.0
-
-        # Run simulation loop
-        for step in range(max_steps):
-            bound = max(a_i * (1.0 - angle_i * t), 0.0)
-            x += v_i * dt + sigma_i * np.sqrt(dt) * np.random.normal()
-            t += dt
-            if x >= bound:
-                rts[i] = t + tau_i
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t + tau_i
-                choices[i] = 0
-                break
-        else:
-            rts[i] = np.nan
-            choices[i] = np.nan
-    return result
-
-@njit(parallel=True)
-def simulate_schedule_ddm(
-    v_schedule: np.ndarray,
-    t_schedule: np.ndarray,
-    a: float | np.ndarray,
-    z: float | np.ndarray,
-    tau: float | np.ndarray,
-    s_v: float | np.ndarray,
-    angle: float | np.ndarray,
-    s_z: float | np.ndarray,
-    s_tau: float | np.ndarray,
-    sigma: float | np.ndarray,
-    dt: float,
-    max_steps: int,
-    num_samples: int
-) -> np.ndarray:
-    """Simulate a drift diffusion model with scheduled drift rates.
-
-    Parameters
-    ----------
-    v_schedule : np.ndarray
-        Drift rates for scheduled model, shape (num_samples, num_segments).
-    t_schedule : np.ndarray
-        Time points for drift rate changes, shape (num_samples, num_segments).
-    a : float or np.ndarray
-        Decision boundary, shape (num_samples,), > 0.
-    z : float or np.ndarray
-        Starting point, shape (num_samples,), 0 < z < 1.
-    tau : float or np.ndarray
-        Non-decision time, shape (num_samples,), >= 0.
-    s_v : float or np.ndarray
-        Drift rate noise standard deviation, shape (num_samples,), >= 0.
-    sigma : float or np.ndarray
-        Diffusion noise standard deviation, shape (num_samples,), > 0.
-    angle : float or np.ndarray
-        Boundary collapse rate, shape (num_samples,), >= 0.
-    s_z : float or np.ndarray
-        Starting point noise standard deviation, shape (num_samples,), >= 0.
-    s_tau : float or np.ndarray
-        Non-decision time noise standard deviation, shape (num_samples,), >= 0.
-    dt : float
-        Time step for simulation (seconds).
-    max_steps : int
-        Maximum number of simulation steps.
-    num_samples : int
-        Number of trials to simulate.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) containing reaction times (column 0) and choices (column 1).
-    """
-    # Initialize output arrays
-    result = np.zeros((num_samples, 2), dtype=np.float32)
-    rts, choices = result[:, 0], result[:, 1]
-
-    # Simulate each trial
-    for i in prange(num_samples):
-        # Extract parameters for the trial
-        a_i = a[i]
-        sigma_i = sigma[i]
-        angle_i = angle[i]
-        s_v_i = s_v[i]
-        s_z_i = s_z[i]
-        s_tau_i = s_tau[i]
-
-        # Sample starting point and non-decision time
-        z_i = max(min(np.random.normal(z[i], s_z_i), 0.999), 0.001)
-        tau_i = max(np.random.normal(tau[i], s_tau_i), 0.)
-
-        # Initialize decision variable and drift schedule
-        x = z_i * a_i
-        t = 0.
-        step = 0
-        v_index = 0
-        v = np.random.normal(v_schedule[i, v_index], s_v_i)  # Sample v for first segment
-        t_next = t_schedule[i, v_index] if t_schedule.shape[1] > v_index else np.inf
-
-        # Run simulation loop
-        while step < max_steps:
-            # Update drift rate if time exceeds next schedule point
-            if t >= t_next:
-                v_index += 1
-                if v_index < v_schedule.shape[1]:
-                    v = np.random.normal(v_schedule[i, v_index], s_v_i)
-                    t_next = t_schedule[i, v_index]
-                else:
-                    t_next = np.inf
-
-            # Update decision variable and boundary
-            bound = max(a_i * (1. - angle_i * t), 0.)
-            x += v * dt + sigma_i * np.sqrt(dt) * np.random.normal(0.0, 1.0)
-            t += dt
-            step += 1
-
-            # Check for boundary crossing
-            if x >= bound:
-                rts[i] = t + tau_i
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t + tau_i
-                choices[i] = 0
-                break
-        else:
-            rts[i] = np.nan
-            choices[i] = np.nan
-    return result
 
 def _process_parameters(
         params: dict[str, Union[float, np.ndarray]],
