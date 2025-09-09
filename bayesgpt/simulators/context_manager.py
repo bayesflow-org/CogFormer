@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, Tuple, Set
 
+
 class ContextManager:
     def __init__(self, parameter_names: list[str], fixed_parameters: Set[str] = None):
         self.parameter_names = list(parameter_names)
