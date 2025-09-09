@@ -2,6 +2,7 @@ import numpy as np
 from typing import Union, Optional, Callable, Iterable
 from ..model import Model
 from simulators.benchmarks import simulate_standard_ddm
+from simulators import ContextManager
 
 
 class StandardDDM(Model):
@@ -13,7 +14,7 @@ class StandardDDM(Model):
     Returns both RT and binary choice (1 = upper, 0 = lower).
     """
 
-    def __init__(self, dt: float = 0.001, max_steps: int = 10000):
+    def __init__(self, context_manager: ContextManager, dt: float = 0.001, max_steps: int = 10000):
         """Initialize StandardDDM with simulation parameters.
 
         Parameters
@@ -23,6 +24,7 @@ class StandardDDM(Model):
         max_steps : int, optional
             Maximum number of simulation steps, by default 10000.
         """
+        self.context_manager = context_manager
         self.dt = dt
         self.max_steps = max_steps
 
