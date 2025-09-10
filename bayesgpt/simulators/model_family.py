@@ -4,7 +4,7 @@ from .model import Model
 from .context_manager import ContextManager
 
 class NestedModelFamily:
-    def __init__(self, name: str, model: type[Model], context_manager: ContextManager, num_samples: int):
+    def __init__(self, name: str, model: type[Model], context_manager: ContextManager, num_samples: int = 10):
         # Initialize with model name, model class, context manager, and number of samples
         self.name = name
         self.model = model(context_manager)  # Instantiate model with context manager
@@ -34,6 +34,9 @@ class NestedModelFamily:
         fixed_parameters = {k: float(v) if isinstance(v, (int, float)) else v[0] for k, v in params.items()}
         params_dict = self.context_manager.combine(sampled_parameters, fixed_parameters)
         params_dict.update(regressed_params)  # Override with regressed parameters
+
+        # Scalarize
+
 
         # Run simulation
         sim_data = self.model.simulate(params_dict, num_samples=num_samples)

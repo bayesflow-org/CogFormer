@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Optional, Iterable
+from typing import Optional, Iterable
 from simulators import Model, ContextManager
 from .ddm import simulate_collapsing_bound_ddm
 
@@ -10,12 +10,7 @@ class CollapsingBoundDDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
-    def simulate(self, params: Dict[str, np.ndarray], num_samples: int = 1) -> Dict[str, np.ndarray]:
-        # Generate design matrices and regressed parameters
-        regressors, regressed_params = self.context_manager.generate_regressors(
-            params=params,
-            num_samples=num_samples
-        )
+    def simulate(self, params: dict[str, np.ndarray], num_samples: int = 1) -> dict[str, np.ndarray]:
 
         # Validate parameters
         # self._validate_parameters(regressed_params, num_samples)
@@ -23,14 +18,14 @@ class CollapsingBoundDDM(Model):
 
         # Simulate using regressed and scalar parameters
         result = simulate_collapsing_bound_ddm(
-            v=regressed_params["v"],
-            a=regressed_params["a"],
-            zr=regressed_params["zr"],
-            tau=regressed_params["tau"],
-            s_v=regressed_params["s_v"],
-            decay=regressed_params["decay"],
-            s_tau=regressed_params["s_tau"],
-            sigma=regressed_params["sigma"],
+            v=params["v"],
+            a=params["a"],
+            zr=params["zr"],
+            tau=params["tau"],
+            s_v=params["s_v"],
+            decay=params["decay"],
+            s_tau=params["s_tau"],
+            sigma=params["sigma"],
             dt=self.dt,
             max_steps=self.max_steps
         )
@@ -63,11 +58,11 @@ class CollapsingBoundDDM(Model):
 
     @staticmethod
     def summarize(
-        outputs: Dict[str, np.ndarray],
+        outputs: dict[str, np.ndarray],
         quantile_levels: Iterable[float] = (0.1, 0.3, 0.5, 0.7, 0.9),
         by_choice: bool = True,
         tau: Optional[np.ndarray] = None
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         # Summarize response times with quantiles
         rts = outputs["rts"].astype(np.float32, copy=False)
         choices = outputs["choices"].astype(np.float32, copy=False)
