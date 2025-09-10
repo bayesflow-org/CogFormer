@@ -1,0 +1,39 @@
+import numpy as np
+from typing import Dict, Tuple
+
+
+def generate_regressors(
+    params: Dict[str, np.ndarray],
+    num_samples: int,
+    param_dims: Dict[str, int],
+    fixed_parameters: set[str],
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    """
+    Expand provided coefficient vectors into per-trial values via a simple design matrix.
+    Scalar inputs (shape (1,) or float) become length-N vectors.
+    Vector inputs of length==dim -> treat as coefficients: [β0, β1, ..., β_{dim-1}]
+    Uses a dummy design: [1, U_1, ..., U_{dim-1}] with U_j ~ U(0,1).
+    """
+    regressors, regressed = {}, {}
+    for name, vec in params.items():
+        if name in fixed_parameters:
+            continue
+        arr = np.asarray(vec, dtype=np.float32)
+        dim = param_dims.get(name, 1)
+
+        # Scalar → broadcast
+        if arr.ndim == 0 or (arr.ndim == 1 and arr.size == 1):
+            regressed[name] = np.full(num_samples, float(arr[0] if arr.ndim else arr), dtype=np.float32)
+            regressors[name] = np.ones((num_samples, 1), dtype=np.float32)
+            continue
+
+        # Coeff vector → linear regression expansion
+        if arr.ndim == 1 and arr.size == dim:
+            X = np.c_[np.ones((num_samples, 1), dtype=np.float32),
+                      np.random.rand(num_samples, max(0, dim - 1)).astype(np.float32)]
+            regressed[name] = (X @ arr.reshape(-1, 1)).ravel().astype(np.float32)
+            regressors[name] = X
+            continue
+
+        raise ValueError(f"{name}: unsupported shape {arr.shape} for dim={dim}")
+    return regressors, regressed
