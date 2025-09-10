@@ -2,6 +2,7 @@ import numpy as np
 from typing import Dict, Optional, Union
 from .model import Model
 from .context_manager import ContextManager
+from utils.simulator_utils import generate_regressors
 
 class NestedModelFamily:
     def __init__(self, name: str, model: type[Model], context_manager: ContextManager, num_samples: int = 10):
@@ -32,15 +33,22 @@ class NestedModelFamily:
         sampled_parameters = self.context_manager.sample(num_samples)
 
         # Generate regressed parameters for provided params (non-fixed only)
-        regressors, regressed_params = self.context_manager.generate_regressors(params_array, num_samples)
+        regressors, regressed_params = generate_regressors(
+            params_array,
+            num_samples,
+            self.context_manager.param_dims,
+            self.context_manager.fixed_parameters
+        )
 
         # Use float values for fixed parameters
         fixed_parameters = {k: float(v) if isinstance(v, (int, float)) else v[0] for k, v in params.items()}
-        params_dict = self.context_manager.combine(sampled_parameters, fixed_parameters)
+        params_dict = self.context_manager.combine(sampled_parameters, fixed_parameters, num_samples=num_samples)
         params_dict.update(regressed_params)  # Override with regressed parameters
 
         params_dict = self.context_manager.normalize_params(params_dict)
         self.context_manager.validate(params_dict, num_samples)
+
+        params_dict = self.model.prepare_params(params_dict, num_samples)
 
         # Run simulation
         sim_data = self.model.simulate(params_dict, num_samples=num_samples)

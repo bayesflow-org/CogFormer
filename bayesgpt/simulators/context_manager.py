@@ -37,48 +37,108 @@ class ContextManager:
         self.param_index_slices, self.param_vector_size = self._build_parameter_slices()
         self.mask = self._build_mask()
 
-    def generate_regressors(self, params: Dict[str, np.ndarray], num_samples: int) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        regressors = {}
-        regressed_parameters = {}
-        for param_name in self.parameter_names:
-            if param_name not in params or param_name in self.fixed_parameters:
-                continue
-            param_vector = params[param_name]
-            dim = self.param_dims.get(param_name, 1)
-            if param_vector.shape[0] == 1:  # Scalar case
-                regressed_parameters[param_name] = np.full(num_samples, param_vector[0], dtype=np.float32)
-                regressors[param_name] = np.ones((num_samples, 1), dtype=np.float32)
-            else:  # Regression case
-                if param_vector.shape[-1] != dim:
-                    raise ValueError(f"Expected {param_name} dim {dim}, got {param_vector.shape[0]}")
-                design_mat = np.c_[np.ones((num_samples, 1)), np.random.rand(num_samples, dim - 1)]
-                regressed_parameters[param_name] = design_mat @ param_vector
-                regressors[param_name] = design_mat.astype(np.float32)
-        return regressors, regressed_parameters
-
-    def sample(self, num_samples: int) -> Dict[str, np.ndarray]:
-        out = {}
+    def sample(self, num_samples: int) -> Dict[str, np.ndarray | float]:
+        """Draw once per simulation (not per trial). For dim=1 → scalar; for dim>1 → (dim,)."""
+        out: Dict[str, np.ndarray | float] = {}
         for name in self.parameter_names:
             if name in self.fixed_parameters:
                 continue
-            dim = self.param_dims.get(name, 1)  # Use inferred or default dim
-            out[name] = np.random.randn(num_samples, dim).astype(np.float32)
+            dim = self.param_dims.get(name, 1)
+            if dim == 1:
+                out[name] = np.float32(np.random.randn())  # scalar, per-sim
+            else:
+                out[name] = np.random.randn(dim).astype(np.float32)  # (dim,), per-sim
         return out
 
-    def combine(self, sampled: Dict[str, np.ndarray], fixed_parameters: Dict[str, float] = None) -> Dict[str, np.ndarray]:
-        out = {}
-        fixed = fixed_parameters or {}
+    def flex_combine(self, sampled: Dict[str, np.ndarray], overrides: Dict[str, float | np.ndarray] | None = None
+                         ) -> Dict[str, np.ndarray]:
+        """Treat keys in `overrides` as fixed for THIS call; others come from `sampled` (or fresh sample)."""
+        out, overrides = {}, (overrides or {})
         num_samples = next(iter(sampled.values())).shape[0] if sampled else 1
+
         for name in self.parameter_names:
             dim = self.param_dims.get(name, 1)
-            if name in self.fixed_parameters:
-                if name not in fixed:
-                    raise ValueError(f"Fixed parameter {name} requires a value in fixed_parameters")
-                out[name] = np.full(num_samples, fixed[name], dtype=np.float32)
-            elif name in fixed:
-                out[name] = np.full(num_samples, fixed[name], dtype=np.float32)
+
+            if name in overrides:
+                val = np.asarray(overrides[name], dtype=np.float32)
+
+                # scalar -> broadcast to (N,) or (N, dim)
+                if val.ndim == 0:
+                    out[name] = (np.full(num_samples, float(val), np.float32)
+                                 if dim == 1 else np.full((num_samples, dim), float(val), np.float32))
+                    continue
+
+                # (dim,) -> tile across trials
+                if dim > 1 and val.ndim == 1 and val.shape[0] == dim:
+                    out[name] = np.tile(val[None, :], (num_samples, 1)).astype(np.float32)
+                    continue
+
+                # (N,) or (N,dim) exact match
+                if (val.ndim == 1 and val.shape[0] == num_samples) or \
+                        (val.ndim == 2 and val.shape == (num_samples, dim)):
+                    out[name] = val.astype(np.float32, copy=False)
+                    continue
+
+                raise ValueError(f"{name}: shape {val.shape} incompatible with num_samples={num_samples}, dim={dim}")
+
+            # not overridden -> use sampled if present, else sample fresh
+            if name in sampled:
+                out[name] = sampled[name]
             else:
-                out[name] = sampled.get(name, np.random.randn(num_samples, dim).astype(np.float32))
+                out[name] = (np.random.randn(num_samples, dim).astype(np.float32)
+                             if dim > 1 else np.random.randn(num_samples).astype(np.float32))
+        return out
+
+    def combine(
+            self,
+            sampled: Dict[str, np.ndarray | float],
+            fixed_parameters: Dict[str, float] | None = None,
+            num_samples: int = 1,
+    ) -> Dict[str, np.ndarray]:
+        out: Dict[str, np.ndarray] = {}
+        fixed = fixed_parameters or {}
+
+        for name in self.parameter_names:
+            dim = self.param_dims.get(name, 1)
+
+            if name in self.fixed_parameters:
+                # fixed: use user value if provided, else neutral default (or 0.0)
+                val = fixed.get(name, 0.0)
+                val = np.asarray(val, dtype=np.float32)
+            elif name in fixed:
+                # user tried to override a free param (disallow if you want strictness)
+                val = np.asarray(fixed[name], dtype=np.float32)
+            else:
+                # free: take per-simulation draw from sampled
+                val = np.asarray(sampled.get(name, 0.0), dtype=np.float32)
+
+            # Broadcast rules
+            if val.ndim == 0:
+                out[name] = (np.full(num_samples, float(val), np.float32) if dim == 1
+                             else np.full((num_samples, dim), float(val), np.float32))
+            elif val.ndim == 1:
+                if dim == 1:
+                    # (1,) or (num_samples,) -> broadcast if length 1, else accept if matches
+                    if val.size == 1:
+                        out[name] = np.full(num_samples, float(val[0]), np.float32)
+                    elif val.size == num_samples:
+                        out[name] = val.astype(np.float32, copy=False)
+                    else:
+                        raise ValueError(f"{name}: expected length 1 or {num_samples}, got {val.shape}")
+                else:
+                    # (dim,) -> tile across trials
+                    if val.size == dim:
+                        out[name] = np.tile(val[None, :], (num_samples, 1)).astype(np.float32)
+                    else:
+                        raise ValueError(f"{name}: expected shape ({dim},), got {val.shape}")
+            elif val.ndim == 2:
+                # (num_samples, dim) exact
+                if val.shape == (num_samples, dim):
+                    out[name] = val.astype(np.float32, copy=False)
+                else:
+                    raise ValueError(f"{name}: expected shape ({num_samples},{dim}), got {val.shape}")
+            else:
+                raise ValueError(f"{name}: unsupported ndim={val.ndim}")
         return out
 
     def get_parameter_dims(self, name: str) -> int:
