@@ -54,6 +54,36 @@ def simulate_standard_ddm(
     return result
 
 
+@njit
+def simulate_collapsing_bound_ddm_trial(
+    v_base: float,
+    a_i: float,
+    tau: float,
+    s_tau: float,
+    s_v: float,
+    decay: float,
+    zr: float,
+    sigma: float,
+    dt: float,
+    max_steps: int,
+) -> (float, float):
+    v_i = np.random.normal(v_base, s_v)
+    tau_i = max(np.random.normal(tau, s_tau), 0.0)
+
+    x = zr * a_i
+    t = tau_i
+
+    for _ in range(max_steps):
+        t += dt
+        bound = max(a_i - decay * t, 1e-3)
+        x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
+        if x >= bound:
+            return t, 1.0
+        if x <= -bound:
+            return t, 0.0
+    return -1.0, -1.0
+
+
 @njit(parallel=True)
 def simulate_collapsing_bound_ddm(
     v: np.ndarray,
@@ -63,50 +93,62 @@ def simulate_collapsing_bound_ddm(
     s_v: float,
     decay: float,
     zr: float = 0.5,
-    sigma: float = 1.,
+    sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000,
 ) -> np.ndarray:
+    n = v.shape[0]
+    out = np.zeros((n, 2), dtype=np.float32)
+    rts, choices = out[:, 0], out[:, 1]
 
-    num_samples = v.shape[0]
-    result = np.zeros((num_samples, 2), dtype=np.float32)
-    rts, choices = result[:, 0], result[:, 1]
+    for i in prange(n):
+        rt_i, ch_i = simulate_collapsing_bound_ddm_trial(
+            float(v[i]), float(a[i]),
+            tau, s_tau, s_v, decay, zr, sigma,
+            dt, max_steps
+        )
+        rts[i] = rt_i
+        choices[i] = ch_i
+    return out
 
-    # Simulate each trial
-    for i in prange(num_samples):
-        # Sample parameters with noise
-        v_i = np.random.normal(v[i], s_v)
-        tau_i = max(np.random.normal(tau, s_tau), 0.0)
 
-        # Initialize decision variable (symmetric around 0)
-        x = zr * a[i]
-        t = tau_i
+@njit(inline='always')
+def simulate_mixture_ddm_trial(
+    v_mean: float,
+    a_i: float,
+    z: float,
+    tau: float,
+    s_v: float,
+    decay: float,
+    s_z: float,
+    s_tau: float,
+    sigma: float,
+    dt: float,
+    max_steps: int,
+) -> (float, float):
+    z_i = min(max(np.random.normal(z, s_z), 0.001), 0.999)
+    tau_i = max(np.random.normal(tau, s_tau), 0.0)
+    v_i = np.random.normal(v_mean, s_v)
 
-        # Simulation loop
-        for step in range(max_steps):
-            t += dt
-            bound = max(a[i] - decay * t, 1e-3)
-            x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
-            if x >= bound:
-                rts[i] = t
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t
-                choices[i] = 0
-                break
-        else:
-            rts[i] = -1.
-            choices[i] = -1.
+    x = z_i * a_i
+    t = 0.0
 
-    return result
+    for _ in range(max_steps):
+        bound = max(a_i * (1.0 - decay * t), 0.0)
+        x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
+        t += dt
+        if x >= bound:
+            return t + tau_i, 1.0
+        if x <= -bound:
+            return t + tau_i, 0.0
+    return -1.0, -1.0  # non-termination
 
 
 @njit(parallel=True)
 def simulate_mixture_ddm(
-    v: np.ndarray,
-    p: np.ndarray,
-    a: np.ndarray,
+    v: np.ndarray,          # (N,) or (N,K) mixture means
+    p: np.ndarray,          # (N,K) probs; if empty (shape[0]==0), assume uniform
+    a: np.ndarray,          # (N,) boundary (trialwise)
     z: float,
     tau: float,
     s_v: float,
@@ -118,61 +160,67 @@ def simulate_mixture_ddm(
     max_steps: int,
     num_samples: int
 ) -> np.ndarray:
-    """
-    Simulate a drift diffusion model with mixture drift rates.
-    """
-    # Initialize output arrays
     result = np.zeros((num_samples, 2), dtype=np.float32)
     rts, choices = result[:, 0], result[:, 1]
 
-    # Simulate each trial
     for i in prange(num_samples):
-
-        # Sample starting point and non-decision time
-        z_i_sample = np.random.normal(z, s_z)
-        z_i = z_i_sample if z_i_sample < 0.999 else 0.999
-        z_i = z_i if z_i > 0.001 else 0.001
-        tau_i = max(np.random.normal(tau, s_tau), 0.0)
-
-        # Select drift rate (single or random choice from components)
+        # pick drift component (supports v as (N,) or (N,K))
         if v.ndim == 1:
-            v_i = v[i]
+            v_mean = float(v[i])
         else:
-            num_components = v.shape[1]
-            p_i = np.ones(num_components).astype(np.float32) / num_components if p is None else p[i]
-            p_i = p_i / np.sum(p_i)  # Normalize probabilities
-            r = np.random.random()
-            cumsum = 0.0
-            selected_idx = 0
-            for j in range(num_components):
-                cumsum += float(p_i[j])
-                if r <= cumsum:
-                    selected_idx = j
-                    break
-            v_i = float(v[i, selected_idx])
-        v_i = float(np.random.normal(v_i, s_v))
+            K = v.shape[1]
+            # probabilities row (uniform if p is "empty")
+            if p.shape[0] == 0:
+                r = np.random.random()
+                csum = 0.0
+                v_mean = float(v[i, K - 1])
+                for j in range(K):
+                    csum += 1.0 / K
+                    if r <= csum:
+                        v_mean = float(v[i, j])
+                        break
+            else:
+                # normalize p[i] and sample
+                s = 0.0
+                for j in range(K):
+                    s += p[i, j]
+                if s <= 0.0:
+                    r = np.random.random()
+                    csum = 0.0
+                    v_mean = float(v[i, K - 1])
+                    for j in range(K):
+                        csum += 1.0 / K
+                        if r <= csum:
+                            v_mean = float(v[i, j])
+                            break
+                else:
+                    r = np.random.random()
+                    csum = 0.0
+                    v_mean = float(v[i, K - 1])
+                    for j in range(K):
+                        csum += p[i, j] / s
+                        if r <= csum:
+                            v_mean = float(v[i, j])
+                            break
 
-        # Initialize decision variable
-        x = z_i * a
-        t = 0.0
+        rt_i, ch_i = simulate_mixture_ddm_trial(
+            v_mean=v_mean,
+            a_i=float(a[i]),
+            z=z,
+            tau=tau,
+            s_v=s_v,
+            decay=decay,
+            s_z=s_z,
+            s_tau=s_tau,
+            sigma=sigma,
+            dt=dt,
+            max_steps=max_steps,
+        )
+        rts[i] = rt_i
+        choices[i] = ch_i
 
-        # Run simulation loop
-        for step in range(max_steps):
-            bound = max(a * (1.0 - decay * t), 0.0)
-            x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
-            t += dt
-            if x >= bound:
-                rts[i] = t + tau_i
-                choices[i] = 1
-                break
-            elif x <= -bound:
-                rts[i] = t + tau_i
-                choices[i] = 0
-                break
-        else:
-            rts[i] = -1.
-            choices[i] = -1.
     return result
+
 
 @njit(parallel=True)
 def simulate_schedule_ddm(
