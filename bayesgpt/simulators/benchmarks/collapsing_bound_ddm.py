@@ -1,31 +1,35 @@
 import numpy as np
 from typing import Optional, Iterable
-from simulators import Model, ContextManager
+from simulators import Model
 from .ddm import simulate_collapsing_bound_ddm
 
 class CollapsingBoundDDM(Model):
-    def __init__(self, context_manager: ContextManager, dt: float = 0.001, max_steps: int = 10000):
+    def __init__(self, dt: float = 0.001, max_steps: int = 10000):
         # Initialize with context manager and simulation parameters
-        self.context_manager = context_manager
         self.dt = dt
         self.max_steps = max_steps
 
-    def simulate(self, params: dict[str, np.ndarray], num_samples: int = 1) -> dict[str, np.ndarray]:
+    def simulate(self, params: dict[str, np.ndarray | float], num_samples: int = 1) -> dict[str, np.ndarray]:
 
-        # Validate parameters
-        # self._validate_parameters(regressed_params, num_samples)
-
+        v = params['v']
+        a= params['a']
+        zr = params['zr']
+        tau = params['tau']
+        s_v = params['s_v']
+        s_tau = params['s_tau']
+        decay = params['decay']
+        sigma = params['sigma']
 
         # Simulate using regressed and scalar parameters
         result = simulate_collapsing_bound_ddm(
-            v=params["v"],
-            a=params["a"],
-            zr=params["zr"],
-            tau=params["tau"],
-            s_v=params["s_v"],
-            decay=params["decay"],
-            s_tau=params["s_tau"],
-            sigma=params["sigma"],
+            v=v,
+            a=a,
+            zr=zr,
+            tau=tau,
+            s_v=s_v,
+            s_tau=s_tau,
+            decay=decay,
+            sigma=sigma,
             dt=self.dt,
             max_steps=self.max_steps
         )
@@ -35,26 +39,6 @@ class CollapsingBoundDDM(Model):
             "rts": result[:, 0],
             "choices": result[:, 1]
         }
-
-    # def _validate_parameters(self, params: Dict[str, np.ndarray], num_samples: int) -> None:
-    #     # Check required parameters
-    #     required_params = ["v", "a", "zr", "tau", "s_v", "decay", "s_tau", "sigma"]
-    #     missing = set(required_params) - set(params)
-    #     if missing:
-    #         raise ValueError(f"Missing parameters: {missing}")
-    #
-    #     # Validate shapes
-    #     for key in params:
-    #         if params[key].shape != (num_samples,):
-    #             raise ValueError(f"{key} must have shape ({num_samples},), got {params[key].shape}")
-    #
-    #     # Enforce constraints
-    #     if np.any(params["a"] <= 0) or np.any(params["sigma"] <= 0):
-    #         raise ValueError("a, sigma must be > 0")
-    #     if np.any(params["zr"] <= 0) or np.any(params["zr"] >= 1):
-    #         raise ValueError("0 < zr < 1")
-    #     if np.any(params["s_v"] < 0) or np.any(params["decay"] < 0) or np.any(params["s_tau"] < 0):
-    #         raise ValueError("s_v, decay, s_tau must be >= 0")
 
     @staticmethod
     def summarize(

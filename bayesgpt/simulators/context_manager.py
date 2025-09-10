@@ -14,6 +14,10 @@ class ContextManager:
         self.mask = None  # Delay mask creation until dims are inferred
 
     def _build_parameter_slices(self) -> Tuple[Dict[str, slice], int]:
+        """
+        Concatenate all parameters into one vector and determine its slice.
+        By default, we assume that all parameters are scalars.
+        """
         param_index_slices = {}
         param_vector_size = 0
         for name in self.parameter_names:
@@ -28,6 +32,10 @@ class ContextManager:
             sl = self.param_index_slices[name]
             mask[sl] = 0.0
         return mask
+
+    def build_layout(self) -> None:
+        self.param_index_slices, self.param_vector_size = self._build_parameter_slices()
+        self.mask = self._build_mask()
 
     def generate_regressors(self, params: Dict[str, np.ndarray], num_samples: int) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         regressors = {}
@@ -75,3 +83,32 @@ class ContextManager:
 
     def get_parameter_dims(self, name: str) -> int:
         return self.param_dims.get(name, 1)
+
+    def normalize_params(self, params: Dict[str, np.ndarray | float]) -> Dict[str, np.ndarray | float]:
+        """Model-agnostic: collapse constants to scalars; squeeze (N,1)->(N,)."""
+        out = {}
+        for k, v in params.items():
+            arr = np.asarray(v)
+            if arr.ndim == 0:
+                out[k] = float(arr)
+            elif arr.ndim == 1:
+                # constant vector → scalar
+                out[k] = float(arr[0]) if arr.size and np.all(arr == arr[0]) else arr
+            elif arr.ndim == 2 and arr.shape[1] == 1:
+                v1 = arr[:, 0]
+                out[k] = float(v1[0]) if v1.size and np.all(v1 == v1[0]) else v1
+            else:
+                out[k] = arr
+        return out
+
+    def validate(self, params: Dict[str, np.ndarray | float], num_samples: int) -> None:
+        """Light sanity checks (dims only); keep model-agnostic."""
+        for k in self.parameter_names:
+            if k not in params:
+                raise ValueError(f"Missing parameter: {k}")
+            v = params[k]
+            if isinstance(v, np.ndarray):
+                if v.ndim == 1 and v.shape[0] not in (1, num_samples):
+                    raise ValueError(f"{k}: expected length {num_samples} (or scalar), got {v.shape}")
+                if v.ndim > 1 and v.shape[0] != num_samples:
+                    raise ValueError(f"{k}: leading dim must be {num_samples}, got {v.shape}")

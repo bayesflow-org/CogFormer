@@ -7,7 +7,7 @@ class NestedModelFamily:
     def __init__(self, name: str, model: type[Model], context_manager: ContextManager, num_samples: int = 10):
         # Initialize with model name, model class, context manager, and number of samples
         self.name = name
-        self.model = model(context_manager)  # Instantiate model with context manager
+        self.model = model()  # Instantiate model with context manager
         self.context_manager = context_manager
         self.parameter_names = context_manager.parameter_names
         self.num_samples = num_samples
@@ -20,6 +20,10 @@ class NestedModelFamily:
         # Simulate data for a single model run
         num_samples = self.num_samples if num_samples is None else num_samples
         params = params or {}
+
+        if self.context_manager.param_index_slices is None:
+            self.context_manager.build_layout()
+
 
         # Convert float params to np.ndarray for generate_regressors
         params_array = {k: np.array([v], dtype=np.float32) if isinstance(v, (int, float)) else v for k, v in params.items()}
@@ -35,18 +39,25 @@ class NestedModelFamily:
         params_dict = self.context_manager.combine(sampled_parameters, fixed_parameters)
         params_dict.update(regressed_params)  # Override with regressed parameters
 
-        # Scalarize
-
+        params_dict = self.context_manager.normalize_params(params_dict)
+        self.context_manager.validate(params_dict, num_samples)
 
         # Run simulation
         sim_data = self.model.simulate(params_dict, num_samples=num_samples)
 
         # Build full parameter vector for inference
         full_params = np.zeros(self.context_manager.param_vector_size, dtype=np.float32)
+
+
         for name in self.parameter_names:
             sl = self.context_manager.param_index_slices[name]
-            param_val = params_dict[name]
-            full_params[sl] = np.mean(param_val, axis=0) if param_val.ndim > 1 else param_val[0]
+            val = np.asarray(params_dict[name])
+            if val.ndim == 0:
+                full_params[sl] = float(val)
+            elif val.ndim == 1:
+                full_params[sl] = np.array([val.mean()], dtype=np.float32)
+            else:
+                full_params[sl] = np.mean(val, axis=0, dtype=np.float32)
 
         return {
             "sim_data": sim_data,

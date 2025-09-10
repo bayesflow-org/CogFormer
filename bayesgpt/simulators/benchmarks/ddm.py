@@ -2,6 +2,19 @@ import numpy as np
 from numba import njit, prange
 
 
+@njit
+def simulate_standard_ddm_trial(
+    v: float,
+    a: float,
+    z: float,
+    tau: float,
+    s_v: float,
+    s_z: float,
+    s_tau: float,
+    sigma: float
+):
+    pass
+
 @njit(parallel=True)
 def simulate_standard_ddm(
     v: np.ndarray,
@@ -9,9 +22,9 @@ def simulate_standard_ddm(
     z: float,
     tau: float,
     s_v: float,
-    sigma: float,
     s_z: float,
     s_tau: float,
+    sigma: float,
     dt: float,
     max_steps: int,
     num_samples: int
