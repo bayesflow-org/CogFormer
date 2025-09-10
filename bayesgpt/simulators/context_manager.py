@@ -10,7 +10,7 @@ class ContextManager:
             raise ValueError("All fixed_parameters must be in parameter_names")
         self.param_dims = {}
         self.param_index_slices = None
-        self.param_vector_size = None
+        self.param_vector_size = len(self.parameter_names)
         self.mask = None  # Delay mask creation until dims are inferred
 
     def _build_parameter_slices(self) -> Tuple[Dict[str, slice], int]:
@@ -27,6 +27,9 @@ class ContextManager:
         return param_index_slices, param_vector_size
 
     def _build_mask(self) -> np.ndarray:
+        """
+        Mask away the fixed parameters as 0.0
+        """
         mask = np.ones(self.param_vector_size, dtype=np.float32)
         for name in self.fixed_parameters:
             sl = self.param_index_slices[name]
