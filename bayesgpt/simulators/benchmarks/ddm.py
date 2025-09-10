@@ -88,7 +88,7 @@ def simulate_collapsing_bound_ddm_trial(
 
     for _ in range(max_steps):
         t += dt
-        bound = max(a_i - decay * t, 1e-3)
+        bound = max(a_i * np.exp(-decay * t), 1e-3)
         x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
         if x >= bound:
             return t, 1.0

@@ -9,36 +9,32 @@ class CollapsingBoundDDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
+    def prepare_params(self, params: dict[str, np.ndarray | float], num_samples: int):
+        import numpy as np
+        out = dict(params)
+        # ensure v, a are (N,)
+        for k in ("v", "a"):
+            if k in out:
+                x = np.asarray(out[k])
+                if x.ndim == 0:
+                    out[k] = np.full(num_samples, float(x), np.float32)
+                elif x.ndim == 1 and x.size == 1:
+                    out[k] = np.full(num_samples, float(x[0]), np.float32)
+        # scalar-only keys: collapse if vectors slipped through
+        for k in ("zr", "tau", "s_v", "s_tau", "decay", "sigma"):
+            if k in out:
+                x = np.asarray(out[k])
+                if x.ndim >= 1:
+                    out[k] = float(x.ravel()[0])
+        return out
+
     def simulate(self, params: dict[str, np.ndarray | float], num_samples: int = 1) -> dict[str, np.ndarray]:
 
-        v = params['v']
-        a= params['a']
-        zr = params['zr']
-        tau = params['tau']
-        s_v = params['s_v']
-        s_tau = params['s_tau']
-        decay = params['decay']
-        sigma = params['sigma']
-
         # Simulate using regressed and scalar parameters
-        result = simulate_collapsing_bound_ddm(
-            v=v,
-            a=a,
-            zr=zr,
-            tau=tau,
-            s_v=s_v,
-            s_tau=s_tau,
-            decay=decay,
-            sigma=sigma,
-            dt=self.dt,
-            max_steps=self.max_steps
-        )
+        result = simulate_collapsing_bound_ddm(**params, dt=self.dt, max_steps=self.max_steps)
 
         # Construct output
-        return {
-            "rts": result[:, 0],
-            "choices": result[:, 1]
-        }
+        return {"rts": result[:, 0], "choices": result[:, 1]}
 
     @staticmethod
     def summarize(
