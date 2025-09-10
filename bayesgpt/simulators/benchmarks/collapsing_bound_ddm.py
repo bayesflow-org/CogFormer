@@ -10,7 +10,7 @@ class CollapsingBoundDDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
-    def simulate(self, params: dict[str, np.ndarray], num_samples: int = 1) -> dict[str, np.ndarray]:
+    def simulate(self, params: dict[str, np.ndarray | float], num_samples: int = 1) -> dict[str, np.ndarray]:
 
         # Validate parameters
         # self._validate_parameters(regressed_params, num_samples)

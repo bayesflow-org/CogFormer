@@ -3,7 +3,6 @@ from collections.abc import Mapping
 from typing import Union, Optional
 import numpy as np
 
-from .context_manager import ContextManager
 
 
 class Model(ABC):
@@ -17,10 +16,9 @@ class Model(ABC):
     @abstractmethod
     def simulate(
         self,
-        params: dict[str, np.ndarray],
+        params: dict[str, np.ndarray | float],
         num_samples: int,
         context: Optional[np.ndarray] = None,
-        context_manager: Optional[ContextManager] = None
     ) -> Union[np.ndarray, Mapping[str, np.ndarray]]:
 
         pass
