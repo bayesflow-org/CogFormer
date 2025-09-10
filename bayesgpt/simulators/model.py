@@ -14,6 +14,14 @@ class Model(ABC):
     with batching handled by NestedModelFamily.
     """
 
+    def prepare_params(
+            self,
+            params: dict[str, np.ndarray | float],
+            num_samples: int,
+    ) -> dict[str, np.ndarray | float]:
+        """Optional: models can normalize/broadcast shapes here. Default: passthrough."""
+        return params
+
     @abstractmethod
     def simulate(
         self,
