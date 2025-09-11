@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional, Iterable
 from simulators import Model
-from .ddm import simulate_collapsing_bound_ddm
+from simulators.benchmarks.ddms.ddm import simulate_collapsing_bound_ddm
 
 class CollapsingBoundDDM(Model):
     def __init__(self, dt: float = 0.001, max_steps: int = 10000):

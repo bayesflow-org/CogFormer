@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Union, Optional, Callable, Iterable
-from ..model import Model
+from simulators.model import Model
 from simulators import ContextManager
-from .ddm import simulate_mixture_ddm, simulate_schedule_ddm
+from simulators.benchmarks.ddms.ddm import simulate_mixture_ddm, simulate_schedule_ddm
 
 
 class SuperDDM(Model):
