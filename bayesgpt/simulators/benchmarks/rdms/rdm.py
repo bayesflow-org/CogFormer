@@ -186,7 +186,7 @@ class RDM(Model):
 
     def simulate(
         self,
-        params: dict[str, np.ndarray | float],
+        params: dict[str, float],
         num_samples: int,
         context: Optional[np.ndarray] = None,
     ) -> dict[str, np.ndarray]:

@@ -15,19 +15,18 @@ class NestedModelFamily:
         prior_fun: Callable,
         num_samples: int = 10
     ):
-        # Initialize with model name, model class, context manager, and number of samples
         self.name = name
-        self.model = model()  # Instantiate model with context manager
+        self.model = model()
         self.context_manager = context_manager
         self.parameter_names = context_manager.parameter_names
         self.num_samples = num_samples
         self.prior_fun = prior_fun
 
     def sample(
-            self,
-            fixed_configs: Iterable[Iterable[str]],
-            num_samples: Optional[int] = None,
-            context: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None,
+        self,
+        fixed_configs: Iterable[Iterable[str]],
+        num_samples: Optional[int] = None,
+        context: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None,
     ):
         """
         For each config (list/set of parameter names to fix), build a mask, apply it to a
@@ -46,11 +45,12 @@ class NestedModelFamily:
 
             masked_priors = self.context_manager.apply_mask(priors_dict, masks)  # shape (P,)
 
-            # 4) Model path: prepare → simulate
-            params_for_model = self.model.prepare_params(masked_priors, num_samples)
-            sim_data = self.model.simulate(params_for_model, num_samples=num_samples, context=context)
+            # Model path: prepare → simulate
+            model_params = self.model.prepare_params(masked_priors, num_samples)
+            print(model_params)
+            sim_data = self.model.simulate(model_params, num_samples=num_samples, context=context)
 
-            # 5) Package results for this config
+            # Package results for this config
             results.append(
                 {
                     "variant_name": f"{self.name}|cfg{idx + 1}",
@@ -59,13 +59,16 @@ class NestedModelFamily:
                     "prior_draw": priors.astype(np.float32, copy=False),
                     "full_params": masked_priors,
                     "sim_data": sim_data,
+                    "context": context
                 }
             )
 
         return results
 
     def _draw_prior_vec(self) -> np.ndarray:
-        """Draw once from the jitted prior; ensure shape matches parameter_names."""
+        """
+        Draw once from the jitted prior; ensure shape matches parameter_names.
+        """
         arr = np.asarray(self.prior_fun(), dtype=np.float32).ravel()
         if arr.size != len(self.parameter_names):
             raise ValueError(

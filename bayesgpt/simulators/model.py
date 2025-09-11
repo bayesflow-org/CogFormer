@@ -1,8 +1,7 @@
+import numpy as np
+from typing import Union, Optional
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Union, Optional
-import numpy as np
-
 
 
 class Model(ABC):
@@ -15,16 +14,16 @@ class Model(ABC):
 
     def prepare_params(
             self,
-            params: dict[str, np.ndarray | float],
+            params: dict[str, float],
             num_samples: int,
-    ) -> dict[str, np.ndarray | float]:
+    ) -> dict[str, float]:
         """Optional: models can normalize/broadcast shapes here. Default: passthrough."""
         return params
 
     @abstractmethod
     def simulate(
         self,
-        params: dict[str, np.ndarray | float],
+        params: dict[str, float],
         num_samples: int,
         context: Optional[np.ndarray] = None,
     ) -> Union[np.ndarray, Mapping[str, np.ndarray]]:

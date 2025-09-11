@@ -1,6 +1,5 @@
 import numpy as np
 from numba import njit
-from utils.simulator_utils import _softplus, _softplus_vec
 
 
 @njit
