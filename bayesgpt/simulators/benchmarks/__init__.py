@@ -1,5 +1,5 @@
 from simulators.benchmarks.ddms.standard_ddm import StandardDDM
-from simulators.benchmarks.ddms.collapsing_bound_ddm import CollapsingBoundDDM
+from simulators.benchmarks.ddms.collapsing_bound_ddm import CollapsingBoundDDM, DDMModel
 from simulators.benchmarks.ddms.super_ddm import SuperDDM
 from simulators.benchmarks.ddms.ddm import (
     simulate_standard_ddm,
