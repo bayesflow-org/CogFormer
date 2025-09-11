@@ -6,7 +6,7 @@ from bayesflow.utils.serialization import serializable
 
 
 @serializable("bayesflow.networks")
-class PositionalEncoder(keras.Layer):
+class PositionEncoder(keras.Layer):
 
     def __init__(
         self,
@@ -34,7 +34,7 @@ class PositionalEncoder(keras.Layer):
         pe : keras.backend.Variable
             Positional encoding tensor, shape (max_len, 1, d_model).
         """
-        super(PositionalEncoder, self).__init__(**kwargs)
+        super(PositionEncoder, self).__init__(**kwargs)
         self.dropout = Dropout(dropout)
 
         # Compute positional encodings using Keras ops
@@ -45,7 +45,10 @@ class PositionalEncoder(keras.Layer):
         pe = ops.zeros([max_length, 1, hidden_dim], dtype="float32")
         pe = pe + ops.concatenate([ops.sin(position * div_term), ops.cos(position * div_term)], axis=-1)
         self.pe = self.add_weight(
-            name="positional_encoding", shape=(max_length, 1, hidden_dim), initializer=lambda x: pe, trainable=False
+            name="positional_encoding",
+            shape=(max_length, 1, hidden_dim),
+            initializer=lambda x: pe,
+            trainable=False
         )
 
 

@@ -19,81 +19,33 @@ class CollapsingBoundDDM(StandardDDM):
         context: Optional[np.ndarray] = None,
         modulation: Optional[Callable[[dict, np.ndarray], dict]] = None
     ) -> dict[str, np.ndarray]:
-        """
-        Simulate data for a single model run with collapsing bounds.
 
-        Parameters
-        ----------
-        params : dict[str, Union[float, np.ndarray]]
-            Parameters for simulation, with arrays of shape (dims,) or scalars.
-            Must include:
-            - v : float or np.ndarray
-                Drift rate, determines evidence accumulation speed.
-            - a : float or np.ndarray
-                Decision boundary, controls decision caution, > 0.
-            - z or z_arr : float or np.ndarray
-                Starting point, relative to boundaries (0 < z < 1).
-            - tau or tau_arr : float or np.ndarray
-                Non-decision time, time before evidence accumulation, >= 0.
-            - s_v : float or np.ndarray
-                Drift rate noise, standard deviation of drift rate variability, >= 0.
-            - sigma : float or np.ndarray
-                Diffusion noise, standard deviation of evidence accumulation noise, > 0.
-            - angle : float or np.ndarray
-                Boundary collapse rate, controls rate of boundary reduction, >= 0.
-            - s_z : float or np.ndarray
-                Starting point noise, standard deviation of starting point variability, >= 0.
-            - s_tau : float or np.ndarray
-                Non-decision time noise, standard deviation of non-decision time variability, >= 0.
-        num_samples : int, optional
-            Number of samples (trials) per simulation, by default 1.
-        context : np.ndarray, optional
-            Array of external conditions for each trial, shape (num_samples,).
-        modulation : Callable[[dict, np.ndarray], dict], optional
-            Function to adjust model parameters based on context.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dictionary containing 'rts', 'choices', and optionally 'context'.
-            Arrays are of shape (num_samples,) in np.float32.
-
-        Raises
-        ------
-        ValueError
-            If context shape is invalid, required parameters are missing, or parameters violate constraints.
-        """
-        # Process and validate parameters
-        params = _process_parameters(params, num_samples)
-        _validate_parameters(params, num_samples)
-
-        # Modulate parameters with context if provided
-        if context is not None and modulation is not None:
-            if context.shape != (num_samples,):
-                raise ValueError(f"context must have shape ({num_samples},), got {context.shape}")
-            params = modulation(params, context)
-            _validate_parameters(params, num_samples)
+        # Generate design matrices and regressed parameter vectors
+        #TODO
+        regressors, regressed_params = self.context_manager.generate_regressors(params, num_samples=num_samples)
 
         # Simulate
         result = simulate_collapsing_bound_ddm(
-            v=params["v"],
-            a=params["a"],
-            z=params["z"],
-            tau=params["tau"],
-            s_v=params["s_v"],
-            sigma=params["sigma"],
-            angle=params["angle"],
-            s_z=params["s_z"],
-            s_tau=params["s_tau"],
+            v=regressed_params["v"],
+            a=regressed_params["a"],
+            z=regressed_params["zr"],
+            tau=regressed_params["tau"],
+            s_v=regressed_params["s_v"],
+            angle=regressed_params["angle"],
+            s_tau=regressed_params["s_tau"],
+            sigma=regressed_params["sigma"],
             dt=self.dt,
             max_steps=self.max_steps,
-            num_samples=num_samples
         )
 
         # Construct output
         output = {"rts": result[:, 0], "choices": result[:, 1]}
-        if context is not None:
-            output["context"] = context
+
+        # Figure out masks
+        #TODO
+
+        output["context"] = context
+        output["regressors"] = regressors
         return output
 
     @staticmethod
@@ -182,55 +134,19 @@ class CollapsingBoundDDM(StandardDDM):
 
 @njit(parallel=True)
 def simulate_collapsing_bound_ddm(
-    v: float | np.ndarray,
-    a: float | np.ndarray,
-    z: float | np.ndarray,
-    tau: float | np.ndarray,
-    s_v: float | np.ndarray,
-    sigma: float | np.ndarray,
-    angle: float | np.ndarray,
-    s_z: float | np.ndarray,
-    s_tau: float | np.ndarray,
+    v: np.ndarray,
+    a: np.ndarray,
+    zr: float,
+    tau: float,
+    s_v: float,
+    angle: float,
+    s_tau: float,
+    sigma: float,
     dt: float,
     max_steps: int,
-    num_samples: int
 ) -> np.ndarray:
-    """
-    Internal function to simulate the collapsing bounds DDM.
 
-    Parameters
-    ----------
-    v : float or np.ndarray
-        Drift rate, shape (num_samples,).
-    a : float or np.ndarray
-        Decision boundary, shape (num_samples,), > 0.
-    z : float or np.ndarray
-        Starting point, shape (num_samples,), 0 < z < 1.
-    tau : float or np.ndarray
-        Non-decision time, shape (num_samples,), >= 0.
-    s_v : float or np.ndarray
-        Drift rate noise standard deviation, shape (num_samples,), >= 0.
-    sigma : float or np.ndarray
-        Diffusion noise standard deviation, shape (num_samples,), > 0.
-    angle : float or np.ndarray
-        Boundary collapse rate, shape (num_samples,), >= 0.
-    s_z : float or np.ndarray
-        Starting point noise standard deviation, shape (num_samples,), >= 0.
-    s_tau : float or np.ndarray
-        Non-decision time noise standard deviation, shape (num_samples,), >= 0.
-    dt : float
-        Interval per time step.
-    max_steps : int
-        Maximum number of simulation steps.
-    num_samples : int
-        Number of trials to simulate.
-
-    Returns
-    -------
-    np.ndarray
-        Array of shape (num_samples, 2) containing reaction times (column 0) and choices (column 1).
-    """
-    # Initialize output arrays
+    num_samples = v.shape[0]
     result = np.zeros((num_samples, 2), dtype=np.float32)
     rts, choices = result[:, 0], result[:, 1]
 
@@ -238,32 +154,30 @@ def simulate_collapsing_bound_ddm(
     for i in prange(num_samples):
         # Sample parameters with noise
         v_i = np.random.normal(v[i], s_v[i])
-        z_i = max(min(np.random.normal(z[i], s_z[i]), 0.999), 0.001)
         tau_i = max(np.random.normal(tau[i], s_tau[i]), 0.0)
 
         # Initialize decision variable (symmetric around 0)
-        x = (2 * z_i - 1.0) * a[i]
-        t = 0.0
+        x = zr[i] * a[i]
+        t = tau_i
 
         # Simulation loop
         for step in range(max_steps):
             t += dt
             bound = max(a[i] - angle[i] * t, 1e-3)
-            x += v_i * dt + sigma[i] * np.sqrt(dt) * np.random.normal()
+            x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
             if x >= bound:
-                rts[i] = t + tau_i
+                rts[i] = t
                 choices[i] = 1
                 break
             elif x <= -bound:
-                rts[i] = t + tau_i
+                rts[i] = t
                 choices[i] = 0
                 break
         else:
-            rts[i] = np.nan
-            choices[i] = np.nan
+            rts[i] = -1.
+            choices[i] = -1.
 
     return result
-
 
 def _process_parameters(
     params: dict[str, Union[float, np.ndarray]],
@@ -303,7 +217,7 @@ def _process_parameters(
         del params["tau_arr"]
 
     # Broadcast scalar parameters to arrays
-    for key in ["v", "a", "z", "tau", "s_v", "sigma", "angle", "s_z", "s_tau"]:
+    for key in ["v", "a", "zr", "tau", "s_v", "angle", "s_tau"]:
         if key in params:
             params[key] = np.full(num_samples, params[key]).astype(np.float32) if np.isscalar(params[key]) \
                 else params[key].astype(np.float32)

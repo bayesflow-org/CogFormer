@@ -1,212 +1,162 @@
 import keras
+from keras.layers import Dense, GlobalAveragePooling1D
 
 from collections.abc import Sequence
 
 from bayesflow.types import Tensor
 from bayesflow.utils.serialization import serializable
+from bayesflow.networks.transformers.mab import MultiHeadAttentionBlock
 from bayesflow.networks.summary_network import SummaryNetwork
+
+from ..encoders import PositionEncoder
 
 
 @serializable("bayesflow.networks")
 class Simformer(SummaryNetwork):
-    """
-    Implements a flexible version of Simformer [1] where an all-in-one
-    transformer encoder can be interfaced with other diffusion models
-    (i.e., [2]) as inference network.
+    """Transformer-based summary network for Simformer, using MultiHeadAttentionBlock.
 
-    [1] Gloeckler et al. (2024), All-in-one simulation-based inference, https://arxiv.org/abs/2404.09636
+    This network processes high-dimensional simulator outputs to produce compact summary
+    representations for downstream diffusion-based inference, using a transformer architecture
+    with multi-head attention blocks.
 
-    [2] Song et al. (2021), Score-Based Generative Modeling through Stochastic Differential Equations,
-    https://arxiv.org/abs/2106.06548
+    Parameters
+    ----------
+    input_dim : int
+        Dimensionality of the input simulator data.
+    output_dim : int
+        Dimensionality of the output summary representation.
+    sequence_length : int, optional
+        Expected sequence length of input data, by default 100.
+    num_layers : int, optional
+        Number of transformer encoder layers, by default 4.
+    num_heads : int, optional
+        Number of attention heads in multi-head attention, by default 8.
+    hidden_dim : int, optional
+        Hidden dimensionality of the transformer, by default 256.
+    dropout : float, optional
+        Dropout rate for regularization, by default 0.1.
+    mlp_depth : int, optional
+        Number of layers in the MLP within MultiHeadAttentionBlock, by default 2.
+    mlp_width : int, optional
+        Width of each MLP layer in MultiHeadAttentionBlock, by default 128.
+
+    Attributes
+    ----------
+    input_dim : int
+        Dimensionality of the input data.
+    output_dim : int
+        Dimensionality of the output summary.
+    hidden_dim : int
+        Hidden dimensionality of the transformer.
+    input_projector : keras.layers.Dense
+        Input projection layer for simulator data.
+    position_encoder : PositionalEncoding
+        Positional encoding layer for sequence context.
+    transformer_layers : list
+        List of MultiHeadAttentionBlock layers for transformer encoding.
+    pooling : keras.layers.GlobalAveragePooling1D
+        Adaptive pooling layer for variable-length sequences.
+    output_projector : keras.layers.Dense
+        Output projection layer for summary representation.
     """
 
     def __init__(
         self,
-        num_params: int,
-        data_dim: int,
-        condition_dim: int,
-        embed_dim: int = 64,
-        num_layers: int = 6,
-        num_heads: int = 4,
-        num_diffusion_steps: int = 1000,
-        **kwargs,
+        input_dim: int,
+        output_dim: int,
+        hidden_dim = 256,
+        sequence_length = 100,
+        num_layers = 2,
+        num_heads = 8,
+        dropout = 0.1,
+        mlp_depth=2,
+        mlp_width=128
     ):
-        """
-        Parameters
-        ----------
-        num_params : int
-            Number of parameters in the global schema.
-        data_dim : int
-            Dimensionality of the simulation data (x).
-        condition_dim : int
-            Dimensionality of additional inference conditions (e.g., full_conditions.shape[-1]).
-        embed_dim : int, optional
-            Embedding dimension for id, value, and condition.
-        num_layers : int, optional
-            Number of transformer layers.
-        num_heads : int, optional
-            Number of attention heads.
-        num_diffusion_steps : int, optional
-            Number of diffusion steps for training and sampling.
-        """
-        super().__init__(**kwargs)
-        self.num_params = num_params
-        self.data_dim = data_dim
-        self.condition_dim = condition_dim
-        self.embed_dim = embed_dim
-        self.token_dim = 3 * embed_dim  # cat(id, value, cond)
-        self.num_vars = num_params + 1  # params + x
-        self.num_extra = 1 if condition_dim > 0 else 0
-        self.total_tokens = self.num_vars + self.num_extra
-        self.num_diffusion_steps = num_diffusion_steps
-#
-#         # Embeddings
-#         self.id_embedding = layers.Embedding(
-#             self.total_tokens, embed_dim, name="id_embedding"
-#         )
-#         self.condition_embedding = layers.Embedding(
-#             2, embed_dim, name="condition_embedding"
-#         )
-#         self.value_linear_layers = [
-#             layers.Dense(embed_dim, name=f"value_linear_layer_{i}")
-#             for i in range(num_params)
-#         ] + [
-#             layers.Dense(
-#                 embed_dim, name="value_linear_layer_x", input_shape=(data_dim,)
-#             )
-#         ]
-#         if condition_dim > 0:
-#             self.conditional_linear_layer = layers.Dense(
-#                 embed_dim, name="conditional_linear_layer", input_shape=(condition_dim,)
-#             )
-#         else:
-#             self.conditional_linear_layer = None
-#
-#         # Time embedding for diffusion
-#         self.time_embedding = keras.Sequential(
-#             [
-#                 layers.Dense(embed_dim, input_shape=(1,), name="time_dense1"),
-#                 layers.Activation("silu", name="time_silu"),
-#                 layers.Dense(embed_dim, name="time_dense2"),
-#             ],
-#             name="time_embedding",
-#         )
-#
-#         # Transformer
-#         transformer_layers = [
-#             layers.TransformerEncoderLayer(
-#                 d_model=self.token_dim,
-#                 num_heads=num_heads,
-#                 dff=self.token_dim * 4,
-#                 dropout=0.1,
-#                 name=f"transformer_layer_{i}",
-#             )
-#             for i in range(num_layers)
-#         ]
-#         self.transformer = keras.Sequential(transformer_layers, name="transformer")
-#
-#         # Score projectors
-#         self.score_linear_layers = [
-#             layers.Dense(1, name=f"score_linear_{i}") for i in range(num_params)
-#         ] + [layers.Dense(data_dim, name="score_linear_x")]
-#
-#         # Diffusion schedule (variance preserving)
-#         betas = ops.linspace(1e-4, 0.02, num_diffusion_steps)
-#         self.alphas = 1.0 - betas
-#         self.alpha_bars = ops.cumprod(self.alphas, axis=0)
-#
-#         # Define model inputs and outputs
-#         z_shape = (None, num_params + data_dim)
-#         t_shape = (None,)
-#         M_C_shape = (None, self.num_vars)
-#         cond_shape = (None, condition_dim) if condition_dim > 0 else None
-#         inputs = [
-#             keras.Input(shape=z_shape, name="z"),
-#             keras.Input(shape=t_shape, name="t"),
-#             keras.Input(shape=M_C_shape, name="M_C"),
-#             keras.Input(shape=cond_shape, name="cond") if cond_shape else None,
-#         ]
-#         inputs = [i for i in inputs if i is not None]
-#         outputs = self.call(inputs, training=False)
-#         super().__init__(inputs=inputs, outputs=outputs)
-#
-    def call(self, input_set: Tensor, training: bool = False, **kwargs) -> Tensor:
-        """Compresses the input sequence into a summary vector of size `summary_dim`.
+
+        super().__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+
+        # Input projector
+        self.input_projector = Dense(hidden_dim, name="input_projection")
+
+        # Position encoder
+        self.position_encoder = PositionEncoder(
+            hidden_dim = hidden_dim,
+            dropout = dropout,
+            max_length = sequence_length
+        )
+
+        # Sequential transformer layers
+        self.transformer_layers = [
+            MultiHeadAttentionBlock(
+                embed_dim = hidden_dim,
+                num_heads = num_heads,
+                dropout = dropout,
+                mlp_depth = mlp_depth,
+                mlp_width = mlp_width,
+                mlp_activation="gelu",
+                kernel_initializer="glorot_uniform",
+                layer_norm = True
+            )
+            for i in range(num_layers)
+        ]
+
+        # Adaptive pooling
+        self.pooling = GlobalAveragePooling1D()
+
+        # Output projector
+        self.output_projector = Dense(output_dim, name="output_projection")
+
+
+    def build(self, input_shape):
+        """Builds the model and validates input dimension.
 
         Parameters
         ----------
-        input_set  : Tensor (e.g., np.ndarray, tf.Tensor, ...)
-            Input of shape (batch_size, set_size, input_dim)
-        training   : boolean, optional (default - False)
-            Passed to the optional internal dropout and spectral normalization
-            layers to distinguish between train and test time behavior.
-        **kwargs   : dict, optional (default - {})
-            Additional keyword arguments passed to the internal attention layer,
-            such as ``attention_mask`` or ``return_attention_scores``
+        input_shape : tuple
+            Shape of the input tensor, expected to be (batch_size, seq_len, input_dim).
+        """
+        if input_shape[-1] != self.input_dim:
+            raise ValueError(
+                f"Expected input_dim {self.input_dim}, but got {input_shape[-1]}"
+            )
+        super().build(input_shape)
+
+#
+    def call(self, x, mask=None, training=False):
+        """Forward pass for processing simulator outputs.
+
+        Parameters
+        ----------
+        x : keras.KerasTensor
+            Input tensor of shape (batch_size, seq_len, input_dim).
+        mask : keras.KerasTensor, optional
+            Attention mask for variable-length sequences, by default None.
+        training : bool, optional
+            Whether the model is in training mode, by default False.
 
         Returns
         -------
-        out : Tensor
-            Output of shape (batch_size, set_size, output_dim)
+        keras.KerasTensor
+            Summary representation of shape (batch_size, output_dim).
         """
+        # Project simulator data
+        x = self.input_projector(x)
 
-        raise NotImplementedError
-#         z, t, M_C, condition = inputs
-#         batch_size = ops.shape(z)[0]
-#         tokens = []
-#         pos = 0
-#
-#         for i in range(self.num_vars):
-#             if i < self.num_params:
-#                 dim_v = 1
-#             else:
-#                 dim_v = self.data_dim
-#             value = z[:, pos : pos + dim_v]
-#             value_embedding = self.value_linear_layers[i](value)
-#             id_embedding = self.id_embedding(ops.full((batch_size,), i, dtype="int32"))
-#             condition_embedding = self.condition_embedding(ops.cast(M_C[:, i], "int32"))
-#             token = ops.concatenate(
-#                 [id_embedding, value_embedding, condition_embedding], axis=-1
-#             )
-#             tokens.append(token)
-#             pos += dim_v
-#
-#         # Add condition token if present
-#         if self.conditional_linear_layer is not None and condition is not None:
-#             conditional_value_embedding = self.conditional_linear_layer(condition)
-#             conditional_id_embedding = self.id_embedding(
-#                 ops.full((batch_size,), self.num_vars, dtype="int32")
-#             )
-#             conditional_condition_embedding = self.condition_embedding(
-#                 ops.ones((batch_size,), dtype="int32")
-#             )
-#             cond_token = ops.concatenate(
-#                 [
-#                     conditional_id_embedding,
-#                     conditional_value_embedding,
-#                     conditional_condition_embedding,
-#                 ],
-#                 axis=-1,
-#             )
-#             tokens.append(cond_token)
-#
-#         tokens = ops.stack(tokens, axis=1)  # (batch_size, total_tokens, token_dim)
-#
-#         # Add time embedding (broadcast to all tokens)
-#         time_embedding = self.time_embedding(
-#             ops.expand_dims(t, -1)
-#         )  # (batch_size, embed_dim)
-#         tokens = tokens + ops.expand_dims(time_embedding, 1)  # Broadcast
-#
-#         out = self.transformer(
-#             tokens, training=training
-#         )  # (batch_size, total_tokens, token_dim)
-#
-#         # Extract scores for variables (ignore extra cond token)
-#         scores = []
-#         for i in range(self.num_vars):
-#             out_i = out[:, i]
-#             score_i = self.score_linear_layers[i](out_i)
-#             scores.append(score_i)
-#         score = ops.concatenate(scores, axis=-1)
-#         return score
+        # Add positional encoding
+        x = self.position_encoder(x)
+
+        # Transformer encoding with MultiHeadAttentionBlock
+        for mab in self.transformer_layers:
+            x = mab(x, x, training=training, attention_mask=mask)
+
+        # Adaptive pooling
+        x = self.pooling(x)
+
+        # Project to summary
+        x = self.output_projector(x)
+
+        return x

@@ -3,36 +3,7 @@ from typing import Optional, Union, Callable, Dict, Tuple
 from collections.abc import Mapping
 
 
-class Tokenizer:
-    """
-    Tri-state tokenizer over a global superset of parameters with optional
-    per-parameter dimensionality.
-
-    This class builds a flattened representation of parameters for a single simulation,
-    exposing three main artifacts:
-    1. **mask**: Encodes whether each slot is inactive (-1), fixed (0), or free (1).
-    2. **base_values**: Aligned vector with free slots = 1.0, fixed slots = user values,
-       inactive slots = 0.0.
-    3. **sampling/combine API**: Draws values for free parameters and constructs
-       per-parameter dictionaries for simulation.
-
-    Parameters
-    ----------
-    parameter_names : list of str
-        Global ordered superset of parameter names.
-    variant_parameters : set of str
-        Subset of parameters used by the variant.
-    fixed_parameters : dict of {str: float, np.ndarray, or Callable[[], np.ndarray]}
-        Fixed values or generators for parameters, returning shape (dims[p],).
-    free_parameters : dict of {str: Callable[[Optional[np.ndarray]], np.ndarray]}
-        Sampling functions for free parameters, returning shape (dims[p],).
-    parameter_dims : dict of {str: int}
-        Per-parameter dimensionality (default 1).
-    constraints : dict of {str: Callable[[np.ndarray], np.ndarray]}
-        Constraint functions for free parameters (e.g., clip for positivity).
-    context_shape : tuple of int, optional
-        Expected shape of context array for a single simulation.
-    """
+class ContextManager:
 
     def __init__(
         self,
@@ -66,6 +37,23 @@ class Tokenizer:
         self.used_params = {n for n in self.parameter_names if n in self.variant_parameters}  # Active parameters
         self.fixed_params = {n for n in self.used_params if n in self.fixed_parameters}  # Fixed parameters
         self.free_params = {n for n in self.used_params if n not in self.fixed_parameters}  # Free parameters
+
+    def generate_regressors(self, params: dict[str, np.ndarray], num_samples):
+
+        regressors = {}
+        regressed_parameters = {}
+
+        for param_name, param_vector in params.items():
+
+            if param_vector.shape[0] == 1:
+                regressed_parameters[param_name] = np.full(num_samples, param_vector[0])
+                regressors[param_vector] = np.ones((num_samples, 1))
+            else:
+                design_mat = np.random.rand(num_samples, param_vector.shape[0] -1)
+                design_mat = np.c_[np.ones((num_samples, 1)), design_mat]
+                regressed_parameters[param_name] = design_mat @ param_vector
+                regressors[param_name] = design_mat
+        return regressors, regressed_parameters
 
     def sample(
             self,
@@ -324,7 +312,8 @@ class Tokenizer:
         inference_conditions["full_conditions"] = np.concatenate(full_conditions)
         return inference_conditions
 
-    def get_mask(self) -> np.ndarray:
+    @property
+    def mask(self) -> np.ndarray:
         """
         Returns the tri-state mask for parameter roles.
 
@@ -335,7 +324,8 @@ class Tokenizer:
         """
         return self.mask
 
-    def get_base_values(self) -> np.ndarray:
+    @property
+    def base_values(self) -> np.ndarray:
         """
         Returns the conditioning vector with fixed/default values.
 
