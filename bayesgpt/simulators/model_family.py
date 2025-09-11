@@ -16,7 +16,8 @@ class NestedModelFamily:
     def sample(
         self,
         num_samples: Optional[int] = None,
-        params: Optional[Dict[str, Union[np.ndarray, float]]] = None
+        params: Optional[Dict[str, Union[np.ndarray, float]]] = None,
+        context: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None
     ) -> Dict[str, Union[np.ndarray, Dict[str, np.ndarray], str]]:
         # Simulate data for a single model run
         num_samples = self.num_samples if num_samples is None else num_samples
@@ -51,7 +52,7 @@ class NestedModelFamily:
         params_dict = self.model.prepare_params(params_dict, num_samples)
 
         # Run simulation
-        sim_data = self.model.simulate(params_dict, num_samples=num_samples)
+        sim_data = self.model.simulate(params_dict, num_samples=num_samples, context=context)
 
         # Build full parameter vector for inference
         full_params = np.zeros(self.context_manager.param_vector_size, dtype=np.float32)
