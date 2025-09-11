@@ -120,27 +120,10 @@ def simulate_rdm_trial(
 #             data=data
 #         )
 
-@njit
-def _softplus(x: float) -> float:
-    # stable softplus for scalar
-    if x > 20.0:
-        return x
-    elif x < -20.0:
-        return np.exp(x)
-    else:
-        return np.log1p(np.exp(x))
-
-@njit
-def _softplus_vec(x: np.ndarray) -> np.ndarray:
-    out = np.empty_like(x, dtype=np.float32)
-    for i in range(x.size):
-        out[i] = _softplus(float(x[i]))
-    return out
-
 # Reuse your existing numba trial kernel:
 # simulate_rdm_trial(v: (K,), a: float, lamda: float, tau: float, ...)
 
-class RDMModel(Model):
+class RDM(Model):
     """
     Rank-based DDM with context-dependent drift and bound.
     Expects the following *scalar* parameters per simulation:
@@ -152,7 +135,13 @@ class RDMModel(Model):
       {"rts": (Ntr,), "choices": (Ntr,)}
     """
 
-    def __init__(self, dt: float = 1e-3, s: float = 1.0, max_iters: int = int(1e5), num_alternatives: int = 2):
+    def __init__(
+        self,
+        dt: float = 1e-3,
+        s: float = 1.0,
+        max_iters: int = int(1e5),
+        num_alternatives: int = 2
+    ):
         self.dt = dt
         self.s = s
         self.max_iters = max_iters
@@ -167,7 +156,10 @@ class RDMModel(Model):
                 out[k] = float(x.ravel()[0])
         return out
 
-    def _unpack_context(self, context: Mapping | np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _unpack_context(
+        self,
+        context: Mapping | np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Supports:
           - dict: {"x_v": (T,), "x_a": (T,), "correct_idx": (T,)}
