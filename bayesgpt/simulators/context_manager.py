@@ -19,6 +19,41 @@ class ContextManager:
         self.mask = mask
         return mask
 
+    def build_random_mask(
+            self,
+            free_parameters: list[str] | set[str] | None = None,
+            p_free: float = 0.5,
+            rng: np.random.Generator | None = None,
+    ) -> dict[str, float]:
+        """
+        Randomly marks parameters as free(=1.0) or fixed(=0.0), while forcing 'free_parameters' to 1.0.
+
+        Parameters
+        ----------
+        free_parameters : list[str] | set[str] | None
+            Parameters that must remain free (mask=1.0).
+        p_free : float
+            Probability that a non-always-free parameter is free. Must be in [0, 1].
+        rng : np.random.Generator | None
+            Optional numpy Generator for deterministic masks.
+
+        Returns
+        -------
+        dict[str, float]
+            {param_name: 0.0 or 1.0}
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+        free_parameters = set(free_parameters or [])
+        mask = {}
+        for name in self.parameter_names:
+            if name in free_parameters:
+                mask[name] = 1.0
+            else:
+                mask[name] = float(rng.random() < p_free)
+        self.mask = mask
+        return mask
+
     def apply_mask(
         self,
         sampled_params: np.ndarray | dict[str, float],
