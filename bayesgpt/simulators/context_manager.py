@@ -60,27 +60,22 @@ class ContextManager:
         mask: np.ndarray | dict[str, float],
         fixed_values: dict[str, float] | None = None,
     ) -> dict[str, float]:
+
         fixed_values = fixed_values or {}
 
-        # Normalize mask accessors
+        # Accessors normalized across dict/ndarray inputs
         def _mask_for(i: int, name: str) -> float:
-            if isinstance(mask, dict):
-                return float(mask[name])
-            else:
-                return float(mask[i])
+            return float(mask[name]) if isinstance(mask, dict) else float(mask[i])
 
-        # Normalize sampled accessors
         def _sampled_for(i: int, name: str) -> float:
-            if isinstance(sampled_params, dict):
-                return float(sampled_params[name])
-            else:
-                return float(sampled_params[i])
+            return float(sampled_params[name]) if isinstance(sampled_params, dict) else float(sampled_params[i])
 
-        masked_params = {}
-        if isinstance(sampled_params, dict):
-            for key, value in sampled_params.items():
-                masked_params[key] = np.float32(value) * float(mask[key])
-        elif isinstance(sampled_params, np.ndarray):
-            for i, val in enumerate(sampled_params):
-                masked_params[i] = np.float32(val) * float(mask[i])
+        masked_params: dict[str, float] = {}
+        for i, name in enumerate(self.parameter_names):
+            m = np.float32(_mask_for(i, name))
+            s = np.float32(_sampled_for(i, name))
+            f = np.float32(fixed_values.get(name, 0.0))
+            # sampled when free (m=1), fixed intercept when masked (m=0)
+            val = s * m + f * (1.0 - m)
+            masked_params[name] = np.float32(val)
         return masked_params
