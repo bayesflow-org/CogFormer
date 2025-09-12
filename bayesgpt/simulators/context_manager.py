@@ -58,7 +58,23 @@ class ContextManager:
         self,
         sampled_params: np.ndarray | dict[str, float],
         mask: np.ndarray | dict[str, float],
+        fixed_values: dict[str, float] | None = None,
     ) -> dict[str, float]:
+        fixed_values = fixed_values or {}
+
+        # Normalize mask accessors
+        def _mask_for(i: int, name: str) -> float:
+            if isinstance(mask, dict):
+                return float(mask[name])
+            else:
+                return float(mask[i])
+
+        # Normalize sampled accessors
+        def _sampled_for(i: int, name: str) -> float:
+            if isinstance(sampled_params, dict):
+                return float(sampled_params[name])
+            else:
+                return float(sampled_params[i])
 
         masked_params = {}
         if isinstance(sampled_params, dict):
