@@ -13,7 +13,8 @@ class NestedModelFamily:
         model: type[Model],
         context_manager: ContextManager,
         prior_fun: Callable,
-        num_samples: int = 10
+        num_samples: int = 10,
+        intrinsic_params: list[str] | None = None,
     ):
         self.name = name
         self.model = model()
@@ -21,6 +22,8 @@ class NestedModelFamily:
         self.parameter_names = context_manager.parameter_names
         self.num_samples = num_samples
         self.prior_fun = prior_fun
+        self.intrinsic_params = intrinsic_params
+
 
     def sample(
         self,
@@ -65,9 +68,63 @@ class NestedModelFamily:
 
         return results
 
+    def sample_with_design(
+            self,
+            design_config: dict[str, list[str]],
+            intrinsic_names: list[str],
+            priors: dict[str, dict[str, callable]],
+            *,
+            num_samples: int | None = None,
+            context: dict[str, np.ndarray] | None = None,
+    ):
+        """
+        Full regression path (model-agnostic):
+          design_matrix      : (num_samples, num_design_factors)
+          parameter_mask     : (num_design_factors, num_intrinsic_params)
+          parameter_matrix   : (num_design_factors, num_intrinsic_params)
+          intrinsic_values   : (num_samples, num_intrinsic_params) = design_matrix @ parameter_matrix
+        """
+        num_samples = self.num_samples if num_samples is None else int(num_samples)
+
+        # 1) Construct matrices
+        design_matrix = self.context_manager.build_design_matrix(
+            design_config=design_config, num_samples=num_samples, context=context
+        )
+        parameter_mask = self.context_manager.build_parameter_mask(
+            design_config=design_config, intrinsic_names=intrinsic_names
+        )
+        parameter_matrix = self.context_manager.sample_parameter_matrix(
+            parameter_mask=parameter_mask, priors=priors, intrinsic_names=intrinsic_names
+        )
+
+        # 2) Compose per-trial intrinsic values
+        intrinsic_values_matrix = (design_matrix @ parameter_matrix).astype(np.float32)  # (N×M)
+
+        # 3) Package params for the model (still model-agnostic)
+        params = {
+            name: intrinsic_values_matrix[:, j].astype(np.float32, copy=False)
+            for j, name in enumerate(intrinsic_names)
+        }
+        params["_intercepts"] = {name: float(parameter_matrix[0, j]) for j, name in enumerate(intrinsic_names)}
+
+        # 4) Model call
+        model_params = self.model.prepare_params(params, num_samples=num_samples)
+        sim_data = self.model.simulate(model_params, num_samples=num_samples, context=None)
+
+        return {
+            "variant_name": f"{self.name}|full_regression",
+            "design_config": design_config,
+            "design_matrix": design_matrix,
+            "parameter_mask": parameter_mask,
+            "parameter_matrix": parameter_matrix,
+            "intrinsic_names": intrinsic_names,
+            "params": model_params,
+            "sim_data": sim_data,
+        }
+
     def _draw_prior_vec(self) -> np.ndarray:
         """
-        Draw once from the jitted prior; ensure shape matches parameter_names.
+        Draw once from the num_intrinsic_paramsitted prior; ensure shape matches parameter_names.
         """
         arr = np.asarray(self.prior_fun(), dtype=np.float32).ravel()
         if arr.size != len(self.parameter_names):

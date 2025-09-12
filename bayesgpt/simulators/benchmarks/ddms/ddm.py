@@ -22,7 +22,9 @@ def simulate_ddm_trial(
     v_i = np.random.normal(v, s_v)
     tau_i = tau
     if s_tau > 0.0:
-        tau_i = np.random.normal(tau, s_tau)
+        low = tau - s_tau * 0.5
+        high = tau + s_tau * 0.5
+        tau_i = np.random.uniform(low, high)
         if tau_i < 0.0:
             tau_i = 0.0
 
@@ -100,10 +102,65 @@ def sample_ddm_prior():
 
 class DDM(Model):
     def prepare_params(self, params: dict, num_samples: int):
-        # no-op; masking already applied upstream
+        """
+        Two modes:
+          • Full-regression: trial-level arrays 'v' and 'a' are provided.
+            Scalars are read from params['_intercepts'] (fallback to params[...] if present).
+          • Legacy: extrinsic coefficients; handled later in simulate().
+        """
+        if "v" in params and "a" in params:  # full-regression mode
+            v_arr = np.asarray(params["v"], dtype=np.float32).reshape(-1)
+            a_arr = np.asarray(params["a"], dtype=np.float32).reshape(-1)
+            if v_arr.shape[0] != num_samples or a_arr.shape[0] != num_samples:
+                raise ValueError("v and a arrays must have length == num_samples")
+
+            # minimal constraints
+            a_arr = np.maximum(a_arr, 1e-6)
+
+            # pull scalar intercepts for the remaining intrinsics
+            intercepts = params.get("_intercepts", {})
+            out = {
+                "v": v_arr,
+                "a": a_arr,
+                "tau": float(max(intercepts.get("tau", params.get("tau", 0.0)), 0.0)),
+                "s_tau": float(max(intercepts.get("s_tau", params.get("s_tau", 0.0)), 0.0)),
+                "s_v": float(max(intercepts.get("s_v", params.get("s_v", 0.0)), 0.0)),
+                "decay": float(max(intercepts.get("decay", params.get("decay", 0.0)), 0.0)),
+            }
+            return out
+
+        # legacy passthrough (extrinsic coefficients handled in simulate)
         return params
 
     def simulate(self, params: dict, num_samples: int, context=None):
+        if "v" in params and "a" in params:
+            v_arr = np.asarray(params["v"], dtype=np.float32).reshape(-1)
+            a_arr = np.asarray(params["a"], dtype=np.float32).reshape(-1)
+            if v_arr.shape[0] != num_samples or a_arr.shape[0] != num_samples:
+                raise ValueError("v and a arrays must have length == num_samples")
+
+            a_arr = np.maximum(a_arr, 1e-6)
+            tau = float(max(params.get("tau", 0.0), 0.0))
+            s_tau = float(max(params.get("s_tau", 0.0), 0.0))
+            s_v = float(max(params.get("s_v", 0.0), 0.0))
+            decay = float(max(params.get("decay", 0.0), 0.0))
+
+            results = simulate_ddm(
+                v=v_arr.astype(np.float32, copy=False),
+                a=a_arr.astype(np.float32, copy=False),
+                tau=tau,
+                s_tau=s_tau,
+                s_v=s_v,
+                decay=decay,
+                z=0.5,
+                sigma=1.0,
+                dt=0.001,
+                max_steps=10000,
+            )
+            rts = results[:, 0]
+            choices = results[:, 1]
+            return {"rts": rts, "choices": choices}
+
         if context is None or "x_v" not in context or "x_a" not in context:
             raise ValueError("context must be a dict with 'x_v' and 'x_a' of shape (num_samples,)")
 
