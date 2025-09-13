@@ -1,147 +1,124 @@
 import numpy as np
-from typing import Dict, Optional, Union
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 
 from .model import Model
 from .context_manager import ContextManager
+from utils.simulator_utils import shifted_softplus
 
 
 class NestedModelFamily:
     def __init__(
         self,
         name: str,
-        model: type[Model],
+        model: Model,
         context_manager: ContextManager,
-        prior_fun: Callable,
-        num_samples: int = 10,
-        intrinsic_params: list[str] | None = None,
+        prior_fun: dict[str, Callable],
+        intrinsic_params: list[str],
     ):
         self.name = name
-        self.model = model()
+        self.model = model
         self.context_manager = context_manager
-        self.parameter_names = context_manager.parameter_names
-        self.num_samples = num_samples
         self.prior_fun = prior_fun
         self.intrinsic_params = intrinsic_params
 
+    @property
+    def parameter_names(self) -> list[str]:
+        return self.context_manager.parameter_names
 
     def sample(
         self,
-        fixed_configs: Iterable[Iterable[str]],
-        num_samples: Optional[int] = None,
-        context: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None,
+        design_config: dict[str, list[str]],
+        *,
+        num_obs: int = 10,
+        num_regressors: int = 0,
+        link_fun: Callable = shifted_softplus,
+        context: dict[str, np.ndarray] | None = None,
+        mask_randomizer_kwargs: dict | None = None,
     ):
-        """
-        For each config (list/set of parameter names to fix), build a mask, apply it to a
-        single prior draw, map to model parameters, and simulate once. Returns a list.
-        """
-        num_samples = self.num_samples if num_samples is None else num_samples
-        results = []
 
-        for idx, fixed_params in enumerate(fixed_configs):
-            # Build mask for this config (aligned with parameter_names)
-            masks = self.context_manager.build_mask(list(fixed_params))  # shape (P,)
+        # Create design config and parameter mask, either dynamically or based on user input
+        if design_config is None:
 
-            # Draw prior once and apply mask (masked entries -> 0.0)
-            priors = self._draw_prior_vec()  # shape (P,)
-            priors_dict = self._prior_vec_to_dict(priors)
+            kwargs = mask_randomizer_kwargs or {}
+            parameter_mask = self.context_manager.build_random_parameter_mask(
+                intrinsic_params=self.intrinsic_params,
+                num_regressors=num_regressors,
+                **kwargs,
+            )
+            design_config = self.context_manager.mask_to_design_config(parameter_mask, self.intrinsic_params)
 
-            masked_priors = self.context_manager.apply_mask(priors_dict, masks)  # shape (P,)
-
-            # Model path: prepare → simulate
-            model_params = self.model.prepare_params(masked_priors, num_samples)
-            print(model_params)
-            sim_data = self.model.simulate(model_params, num_samples=num_samples, context=context)
-
-            # Package results for this config
-            results.append(
-                {
-                    "variant_name": f"{self.name}|cfg{idx + 1}",
-                    "fixed_parameters": list(fixed_params),
-                    "mask": masks,
-                    "prior_draw": priors.astype(np.float32, copy=False),
-                    "full_params": masked_priors,
-                    "sim_data": sim_data,
-                    "context": context
-                }
+        else:
+            parameter_mask = self.context_manager.build_parameter_mask(
+                design_config=design_config,
+                intrinsic_params=self.intrinsic_params,
             )
 
-        return results
-
-    def sample_with_design(
-            self,
-            design_config: dict[str, list[str]],
-            intrinsic_names: list[str],
-            priors: dict[str, dict[str, callable]],
-            *,
-            num_samples: int | None = None,
-            context: dict[str, np.ndarray] | None = None,
-    ):
-        """
-        Full regression path (model-agnostic):
-          design_matrix      : (num_samples, num_design_factors)
-          parameter_mask     : (num_design_factors, num_intrinsic_params)
-          parameter_matrix   : (num_design_factors, num_intrinsic_params)
-          intrinsic_values   : (num_samples, num_intrinsic_params) = design_matrix @ parameter_matrix
-        """
-        num_samples = self.num_samples if num_samples is None else int(num_samples)
-
-        # 1) Construct matrices
+        # Design matrix
         design_matrix = self.context_manager.build_design_matrix(
-            design_config=design_config, num_samples=num_samples, context=context
+            design_config=design_config, num_obs=num_obs, context=context
         )
-        parameter_mask = self.context_manager.build_parameter_mask(
-            design_config=design_config, intrinsic_names=intrinsic_names
-        )
+
+        # Parameter matrix
         parameter_matrix = self.context_manager.sample_parameter_matrix(
-            parameter_mask=parameter_mask, priors=priors, intrinsic_names=intrinsic_names
+            parameter_mask=parameter_mask, priors=self.prior_fun, intrinsic_params=self.intrinsic_params
         )
 
-        # 2) Compose per-trial intrinsic values
-        intrinsic_values_matrix = (design_matrix @ parameter_matrix).astype(np.float32)  # (N×M)
+        # Compose per-trial intrinsic values
+        intrinsic_values_matrix = link_fun(design_matrix @ parameter_matrix)
 
-        # 3) Package params for the model (still model-agnostic)
+        # Package for model
         params = {
             name: intrinsic_values_matrix[:, j].astype(np.float32, copy=False)
-            for j, name in enumerate(intrinsic_names)
+            for j, name in enumerate(self.intrinsic_params)
         }
-        params["_intercepts"] = {name: float(parameter_matrix[0, j]) for j, name in enumerate(intrinsic_names)}
 
-        # 4) Model call
-        model_params = self.model.prepare_params(params, num_samples=num_samples)
-        sim_data = self.model.simulate(model_params, num_samples=num_samples, context=None)
+        sim_trials = self.model.simulate(params, context=None)
 
         return {
-            "variant_name": f"{self.name}|full_regression",
+            "model_name": f"{self.name}",
             "design_config": design_config,
             "design_matrix": design_matrix,
             "parameter_mask": parameter_mask,
             "parameter_matrix": parameter_matrix,
-            "intrinsic_names": intrinsic_names,
-            "params": model_params,
-            "sim_data": sim_data,
+            "sim_trials": sim_trials,
         }
 
-    def _draw_prior_vec(self) -> np.ndarray:
+    def batch_sample(
+            self,
+            *,
+            batch_size: int,
+            num_obs: int | None = None,
+            design_config: dict[str, list[str]] | None = None,
+            num_regressors: int | None = None,
+            mask_randomizer_kwargs: dict | None = None,
+            context: dict[str, np.ndarray] | None = None,
+            min_num_obs: int = 10,
+            max_num_obs: int = 600,
+            min_num_regressors: int = 0,
+            max_num_regressors: int = 10,
+    ):
         """
-        Draw once from the num_intrinsic_paramsitted prior; ensure shape matches parameter_names.
+        Memory-friendly generator version of `sample_many_with_design`.
+        Yields one result dict at a time.
         """
-        arr = np.asarray(self.prior_fun(), dtype=np.float32).ravel()
-        if arr.size != len(self.parameter_names):
-            raise ValueError(
-                f"Prior length {arr.size} != #params {len(self.parameter_names)} ({len(self.parameter_names)})."
-            )
-        return arr
 
-    def _prior_vec_to_dict(self, prior_vec: np.ndarray) -> dict[str, float]:
-        """
-        Convert a 1-D prior vector (canonical order) into a {param: value} dict.
-        """
-        arr = np.asarray(prior_vec, dtype=np.float32).ravel()
-        if arr.size != len(self.parameter_names):
-            raise ValueError(
-                f"Prior length {arr.size} != #params {len(self.parameter_names)}."
+        num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
+        num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+
+        batch = []
+        for i in range(batch_size):
+
+            sim_instance = self.sample(
+                design_config=design_config,
+                num_obs=num_obs,
+                context=context,
+                num_regressors=num_regressors,
+                mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs
             )
-        if not np.all(np.isfinite(arr)):
-            raise ValueError("Prior vector contains non-finite values (NaN/Inf).")
-        return {name: np.float32(arr[i]) for i, name in enumerate(self.parameter_names)}
+
+            sim_instance["batch_id"] = i
+            sim_instance["num_obs"] = num_obs
+            sim_instance["num_factors"] = num_regressors
+            batch.append(sim_instance)
+
+        return batch

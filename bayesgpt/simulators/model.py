@@ -8,14 +8,14 @@ class Model(ABC):
     """
     Abstract base class for simulation-based inference models.
 
-    Defines the interface for simulating data with num_samples trials per simulation,
+    Defines the interface for simulating data with num_obs trials per simulation,
     with batching handled by NestedModelFamily.
     """
 
     def prepare_params(
             self,
             params: dict[str, float],
-            num_samples: int,
+            num_obs: int,
     ) -> dict[str, float]:
         """Optional: models can normalize/broadcast shapes here. Default: passthrough."""
         return params
@@ -23,8 +23,7 @@ class Model(ABC):
     @abstractmethod
     def simulate(
         self,
-        params: dict[str, float],
-        num_samples: int,
+        params: dict[str, np.ndarray],
         context: Optional[np.ndarray] = None,
     ) -> Union[np.ndarray, Mapping[str, np.ndarray]]:
 
