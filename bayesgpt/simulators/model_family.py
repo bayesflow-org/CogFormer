@@ -97,11 +97,6 @@ class NestedModelFamily:
             min_num_regressors: int = 0,
             max_num_regressors: int = 10,
     ):
-        """
-        Memory-friendly generator version of `sample_many_with_design`.
-        Yields one result dict at a time.
-        """
-
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
 
