@@ -78,8 +78,9 @@ class NestedModelFamily:
             "model_name": f"{self.name}",
             "design_config": design_config,
             "design_matrix": design_matrix,
-            "parameter_mask": parameter_mask,
-            "parameter_matrix": parameter_matrix,
+            "param_mask": parameter_mask,
+            "param_matrix": parameter_matrix,
+            "param_samples": params,
             "sim_trials": sim_trials,
         }
 

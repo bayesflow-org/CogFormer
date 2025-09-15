@@ -109,7 +109,7 @@ class ContextManager:
         config: dict[str, list[str]] = {}
         for i in range(num_regressors):
             key = "1" if i == 0 else f"u_{i}"
-            config[key] = [intrinsic_params[j] for j in range(n) if parameter_mask[i, j] == 1.0]
+            config[key] = [intrinsic_params[j] for j in range(num_regressors) if parameter_mask[i, j] == 1.0]
         return config
 
     def sample_parameter_matrix(
