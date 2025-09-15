@@ -98,11 +98,16 @@ class NestedModelFamily:
             min_num_regressors: int = 0,
             max_num_regressors: int = 10,
     ):
-        num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
-        num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+        # Initialize batch and keep track of the maximum num_obs
+        list_batch = []
+        list_num_obs = np.zeros(batch_size)
+        list_num_regressors = np.zeros(batch_size)
 
-        batch = []
         for i in range(batch_size):
+            num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
+            num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+            list_num_obs[i] = num_obs
+            list_num_regressors[i] = num_regressors
 
             sim_instance = self.sample(
                 design_config=design_config,
@@ -114,7 +119,37 @@ class NestedModelFamily:
 
             sim_instance["batch_id"] = i
             sim_instance["num_obs"] = num_obs
-            sim_instance["num_factors"] = num_regressors
-            batch.append(sim_instance)
+            sim_instance["num_regressors"] = num_regressors
+            list_batch.append(sim_instance)
+
+
+        max_num_obs = np.max(list_num_obs)
+        max_num_regressors = np.max(list_num_regressors)
+        batch = self.collate(list_batch, max_num_obs, max_num_regressors)
 
         return batch
+
+
+    def collate(self, list_batch: list[dict], max_num_obs: int, max_num_regressors: int) -> dict[str, np.ndarray]:
+        # Infer batch size
+        batch_size = len(list_batch)
+
+        design_matrices = np.array(batch_size, dtype=np.float32)
+        param_mask = np.array(batch_size, dtype=np.float32)
+        param_matrices = np.array(batch_size, dtype=np.float32)
+        param_samples = np.array(batch_size, dtype=np.float32)
+        sim_data = np.array(batch_size, dtype=np.float32)
+
+        for i in range(batch_size):
+            # TODO
+            pass
+
+        collated_batch = {
+            "design_matrices": design_matrices,
+            "param_mask": param_mask,
+            "param_matrices": param_matrices,
+            "param_samples": param_samples,
+            "sim_data": sim_data
+        }
+
+        return collated_batch
