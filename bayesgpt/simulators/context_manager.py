@@ -22,7 +22,6 @@ class ContextManager:
         num_regressors = len(regressor_keys)
         design_matrix = np.empty((num_obs, num_regressors), dtype=np.float32)
 
-
         for j, key in enumerate(regressor_keys):
             if key == "1":
                 design_matrix[:, j] = 1.0
@@ -105,11 +104,10 @@ class ContextManager:
         Convert a (num_regressors × num_intrinsics) binary mask into a design_config dict.
         Row 0 -> key "1" (intercept), rows 1.. -> "u_1", "u_2", ...
         """
-        m, n = parameter_mask.shape
-        if n != len(intrinsic_params):
-            raise ValueError("parameter_mask width != len(intrinsic_params)")
+        num_regressors, num_intrinsic_params = parameter_mask.shape
+
         config: dict[str, list[str]] = {}
-        for i in range(m):
+        for i in range(num_regressors):
             key = "1" if i == 0 else f"u_{i}"
             config[key] = [intrinsic_params[j] for j in range(n) if parameter_mask[i, j] == 1.0]
         return config
