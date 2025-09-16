@@ -122,9 +122,9 @@ class NestedModelFamily:
             sim_instance["num_regressors"] = num_regressors
             list_batch.append(sim_instance)
 
-
-        max_num_obs = np.max(list_num_obs)
-        max_num_regressors = np.max(list_num_regressors)
+        print(list_num_obs, list_num_regressors)
+        max_num_obs = np.max(list_num_obs).astype(np.int32)
+        max_num_regressors = np.max(list_num_regressors).astype(np.int32)
         batch = self.collate(list_batch, max_num_obs, max_num_regressors)
 
         return batch
@@ -133,16 +133,34 @@ class NestedModelFamily:
     def collate(self, list_batch: list[dict], max_num_obs: int, max_num_regressors: int) -> dict[str, np.ndarray]:
         # Infer batch size
         batch_size = len(list_batch)
+        num_params = len(self.intrinsic_params)
 
-        design_matrices = np.array(batch_size, dtype=np.float32)
-        param_mask = np.array(batch_size, dtype=np.float32)
-        param_matrices = np.array(batch_size, dtype=np.float32)
-        param_samples = np.array(batch_size, dtype=np.float32)
-        sim_data = np.array(batch_size, dtype=np.float32)
+        design_matrices = np.zeros((batch_size, max_num_obs, max_num_regressors), dtype=np.float32)
+        param_mask = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
+        param_matrices = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
+
+        # Initialize param_samples
+        param_samples = dict.fromkeys(self.intrinsic_params)
+        for k in param_samples.keys():
+            param_samples[k] = np.zeros((batch_size, max_num_obs), dtype=np.float32)
+
+        # Initialize sim_data
+        sim_data = dict.fromkeys(list_batch[0]["sim_trials"].keys())
+        for k in sim_data.keys():
+            sim_data[k] = np.zeros((batch_size, max_num_obs), dtype=np.float32)
 
         for i in range(batch_size):
-            # TODO
-            pass
+            num_obs = list_batch[i]["num_obs"]
+            num_regressors = list_batch[i]["num_regressors"]
+            design_matrices[i, :num_obs, :num_regressors] = list_batch[i]["design_matrix"]
+            param_mask[i, :num_regressors] = list_batch[i]["param_mask"]
+            param_matrices[i, :num_regressors] = list_batch[i]["param_matrix"]
+
+            for k, v in list_batch[i]["param_samples"].items():
+                param_samples[k][i, :num_obs] = v
+
+            for k, v in list_batch[i]["sim_trials"].items():
+                sim_data[k][i, :num_obs] = v
 
         collated_batch = {
             "design_matrices": design_matrices,
