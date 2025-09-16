@@ -60,7 +60,7 @@ class NestedModelFamily:
 
         # Parameter matrix
         parameter_matrix = self.context_manager.sample_parameter_matrix(
-            parameter_mask=parameter_mask, priors=self.prior_fun, intrinsic_params=self.intrinsic_params
+            parameter_mask=parameter_mask, prior_fun=self.prior_fun, intrinsic_params=self.intrinsic_params
         )
 
         # Compose per-trial intrinsic values
@@ -98,14 +98,17 @@ class NestedModelFamily:
             min_num_regressors: int = 0,
             max_num_regressors: int = 10,
     ):
+        num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
+        num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+
         # Initialize batch and keep track of the maximum num_obs
         list_batch = []
         list_num_obs = np.zeros(batch_size)
         list_num_regressors = np.zeros(batch_size)
 
         for i in range(batch_size):
-            num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
-            num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+
+            print(num_obs, num_regressors)
             list_num_obs[i] = num_obs
             list_num_regressors[i] = num_regressors
 
@@ -117,39 +120,46 @@ class NestedModelFamily:
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs
             )
 
-            sim_instance["batch_id"] = i
             sim_instance["num_obs"] = num_obs
             sim_instance["num_regressors"] = num_regressors
             list_batch.append(sim_instance)
 
-        print(list_num_obs, list_num_regressors)
-        max_num_obs = np.max(list_num_obs).astype(np.int32)
-        max_num_regressors = np.max(list_num_regressors).astype(np.int32)
-        batch = self.collate(list_batch, max_num_obs, max_num_regressors)
+        batch = self.collate(list_batch)
 
         return batch
 
 
-    def collate(self, list_batch: list[dict], max_num_obs: int, max_num_regressors: int) -> dict[str, np.ndarray]:
+    def collate(self, list_batch: list[dict]) -> dict[str, np.ndarray]:
+
         # Infer batch size
         batch_size = len(list_batch)
         num_params = len(self.intrinsic_params)
+        num_obs = list_batch[0]['design_matrix'].shape[0]
+        num_regressors = list_batch[0]['design_matrix'].shape[1]
 
-        design_matrices = np.zeros((batch_size, max_num_obs, max_num_regressors), dtype=np.float32)
-        param_mask = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
-        param_matrices = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
+        # initialize design configs
+        model_names = []
+        design_configs = []
+
+        # Initialize design matrices, param masks, and param matrices
+        design_matrices = np.zeros((batch_size, num_obs, num_regressors), dtype=np.float32)
+        param_mask = np.zeros((batch_size, num_regressors, num_params), dtype=np.float32)
+        param_matrices = np.zeros((batch_size, num_regressors, num_params), dtype=np.float32)
 
         # Initialize param_samples
         param_samples = dict.fromkeys(self.intrinsic_params)
         for k in param_samples.keys():
-            param_samples[k] = np.zeros((batch_size, max_num_obs), dtype=np.float32)
+            param_samples[k] = np.zeros((batch_size, num_obs), dtype=np.float32)
 
         # Initialize sim_data
         sim_data = dict.fromkeys(list_batch[0]["sim_trials"].keys())
         for k in sim_data.keys():
-            sim_data[k] = np.zeros((batch_size, max_num_obs), dtype=np.float32)
+            sim_data[k] = np.zeros((batch_size, num_obs), dtype=np.float32)
+
 
         for i in range(batch_size):
+            model_names.append(list_batch[i]["model_name"])
+            design_configs.append(list_batch[i]["design_config"])
             num_obs = list_batch[i]["num_obs"]
             num_regressors = list_batch[i]["num_regressors"]
             design_matrices[i, :num_obs, :num_regressors] = list_batch[i]["design_matrix"]
@@ -163,6 +173,8 @@ class NestedModelFamily:
                 sim_data[k][i, :num_obs] = v
 
         collated_batch = {
+            "model_names": model_names,
+            "design_configs": design_configs,
             "design_matrices": design_matrices,
             "param_mask": param_mask,
             "param_matrices": param_matrices,

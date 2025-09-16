@@ -14,6 +14,7 @@ class ContextManager:
         context: dict[str, np.ndarray] | None = None,
         discrete_prob: float = 0.5
     ) -> np.ndarray:
+        # Provide context
         context = context or {}
         regressor_keys = list(design_config.keys())
         if "1" in regressor_keys and regressor_keys[0] != "1":
@@ -109,20 +110,24 @@ class ContextManager:
         config: dict[str, list[str]] = {}
         for i in range(num_regressors):
             key = "1" if i == 0 else f"u_{i}"
-            config[key] = [intrinsic_params[j] for j in range(num_regressors) if parameter_mask[i, j] == 1.0]
+            config[key] = []
+            for j in range(num_intrinsic_params):
+                if parameter_mask[i, j] == 1.0:
+                    config[key].append(intrinsic_params[j])
+
         return config
 
     def sample_parameter_matrix(
         self,
         parameter_mask: np.ndarray,
-        priors: dict[str, dict[str, Callable]],
+        prior_fun: dict[str, Callable],
         intrinsic_params: list[str],
     ) -> np.ndarray:
         """
         Build parameter_matrix with shape (num_regressors, num_intrinsic_params) by sampling
         entry-wise wherever parameter_mask==1.
-        - Row 0 (intercept) uses priors[intrinsic]['intercept']()
-        - Rows >=1 (slopes)  use priors[intrinsic]['slope']()
+        - Row 0 (intercept) uses prior_fun[intrinsic]['intercept']()
+        - Rows >=1 (slopes)  use prior_fun[intrinsic]['slope']()
         - Entries with mask==0 are 0.0
         """
 
@@ -134,9 +139,9 @@ class ContextManager:
                 if parameter_mask[design_index, param_index] == 1.0:
 
                     if design_index == 0:
-                        sampler = priors[intrinsic]["intercept"]
+                        sampler = prior_fun[intrinsic]["intercept"]
                     else:
-                        sampler = priors[intrinsic]["slope"]
+                        sampler = prior_fun[intrinsic]["slope"]
 
                     parameter_matrix[design_index, param_index] = sampler()
         return parameter_matrix
