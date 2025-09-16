@@ -14,7 +14,7 @@ def simulate_ddm_trial(
     z: float = 0.5,
     sigma: float = 1.0,
     dt: float = 0.001,
-    max_steps: int = 10000,
+    max_steps: int = 100000,
 ) -> (float, float):
     """
     Single trial with collapsing bounds; v_mean and a_i are already per-trial scalars.
@@ -42,10 +42,11 @@ def simulate_ddm_trial(
             bound = 1e-3
         x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
         if x >= bound:
-            return t, 1.0
+            return np.array([t, 1.0], dtype=np.float32)
         if x <= -bound:
-            return t, 0.0
-    return -1.0, -1.0
+            return np.array([t, 0.0], dtype=np.float32)
+    # No decision within max_steps
+    return np.array([-1.0, -1.0], dtype=np.float32)
 
 @njit(parallel=True)
 def simulate_ddm(
@@ -62,10 +63,10 @@ def simulate_ddm(
 ) -> np.ndarray:
 
     n = v.shape[0]
-    out = np.zeros((n, 2), dtype=np.float32)
+    sim_data = np.zeros((n, 2), dtype=np.float32)
 
     for i in prange(n):
-        rt_i, ch_i = simulate_ddm_trial(
+        sim_trial = simulate_ddm_trial(
             v=v[i],
             a=a[i],
             tau=tau[i],
@@ -77,10 +78,9 @@ def simulate_ddm(
             dt=dt,
             max_steps=max_steps,
         )
-        out[i, 0] = rt_i
-        out[i, 1] = ch_i
+        sim_data[i] = sim_trial
 
-    return out
+    return sim_data
 
 @njit
 def sample_ddm_prior():
@@ -97,7 +97,7 @@ def sample_ddm_prior():
 
 class DDM(Model):
 
-    def __init__(self, dt: float = 1e-3, max_steps: int = 10000):
+    def __init__(self, dt: float = 1e-3, max_steps: int = 1e4):
         self.dt = dt
         self.max_steps = max_steps
 
