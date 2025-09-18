@@ -69,7 +69,7 @@ class ContextManager:
         By default, keeps the intercept (col 0) continuous.
         """
         discrete_mask = 1 * (np.random.rand(num_regressors) < discrete_prob)
-        # Intercept is always continuous
+        # Intercept should always be continuous
         discrete_mask[0] = 0
         return discrete_mask
 
@@ -92,7 +92,7 @@ class ContextManager:
 
         # Generate discrete mask if none provided
         if discrete_mask is None:
-            discrete_mask = int(np.random.rand(num_regressors) < discrete_prob)
+            discrete_mask = self.build_random_discrete_mask(num_regressors=num_regressors, discrete_prob=discrete_prob)
 
         design_matrix = np.empty((num_obs, num_regressors), dtype=np.float32)
 

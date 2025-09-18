@@ -34,11 +34,11 @@ class NestedModelFamily:
         link_fun: Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
+        discrete_mask: np.ndarray | None = None,
+        discrete_prob: float = 0.5
     ):
-
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
-
             kwargs = mask_randomizer_kwargs or {}
             parameter_mask = self.context_manager.build_random_parameter_mask(
                 intrinsic_params=self.intrinsic_params,
@@ -51,6 +51,17 @@ class NestedModelFamily:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
+            )
+
+        # Discrete mask
+        regressor_keys = list(design_config.keys())
+        if "1" in regressor_keys and regressor_keys[0] != "1":
+            regressor_keys = ["1"] + [k for k in regressor_keys if k != "1"]
+        num_regressors_from_config = len(regressor_keys)
+
+        if discrete_mask is None:
+            discrete_mask = self.context_manager.build_random_discrete_mask(
+                num_regressors=num_regressors_from_config, discrete_prob=discrete_prob
             )
 
         # Design matrix
@@ -72,7 +83,11 @@ class NestedModelFamily:
             for j, name in enumerate(self.intrinsic_params)
         }
 
-        sim_trials = self.model.simulate(params, context=None)
+        # Prepare params
+        params = self.model.prepare_params(params=params, num_obs=num_obs, context=context)
+
+        # Simulate
+        sim_trials = self.model.simulate(params, context=context)
 
         return {
             "model_name": f"{self.name}",
@@ -82,6 +97,7 @@ class NestedModelFamily:
             "param_matrix": parameter_matrix,
             "param_samples": params,
             "sim_trials": sim_trials,
+            "discrete_mask": discrete_mask
         }
 
     def batch_sample(
@@ -97,6 +113,7 @@ class NestedModelFamily:
             max_num_obs: int = 600,
             min_num_regressors: int = 0,
             max_num_regressors: int = 10,
+            discrete_prob: float = 0.5
     ):
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
@@ -107,8 +124,6 @@ class NestedModelFamily:
         list_num_regressors = np.zeros(batch_size)
 
         for i in range(batch_size):
-
-            print(num_obs, num_regressors)
             list_num_obs[i] = num_obs
             list_num_regressors[i] = num_regressors
 
@@ -117,7 +132,9 @@ class NestedModelFamily:
                 num_obs=num_obs,
                 context=context,
                 num_regressors=num_regressors,
-                mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs
+                mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
+                discrete_mask=None,
+                discrete_prob=discrete_prob
             )
 
             sim_instance["num_obs"] = num_obs
@@ -130,7 +147,6 @@ class NestedModelFamily:
 
 
     def collate(self, list_batch: list[dict]) -> dict[str, np.ndarray]:
-
         # Infer batch size
         batch_size = len(list_batch)
         num_params = len(self.intrinsic_params)
@@ -145,6 +161,7 @@ class NestedModelFamily:
         design_matrices = np.zeros((batch_size, num_obs, num_regressors), dtype=np.float32)
         param_mask = np.zeros((batch_size, num_regressors, num_params), dtype=np.float32)
         param_matrices = np.zeros((batch_size, num_regressors, num_params), dtype=np.float32)
+        discrete_masks = np.zeros((batch_size, num_regressors), dtype=np.float32)
 
         # Initialize param_samples
         param_samples = dict.fromkeys(self.intrinsic_params)
@@ -156,7 +173,7 @@ class NestedModelFamily:
         for k in sim_data.keys():
             sim_data[k] = np.zeros((batch_size, num_obs), dtype=np.float32)
 
-
+        # Loop and collate
         for i in range(batch_size):
             model_names.append(list_batch[i]["model_name"])
             design_configs.append(list_batch[i]["design_config"])
@@ -165,6 +182,7 @@ class NestedModelFamily:
             design_matrices[i, :num_obs, :num_regressors] = list_batch[i]["design_matrix"]
             param_mask[i, :num_regressors] = list_batch[i]["param_mask"]
             param_matrices[i, :num_regressors] = list_batch[i]["param_matrix"]
+            discrete_masks[i, :num_regressors] = list_batch[i]["discrete_mask"][:num_regressors]
 
             for k, v in list_batch[i]["param_samples"].items():
                 param_samples[k][i, :num_obs] = v
@@ -179,7 +197,8 @@ class NestedModelFamily:
             "param_mask": param_mask,
             "param_matrices": param_matrices,
             "param_samples": param_samples,
-            "sim_data": sim_data
+            "sim_data": sim_data,
+            "discrete_masks": discrete_masks,
         }
 
         return collated_batch

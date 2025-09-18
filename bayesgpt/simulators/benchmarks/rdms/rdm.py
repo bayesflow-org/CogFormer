@@ -9,12 +9,12 @@ def sample_rdm_trial(
     decay: float,
     tau: float,
     dt: float = 0.001,
-    s: float = 1.0,
+    sigma: float = 1.0,
     max_steps: int = 10000,
 ) -> np.ndarray:
     # Infer number of alternatives
     num_alternatives = v.shape[0]
-    c = s * np.sqrt(dt)
+    c = sigma * np.sqrt(dt)
     # exponentially collapsing threshold
     t = np.arange(0, max_steps * dt, dt)
     threshold = a * np.exp(-decay * t)
@@ -34,7 +34,7 @@ def simulate_rdm(
     a: np.ndarray,
     tau: np.ndarray,
     decay: np.ndarray,
-    s: float = 1.0,
+    sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000
 ):
@@ -47,7 +47,7 @@ def simulate_rdm(
             a=a[i],
             decay=decay[i],
             tau=tau[i],
-            s=s,
+            sigma=sigma,
             dt=dt,
             max_steps=max_steps
         )
@@ -62,10 +62,10 @@ def sample_rdm_prior() -> np.ndarray:
     v_slope = np.random.normal(0.0, 3.0)
     a_intercept = np.random.gamma(10.0, 0.3)
     a_slope = np.random.normal(0.0, 1.0)
-    lamda = np.random.gamma(1, 0.4)
+    decay = np.random.gamma(1, 0.4)
     tau = np.random.gamma(3.0, 0.2)
     return np.array(
-        [v_intercept, v_diff, v_slope, a_intercept, a_slope, lamda, tau]
+        [v_intercept, v_diff, v_slope, a_intercept, a_slope, decay, tau]
     )
 
 class RDM(Model):
@@ -74,6 +74,45 @@ class RDM(Model):
         super().__init__()
         self.dt = dt
         self.max_steps = max_steps
+
+    def prepare_params(
+        self,
+        params: dict[str, np.ndarray],
+        num_obs: int,
+        context: dict[str, np.ndarray] | None = None,
+    ) -> dict[str, np.ndarray]:
+        """
+        Expand per-trial scalar drifts into K-way vectors using context.
+        Expects in `params`: v, (optional) v_diff, a, tau, decay
+        Expects in `context`: 'correct_idx' (len==num_obs), and either 'num_alternatives' or infer K from correct_idx.
+        """
+        context = context or {}
+        v_base = params["v"].astype(np.float32, copy=False)
+        v_diff = params.get("v_diff", np.zeros_like(v_base)).astype(np.float32, copy=False)
+
+        if "correct_idx" not in context:
+            raise ValueError("RDM requires context['correct_idx'] as int indices per trial.")
+        correct_idx = np.asarray(context["correct_idx"], dtype=np.int32).reshape(-1)
+        if correct_idx.shape[0] != num_obs:
+            raise ValueError(f"correct_idx length {correct_idx.shape[0]} != num_obs {num_obs}")
+
+        K = int(context.get("num_alternatives", int(correct_idx.max()) + 1))
+
+        # Build per-trial K-vector drift:
+        v_correct   = v_base + 0.5 * v_diff
+        v_incorrect = v_base - 0.5 * v_diff
+        V = np.full((num_obs, K), 0.0, dtype=np.float32)
+        for i in range(num_obs):
+            V[i, :] = v_incorrect[i]
+            V[i, correct_idx[i]] = v_correct[i]
+
+        # Return normalized/broadcast params for the kernel
+        return {
+            "v": V,
+            "a": params["a"].astype(np.float32, copy=False),
+            "tau": params["tau"].astype(np.float32, copy=False),
+            "decay": params["decay"].astype(np.float32, copy=False),
+        }
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_rdm(**params, dt=self.dt, max_steps=self.max_steps)

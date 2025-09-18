@@ -13,10 +13,11 @@ class Model(ABC):
     """
 
     def prepare_params(
-            self,
-            params: dict[str, float],
-            num_obs: int,
-    ) -> dict[str, float]:
+        self,
+        params: dict[str, float],
+        num_obs: int,
+        context: dict[str, np.ndarray] | None = None,
+    ) -> dict[str, float | np.ndarray]:
         """Optional: models can normalize/broadcast shapes here. Default: passthrough."""
         return params
 
