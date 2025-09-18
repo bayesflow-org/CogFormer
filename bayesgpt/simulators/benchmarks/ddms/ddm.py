@@ -16,9 +16,7 @@ def simulate_ddm_trial(
     dt: float = 0.001,
     max_steps: int = 100000,
 ) -> (float, float):
-    """
-    Single trial with collapsing bounds; v_mean and a_i are already per-trial scalars.
-    """
+
     v_i = np.random.normal(v, s_v)
     tau_i = tau
     if s_tau > 0.0:

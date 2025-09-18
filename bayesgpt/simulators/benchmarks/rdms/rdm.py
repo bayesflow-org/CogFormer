@@ -12,6 +12,7 @@ def sample_rdm_trial(
     s: float = 1.0,
     max_steps: int = 10000,
 ) -> np.ndarray:
+    # Infer number of alternatives
     num_alternatives = v.shape[0]
     c = s * np.sqrt(dt)
     # exponentially collapsing threshold

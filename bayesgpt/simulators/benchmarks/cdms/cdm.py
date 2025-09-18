@@ -11,7 +11,7 @@ def sample_cdm_trial(
     tau: float,
     dt: float = 0.001,
     s: float = 1.0,
-    max_steps: int = 100000,
+    max_steps: int = 10000,
 ) -> np.ndarray:
     c = np.sqrt(dt) * s
     # exponentially collapsing threshold
@@ -33,7 +33,7 @@ def simulate_cdm(
     decay: np.ndarray,
     s: float = 1.0,
     dt: float = 0.001,
-    max_steps: int = 100000
+    max_steps: int = 10000
 ):
     n = mu.shape[0]
     sim_data = np.zeros((n, 2), dtype=np.float32)
