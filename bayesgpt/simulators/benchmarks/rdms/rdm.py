@@ -90,25 +90,28 @@ class RDM(Model):
         v_base = params["v"].astype(np.float32, copy=False)
         v_diff = params.get("v_diff", np.zeros_like(v_base)).astype(np.float32, copy=False)
 
+        # For debug
         if "correct_idx" not in context:
             raise ValueError("RDM requires context['correct_idx'] as int indices per trial.")
         correct_idx = np.asarray(context["correct_idx"], dtype=np.int32).reshape(-1)
+
+        # For debug
         if correct_idx.shape[0] != num_obs:
             raise ValueError(f"correct_idx length {correct_idx.shape[0]} != num_obs {num_obs}")
 
-        K = int(context.get("num_alternatives", int(correct_idx.max()) + 1))
+        num_alternatives = int(context.get("num_alternatives", int(correct_idx.max()) + 1))
 
         # Build per-trial K-vector drift:
         v_correct   = v_base + 0.5 * v_diff
         v_incorrect = v_base - 0.5 * v_diff
-        V = np.full((num_obs, K), 0.0, dtype=np.float32)
+        v = np.full((num_obs, num_alternatives), 0.0, dtype=np.float32)
         for i in range(num_obs):
-            V[i, :] = v_incorrect[i]
-            V[i, correct_idx[i]] = v_correct[i]
+            v[i, :] = v_incorrect[i]
+            v[i, correct_idx[i]] = v_correct[i]
 
         # Return normalized/broadcast params for the kernel
         return {
-            "v": V,
+            "v": v,
             "a": params["a"].astype(np.float32, copy=False),
             "tau": params["tau"].astype(np.float32, copy=False),
             "decay": params["decay"].astype(np.float32, copy=False),
