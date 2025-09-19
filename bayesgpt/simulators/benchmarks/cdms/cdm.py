@@ -55,7 +55,7 @@ def simulate_cdm(
 @njit
 def sample_cdm_prior() -> np.ndarray:
     v_intercept = np.random.normal(1, 2)
-    v_theta = 2.0*np.pi * (np.random.beta(3.0, 3.0) - 0.5)
+    v_theta = 2.0 * np.pi * (np.random.beta(3.0, 3.0) - 0.5)
     v_slope = np.random.normal(0, 2)
     s_v = np.random.gamma(1, 0.2)
     a_intercept = np.random.gamma(10.0, 0.3)
@@ -77,6 +77,6 @@ class CDM(Model):
         self.dt = dt
         self.max_steps = max_steps
 
-    def sivlate(self, params: dict[str, np.ndarray], context=None):
+    def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_cdm(**params, dt=self.dt, max_steps=self.max_steps)
         return {"rts": results[:, 0], "choices": results[:, 1]}
