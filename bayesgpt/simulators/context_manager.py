@@ -33,29 +33,33 @@ class ContextManager:
             num_regressors: int,
             mandatory_intrinsics: list[str] | set[str] | None = None,
             intercept_only_intrinsics: list[str] | set[str] | None = None,
-            p_free: float = 0.5,
+            free_prob: float = 0.5,     # Probability of a param being free
+            keep_intercept: bool = False
     ) -> np.ndarray:
 
         mandatory = set(mandatory_intrinsics or [])
         intercept_only = set(intercept_only_intrinsics or [])
 
         num_intrinsic_params = len(intrinsic_params)
-        mask = np.zeros((num_regressors, num_intrinsic_params), dtype=np.float32)
+        # Always include intercept row, even if num_regressors = 0
+        num_rows = num_regressors + (1 if keep_intercept else 0)
+        mask = np.zeros((num_rows, num_intrinsic_params), dtype=np.float32)
 
         # Intercept row
-        for j, name in enumerate(intrinsic_params):
-            if name in mandatory or name in intercept_only:
-                mask[0, j] = 1.0
-            else:
-                mask[0, j] = float(np.random.random() < p_free)
+        if keep_intercept:
+            for j, name in enumerate(intrinsic_params):
+                if name in mandatory or name in intercept_only:
+                    mask[0, j] = 1.0
+                else:
+                    mask[0, j] = float(np.random.random() < free_prob)
 
         # Slope rows
-        for i in range(1, num_regressors):
+        for i in range(1, num_rows):
             for j, name in enumerate(intrinsic_params):
                 if name in intercept_only:
                     mask[i, j] = 0.0
                 else:
-                    mask[i, j] = float(np.random.random() < p_free)
+                    mask[i, j] = float(np.random.random() < free_prob)
 
         return mask
 
@@ -68,48 +72,59 @@ class ContextManager:
         Bernoulli mask over regressors: 1->discrete {0,1}, 0->continuous U[0,1].
         By default, keeps the intercept (col 0) continuous.
         """
+        # No intercept, no discrete mask
+        if num_regressors == 0:
+            return np.array([])
+
         discrete_mask = 1 * (np.random.rand(num_regressors) < discrete_prob)
-        # Intercept should always be continuous
-        discrete_mask[0] = 0
         return discrete_mask
+
+    def build_regressor_mask(self):
+        raise NotImplementedError
 
     def build_design_matrix(
         self,
         design_config: dict[str, list[str]],
         num_obs: int,
-        *,
         context: dict[str, np.ndarray] | None = None,
         discrete_mask: np.ndarray | None = None,
-        discrete_prob: float = 0.5
+        discrete_prob: float = 0.5,
+        keep_intercept: bool = False
     ) -> np.ndarray:
         # Provide context
         context = context or {}
         regressor_keys = list(design_config.keys())
-        if "1" in regressor_keys and regressor_keys[0] != "1":
-            regressor_keys = ["1"] + [k for k in regressor_keys if k != "1"]
+        has_intercept = "1" in regressor_keys and keep_intercept
 
+        # Exclude intercept from regressor keys
+        regressor_keys = [k for k in regressor_keys if k != "1"]
         num_regressors = len(regressor_keys)
+
+        # Design matrix always includes intercept column if present in design_config
+        num_columns = num_regressors + (1 if has_intercept else 0)
+        design_matrix = np.empty((num_obs, num_columns), dtype=np.float32)
 
         # Generate discrete mask if none provided
         if discrete_mask is None:
             discrete_mask = self.build_random_discrete_mask(num_regressors=num_regressors, discrete_prob=discrete_prob)
 
-        design_matrix = np.empty((num_obs, num_regressors), dtype=np.float32)
+        # Fill in the matrix
+        col_idx = 0
+        if has_intercept:
+            design_matrix[:, 0] = 0
+            col_idx += 1
 
         for j, key in enumerate(regressor_keys):
-            if key == "1":
-                design_matrix[:, j] = 1.0
-                continue
-
             if key in context:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
-                design_matrix[:, j] = col
+                design_matrix[:, col_idx] = col
             elif discrete_mask[j] == 1:
-                design_matrix[:, j] = np.random.randint(0, 2, size=num_obs).astype(np.float32)
+                design_matrix[:, col_idx] = np.random.randint(0, 2, size=num_obs).astype(np.float32)
             else:
-                design_matrix[:, j] = np.random.uniform(0.0, 1.0, size=num_obs).astype(np.float32)
+                design_matrix[:, col_idx] = np.random.uniform(0.0, 1.0, size=num_obs).astype(np.float32)
+            col_idx += 1
 
         return design_matrix
 
@@ -117,16 +132,21 @@ class ContextManager:
             self,
             parameter_mask: np.ndarray,
             intrinsic_params: list[str],
+            keep_intercept: bool = False,
     ) -> dict[str, list[str]]:
         """
         Convert a (num_regressors × num_intrinsics) binary mask into a design_config dict.
         Row 0 -> key "1" (intercept), rows 1.. -> "u_1", "u_2", ...
         """
-        num_regressors, num_intrinsic_params = parameter_mask.shape
+        num_rows, num_intrinsic_params = parameter_mask.shape
 
         config: dict[str, list[str]] = {}
-        for i in range(num_regressors):
-            key = "1" if i == 0 else f"u_{i}"
+        for i in range(num_rows):
+            if i == 0 and keep_intercept:
+                key = "1"
+            else:
+                key = f"u_{i + 1}" if keep_intercept else f"u_{i}"
+
             config[key] = []
             for j in range(num_intrinsic_params):
                 if parameter_mask[i, j] == 1.0:
