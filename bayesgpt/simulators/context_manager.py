@@ -10,22 +10,28 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
+        max_num_regressors: int = 10,
+        keep_intercept: bool = False
     ) -> np.ndarray:
-        """
-        Build parameter_mask with shape (num_regressors, num_intrinsic_params).
-        parameter_mask[design_index, param_index] == 1 iff the design key affects that intrinsic.
-        """
-        design_keys = list(design_config.keys())
-        num_regressors = len(design_keys)
+
+        if max_num_regressors is None:
+            raise ValueError("max_num_regressors must be provided for padded masks.")
+
+        has_intercept = ("1" in design_config) and keep_intercept
+        non_intercept_keys = [k for k in design_config.keys() if k != "1"]
+
+        # Order: intercept first if present, then non-intercepts
+        ordered_keys = (["1"] if has_intercept else []) + non_intercept_keys
         num_intrinsic_params = len(intrinsic_params)
 
-        parameter_mask = np.zeros((num_regressors, num_intrinsic_params), dtype=np.float32)
-        for design_index, key in enumerate(design_keys):
+        mask = np.zeros((max_num_regressors, num_intrinsic_params), dtype=np.float32)
+        for design_index, key in enumerate(ordered_keys):
             for intrinsic in design_config[key]:
                 if intrinsic in intrinsic_params:
                     param_index = intrinsic_params.index(intrinsic)
-                    parameter_mask[design_index, param_index] = 1.0
-        return parameter_mask
+                    mask[design_index, param_index] = 1.0
+
+        return mask
 
     def build_random_parameter_mask(
             self,
@@ -99,9 +105,10 @@ class ContextManager:
         num_obs: int,
         max_num_regressors: int = 10,
         context: dict[str, np.ndarray] | None = None,
-        discrete_mask: np.ndarray | None = None,
         discrete_prob: float = 0.5,
-        keep_intercept: bool = False
+        keep_intercept: bool = False,
+        min_num_categories: int = 2,
+        max_num_categories: int = 5
     ) -> np.ndarray:
         # Provide context
         context = context or {}
@@ -116,10 +123,9 @@ class ContextManager:
         design_matrix = np.zeros((num_obs, max_num_regressors), dtype=np.float32)
 
         # Generate discrete mask for the non-intercept regressors if none provided
-        if discrete_mask is None:
-            discrete_mask = self.build_random_discrete_mask(
-                num_regressors=num_regressors, discrete_prob=discrete_prob
-            )
+        discrete_mask = self.build_random_discrete_mask(
+            num_regressors=num_regressors, discrete_prob=discrete_prob
+        )
 
         # Fill in the matrix
         col_idx = 0
@@ -134,10 +140,23 @@ class ContextManager:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
                 design_matrix[:, col_idx] = col
             elif discrete_mask[j] == 1:
-                design_matrix[:, col_idx] = np.random.randint(0, 2, size=num_obs).astype(np.float32)
+                # Sample dummies
+                dummies = self.sample_dummies(
+                    num_obs=num_obs,
+                    min_num_categories=min_num_categories,
+                    max_num_categories=max_num_categories
+                )
+
+                # Replace this column by deleting it and inserting the dummy in place
+                design_matrix = np.delete(design_matrix, j, axis=1)
+                design_matrix = np.insert(design_matrix, [j], dummies, axis=1)
+
+                # Infer num_categories and increment the column index
+                num_categories = dummies.shape[1]
+                col_idx += num_categories
             else:
-                design_matrix[:, col_idx] = np.random.uniform(0.0, 1.0, size=num_obs).astype(np.float32)
-            col_idx += 1
+                design_matrix[:, col_idx] = np.random.uniform(0.0, 1.0, size=num_obs)
+                col_idx += 1
 
         return design_matrix
 
@@ -146,15 +165,20 @@ class ContextManager:
             parameter_mask: np.ndarray,
             intrinsic_params: list[str],
             keep_intercept: bool = False,
+            ignore_padding: bool = True
     ) -> dict[str, list[str]]:
         """
         Convert a (num_regressors × num_intrinsics) binary mask into a design_config dict.
         Row 0 -> key "1" (intercept), rows 1.. -> "u_1", "u_2", ...
         """
         num_rows, num_intrinsic_params = parameter_mask.shape
-
         config: dict[str, list[str]] = {}
+
         for i in range(num_rows):
+            # Skip padded rows if requested
+            if ignore_padding and not parameter_mask[i].any():
+                continue
+
             if i == 0 and keep_intercept:
                 key = "1"
             else:
@@ -195,3 +219,21 @@ class ContextManager:
 
                     parameter_matrix[design_index, param_index] = sampler()
         return parameter_matrix
+
+
+    def sample_dummies(
+        self,
+        num_obs: int,
+        discrete_prob: float = 0.5,
+        min_num_categories: int = 2,
+        max_num_categories: int = 5,
+    ):
+        if np.random.rand() < discrete_prob:
+            num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
+            if num_categories < 2:
+                num_categories = 2
+
+            p = float(np.ones(num_categories) / num_categories)
+            one_hot_encoder = np.random.multinomial(1, p, size=num_obs).astype(np.float32)
+            dummies = one_hot_encoder[:, :num_categories - 1]
+            return dummies

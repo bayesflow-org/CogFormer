@@ -59,7 +59,7 @@ class NestedModelFamily:
             )
 
         # Discrete mask
-        regressor_keys = [k for k in design_config.keys() if k != 1]
+        regressor_keys = [k for k in design_config.keys() if k != "1"]
         num_regressors_from_config = len(regressor_keys)
 
         if discrete_mask is None:
