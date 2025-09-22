@@ -30,6 +30,7 @@ class NestedModelFamily:
         design_config: dict[str, list[str]] = None,
         num_obs: int = 10,
         num_regressors: int = 0,
+        max_num_regressors: int = 10,
         link_fun: Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
@@ -51,7 +52,6 @@ class NestedModelFamily:
                 intrinsic_params=self.intrinsic_params,
                 keep_intercept=keep_intercept,
             )
-
         else:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
@@ -82,12 +82,15 @@ class NestedModelFamily:
             context=context,
             discrete_mask=discrete_mask,
             discrete_prob=discrete_prob,
-            keep_intercept=keep_intercept
+            keep_intercept=keep_intercept,
+            max_num_regressors=max_num_regressors,
         )
 
         # Parameter matrix
         parameter_matrix = self.context_manager.sample_parameter_matrix(
-            parameter_mask=parameter_mask, prior_fun=self.prior_fun, intrinsic_params=self.intrinsic_params
+            parameter_mask=parameter_mask,
+            prior_fun=self.prior_fun,
+            intrinsic_params=self.intrinsic_params
         )
 
         # Compose per-trial intrinsic values
@@ -104,6 +107,13 @@ class NestedModelFamily:
         params = self.model.prepare_params(params=params, num_obs=num_obs, context=context)
         sim_trials = self.model.simulate(params, context=context)
 
+        # Regressor mask
+        regressor_mask = self.context_manager.build_regressor_mask(
+            num_regressors=num_regressors_from_config,
+            max_num_regressors=max_num_regressors,
+            keep_intercept=keep_intercept
+        )
+
         return {
             "model_name": f"{self.name}",
             "design_config": design_config,
@@ -111,7 +121,10 @@ class NestedModelFamily:
             "param_mask": parameter_mask,
             "param_matrix": parameter_matrix,
             "sim_trials": sim_trials,
-            "discrete_mask": discrete_mask
+            "discrete_mask": discrete_mask,
+            "regressor_mask": regressor_mask,
+            "max_num_regressors": max_num_regressors,
+            "keep_intercept": keep_intercept,
         }
 
     def batch_sample(
@@ -149,7 +162,8 @@ class NestedModelFamily:
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
                 discrete_mask=None,
                 discrete_prob=discrete_prob,
-                keep_intercept=keep_intercept
+                keep_intercept=keep_intercept,
+                max_num_regressors=max_num_regressors
             )
 
             sim_instance["num_obs"] = num_obs
@@ -161,58 +175,60 @@ class NestedModelFamily:
         return batch
 
     def collate(self, list_batch: list[dict]) -> dict[str, np.ndarray]:
+
         # Infer batch size
         batch_size = len(list_batch)
         num_params = len(self.intrinsic_params)
-        num_obs = list_batch[0]["design_matrix"].shape[0]
 
-        # Use max num_regressors across batch, plus 1 for intercept if present
-        num_regressors = max(
-            list_batch[i]['design_matrix'].shape[1] - (1 if "1" in list_batch[i]['design_config'] else 0)
-            for i in range(batch_size)
-        )
-        print(type(num_regressors))
-        # Assume keep_intercept is consistent across batch; use first instance to check
-        keep_intercept = "1" in list_batch[0]['design_config']
-        num_columns = num_regressors + (1 if keep_intercept else 0)
+        # fixed padded width from first element
+        max_num_regressors = list_batch[0]["max_num_regressors"]
+        keep_intercept = list_batch[0]["keep_intercept"]
+
+        # variable num_obs per item → pad to max
+        max_num_obs = max(b["design_matrix"].shape[0] for b in list_batch)
 
         # Preallocate arrays
-        design_matrices = np.empty((batch_size, num_obs, num_columns))
-        param_mask = np.empty((batch_size, num_columns, num_params))
-        param_matrices = np.empty((batch_size, num_columns, num_params))
-        discrete_masks = np.empty((batch_size, num_regressors))
-        num_obs_array = np.empty(batch_size)
-        num_regressors_array = np.empty(batch_size)
+        design_matrices = np.zeros((batch_size, max_num_obs, max_num_regressors), dtype=np.float32)
+        param_masks = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
+        param_matrices = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
+        regressor_masks = np.zeros((batch_size, max_num_regressors), dtype=np.float32)
+        discrete_masks = np.zeros((batch_size, max_num_regressors - (1 if keep_intercept else 0)), dtype=np.float32)
+        num_obs_array = np.zeros(batch_size, dtype=np.int32)
+        num_regressors_array = np.zeros(batch_size, dtype=np.int32)
 
         # Collect lists
         model_names, design_configs = [], []
 
         # Initialize sim_data dict with zero arrays
         sim_keys = list_batch[0]["sim_trials"].keys()
-        sim_data = {k: np.empty((batch_size, num_obs)) for k in sim_keys}
+        sim_data = {k: np.empty((batch_size, max_num_obs)) for k in sim_keys}
 
         # Collate batch entries
-        for i, batch in enumerate(list_batch):
-            model_names.append(batch["model_name"])
-            design_configs.append(batch["design_config"])
-            num_obs_array[i] = batch["num_obs"]
-            num_regressors_array[i] = batch["num_regressors"]
-            design_matrices[i] = batch["design_matrix"]
-            param_mask[i] = batch["param_mask"]
-            param_matrices[i] = batch["param_matrix"]
-            discrete_masks[i] = batch["discrete_mask"]
+        for i, b in enumerate(list_batch):
+            model_names.append(b["model_name"])
+            design_configs.append(b["design_config"])
 
-            for k, v in batch["sim_trials"].items():
-                sim_data[k][i] = v
+            design_matrices[i] = b["design_matrix"]
+            param_masks[i] = b["param_mask"]
+            param_matrices[i] = b["param_matrix"]
+            regressor_masks[i] = b["regressor_mask"]
+            discrete_masks[i] = b["discrete_mask"]
+            num_obs_array[i] = b["num_obs"]
+            num_regressors_array[i] = b["num_regressors"]
+
+            for k in sim_keys:
+                v = b["sim_trials"][k]
+                sim_data[k][i, :v.shape[0]] = v
 
         return {
             "model_names": model_names,
             "design_configs": design_configs,
             "design_matrices": design_matrices,
-            "param_mask": param_mask,
+            "param_masks": param_masks,
             "param_matrices": param_matrices,
             "sim_data": sim_data,
+            "regressor_masks": regressor_masks,
             "discrete_masks": discrete_masks,
             "num_obs": num_obs_array,
-            "num_regressors": num_regressors_array,
+            "num_regressors": num_regressors_array
         }

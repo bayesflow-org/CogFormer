@@ -31,6 +31,7 @@ class ContextManager:
             self,
             intrinsic_params: list[str],
             num_regressors: int,
+            max_num_regressors: int = 10,
             mandatory_intrinsics: list[str] | set[str] | None = None,
             intercept_only_intrinsics: list[str] | set[str] | None = None,
             free_prob: float = 0.5,     # Probability of a param being free
@@ -43,7 +44,7 @@ class ContextManager:
         num_intrinsic_params = len(intrinsic_params)
         # Always include intercept row, even if num_regressors = 0
         num_rows = num_regressors + (1 if keep_intercept else 0)
-        mask = np.zeros((num_rows, num_intrinsic_params), dtype=np.float32)
+        mask = np.zeros((max_num_regressors, num_intrinsic_params), dtype=np.float32)
 
         # Intercept row
         if keep_intercept:
@@ -54,7 +55,8 @@ class ContextManager:
                     mask[0, j] = float(np.random.random() < free_prob)
 
         # Slope rows
-        for i in range(1, num_rows):
+        start = 1 if keep_intercept else 0
+        for i in range(start, num_rows):
             for j, name in enumerate(intrinsic_params):
                 if name in intercept_only:
                     mask[i, j] = 0.0
@@ -77,15 +79,25 @@ class ContextManager:
             return np.array([])
 
         discrete_mask = 1 * (np.random.rand(num_regressors) < discrete_prob)
+        print(discrete_mask)
         return discrete_mask
 
-    def build_regressor_mask(self):
-        raise NotImplementedError
+    def build_regressor_mask(
+        self,
+        num_regressors: int,
+        max_num_regressors: int = 10,
+        keep_intercept: bool = False
+    ) -> np.ndarray:
+        mask = np.zeros(max_num_regressors, dtype=np.float32)
+        used = num_regressors + (1 if keep_intercept else 0)
+        mask[:used] = 1.0
+        return mask
 
     def build_design_matrix(
         self,
         design_config: dict[str, list[str]],
         num_obs: int,
+        max_num_regressors: int = 10,
         context: dict[str, np.ndarray] | None = None,
         discrete_mask: np.ndarray | None = None,
         discrete_prob: float = 0.5,
@@ -94,19 +106,20 @@ class ContextManager:
         # Provide context
         context = context or {}
         regressor_keys = list(design_config.keys())
-        has_intercept = "1" in regressor_keys and keep_intercept
+        has_intercept = ("1" in regressor_keys) and keep_intercept
 
         # Exclude intercept from regressor keys
         regressor_keys = [k for k in regressor_keys if k != "1"]
         num_regressors = len(regressor_keys)
 
         # Design matrix always includes intercept column if present in design_config
-        num_columns = num_regressors + (1 if has_intercept else 0)
-        design_matrix = np.empty((num_obs, num_columns), dtype=np.float32)
+        design_matrix = np.zeros((num_obs, max_num_regressors), dtype=np.float32)
 
-        # Generate discrete mask if none provided
+        # Generate discrete mask for the non-intercept regressors if none provided
         if discrete_mask is None:
-            discrete_mask = self.build_random_discrete_mask(num_regressors=num_regressors, discrete_prob=discrete_prob)
+            discrete_mask = self.build_random_discrete_mask(
+                num_regressors=num_regressors, discrete_prob=discrete_prob
+            )
 
         # Fill in the matrix
         col_idx = 0
