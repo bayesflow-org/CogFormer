@@ -119,8 +119,12 @@ class ContextManager:
         regressor_keys = [k for k in regressor_keys if k != "1"]
         num_regressors = len(regressor_keys)
 
+        # Construct per-parameter column blocks
+        block_width = max_num_categories - 1
+        num_cols = num_regressors * block_width + (1 if has_intercept else 0)
+
         # Design matrix always includes intercept column if present in design_config
-        design_matrix = np.zeros((num_obs, max_num_regressors), dtype=np.float32)
+        design_matrix = np.zeros((num_obs, num_cols), dtype=np.float32)
 
         # Generate discrete mask for the non-intercept regressors if none provided
         discrete_mask = self.build_random_discrete_mask(
@@ -130,15 +134,18 @@ class ContextManager:
         # Fill in the matrix
         col_idx = 0
         if has_intercept:
-            design_matrix[:, 0] = 0
-            col_idx += 1
+            design_matrix[:, 0] = 1
+            col_idx = 1
 
         for j, key in enumerate(regressor_keys):
+            start = col_idx + j * block_width
+            end = start + block_width
+
             if key in context:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
-                design_matrix[:, col_idx] = col
+                design_matrix[:, start] = col
             elif discrete_mask[j] == 1:
                 # Sample dummies
                 dummies = self.sample_dummies(
@@ -147,15 +154,11 @@ class ContextManager:
                     max_num_categories=max_num_categories
                 )
 
-                # Replace this column by deleting it and inserting the dummy in place
-                design_matrix = np.delete(design_matrix, j, axis=1)
-                design_matrix = np.insert(design_matrix, [j], dummies, axis=1)
-
                 # Infer num_categories and increment the column index
                 num_categories = dummies.shape[1]
                 col_idx += num_categories
             else:
-                design_matrix[:, col_idx] = np.random.uniform(0.0, 1.0, size=num_obs)
+                design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
                 col_idx += 1
 
         return design_matrix
