@@ -89,7 +89,7 @@ class ContextManager:
             intrinsic_params: list[str],
             num_regressors: int,
             max_num_regressors: int = 10,
-            max_num_categories: int = 5,
+            max_num_categories: int = 4,
             mandatory_intrinsics: list[str] | set[str] | None = None,
             intercept_only_intrinsics: list[str] | set[str] | None = None,
             free_prob: float = 0.5,     # Probability of a param being free
@@ -136,7 +136,7 @@ class ContextManager:
         self,
         num_regressors: int,
         max_num_regressors: int = 10,
-        max_num_categories: int = 5,
+        max_num_categories: int = 4,
         keep_intercept: bool = False
     ) -> np.ndarray:
         block_width = max_num_categories - 1
@@ -156,7 +156,7 @@ class ContextManager:
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
         min_num_categories: int = 2,
-        max_num_categories: int = 5
+        max_num_categories: int = 4
     ) -> np.ndarray:
         # Provide context
         context = context or {}
@@ -280,7 +280,7 @@ class ContextManager:
         self,
         num_obs: int,
         min_num_categories: int = 2,
-        max_num_categories: int = 5,
+        max_num_categories: int = 4,
     ):
         # Randomly generate a num_categories
         num_categories = np.random.randint(min_num_categories, max_num_categories + 1)

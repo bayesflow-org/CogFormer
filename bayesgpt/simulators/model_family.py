@@ -31,11 +31,10 @@ class NestedModelFamily:
         num_obs: int = 10,
         num_regressors: int = 0,
         max_num_regressors: int = 10,
-        max_num_categories: int = 5,
+        max_num_categories: int = 4,
         link_fun: Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
-        discrete_mask: np.ndarray | None = None,
         discrete_prob: float = 0.5,
         free_prob: float = 0.5,
         keep_intercept: bool = False,
@@ -69,18 +68,10 @@ class NestedModelFamily:
         regressor_keys = [k for k in design_config.keys() if k != "1"]
         num_regressors_from_config = len(regressor_keys)
 
-        if discrete_mask is None:
-            discrete_mask = self.context_manager.build_random_discrete_mask(
-                num_regressors=num_regressors_from_config, discrete_prob=discrete_prob
-            )
-            #
-            # No discrete mask, sample internally
-            # Flip a coin with p = 0.5, if 0
-            # sample a continuous regressor
-            # if 1, sample k categories k ~ U(2, 4), then create a vector of
-            # pvals = [1/k, 1/k,...], pass to np.random.multinomial(n=1, pvals=pvals, size=num_obs)
-            # dummy encode the one-hot-encoded outputs
-            # voila
+
+        discrete_mask = self.context_manager.build_random_discrete_mask(
+            num_regressors=num_regressors_from_config, discrete_prob=discrete_prob
+        )
 
         # Design matrix
         design_matrix = self.context_manager.build_design_matrix(
@@ -138,20 +129,20 @@ class NestedModelFamily:
         }
 
     def batch_sample(
-            self,
-            batch_size: int,
-            num_obs: int | None = None,
-            design_config: dict[str, list[str]] | None = None,
-            num_regressors: int | None = None,
-            mask_randomizer_kwargs: dict | None = None,
-            context: dict[str, np.ndarray] | None = None,
-            min_num_obs: int = 10,
-            max_num_obs: int = 600,
-            min_num_regressors: int = 0,
-            max_num_regressors: int = 10,
-            max_num_categories: int = 5,
-            discrete_prob: float = 0.5,
-            keep_intercept: bool = False,
+        self,
+        batch_size: int,
+        num_obs: int | None = None,
+        design_config: dict[str, list[str]] | None = None,
+        num_regressors: int | None = None,
+        mask_randomizer_kwargs: dict | None = None,
+        context: dict[str, np.ndarray] | None = None,
+        min_num_obs: int = 10,
+        max_num_obs: int = 600,
+        min_num_regressors: int = 0,
+        max_num_regressors: int = 10,
+        max_num_categories: int = 4,
+        discrete_prob: float = 0.5,
+        keep_intercept: bool = False,
     ):
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
@@ -171,7 +162,6 @@ class NestedModelFamily:
                 context=context,
                 num_regressors=num_regressors,
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
-                discrete_mask=None,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
                 max_num_regressors=max_num_regressors,
@@ -195,7 +185,6 @@ class NestedModelFamily:
 
         # fixed padded width from first element
         num_regressors = list_batch[0]["num_regressors"]
-        max_num_categories = list_batch[0]["max_num_categories"]
         keep_intercept = list_batch[0]["keep_intercept"]
 
         # variable num_obs per item → pad to max
