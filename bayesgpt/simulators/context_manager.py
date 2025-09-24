@@ -15,9 +15,6 @@ class ContextManager:
         keep_intercept: bool = False
     ) -> np.ndarray:
 
-        if max_num_regressors is None:
-            raise ValueError("max_num_regressors must be provided for padded masks.")
-
         regressor_keys = list(design_config.keys())
         has_intercept = ("1" in regressor_keys) and keep_intercept
         regressor_keys = [k for k in regressor_keys if k != "1"]
@@ -28,6 +25,7 @@ class ContextManager:
         num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
 
         mask = np.zeros((num_cols, num_intrinsic_params), dtype=np.float32)
+        print(f"shape of param mask: {mask.shape}")
 
         # Building the matrix
         # Start with intercept
@@ -51,43 +49,71 @@ class ContextManager:
 
         return mask
 
+
+    def build_random_design_config(
+        self,
+        intrinsic_params: list[str],
+        num_regressors: int,
+        free_prob: float = 0.5,
+        keep_intercept: bool = False,
+        mandatory_intrinsics: list[str] | set[str] | None = None,
+        intercept_only_intrinsics: list[str] | set[str] | None = None,
+    ) -> dict[str, list[str]]:
+
+        mandatory = set(mandatory_intrinsics or [])
+        intercept_only = set(intercept_only_intrinsics or [])
+        config: dict[str, list[str]] = {}
+
+        if keep_intercept:
+            names = []
+            for param in intrinsic_params:
+                if param in mandatory or param in intercept_only or (np.random.rand() < free_prob):
+                    names.append(param)
+            config["1"] = names
+
+        for r in range(num_regressors):
+            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
+            names = []
+            for param in intrinsic_params:
+                if param in intercept_only:
+                    continue
+                elif param in mandatory or (np.random.rand() < free_prob):
+                    names.append(param)
+            config[key] = names
+
+        return config
+
+
     def build_random_parameter_mask(
             self,
             intrinsic_params: list[str],
             num_regressors: int,
             max_num_regressors: int = 10,
+            max_num_categories: int = 5,
             mandatory_intrinsics: list[str] | set[str] | None = None,
             intercept_only_intrinsics: list[str] | set[str] | None = None,
             free_prob: float = 0.5,     # Probability of a param being free
             keep_intercept: bool = False
     ) -> np.ndarray:
 
-        mandatory = set(mandatory_intrinsics or [])
-        intercept_only = set(intercept_only_intrinsics or [])
+        design_config = self.build_random_design_config(
+            intrinsic_params=intrinsic_params,
+            num_regressors=num_regressors,
+            free_prob=free_prob,
+            keep_intercept=keep_intercept,
+            mandatory_intrinsics=mandatory_intrinsics,
+            intercept_only_intrinsics=intercept_only_intrinsics
+        )
 
-        num_intrinsic_params = len(intrinsic_params)
-        # Always include intercept row, even if num_regressors = 0
-        num_rows = num_regressors + (1 if keep_intercept else 0)
-        mask = np.zeros((max_num_regressors, num_intrinsic_params), dtype=np.float32)
+        parameter_mask = self.build_parameter_mask(
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_regressors=max_num_regressors,
+            max_num_categories=max_num_categories,
+            keep_intercept=keep_intercept,
+        )
 
-        # Intercept row
-        if keep_intercept:
-            for j, name in enumerate(intrinsic_params):
-                if name in mandatory or name in intercept_only:
-                    mask[0, j] = 1.0
-                else:
-                    mask[0, j] = float(np.random.random() < free_prob)
-
-        # Slope rows
-        start = 1 if keep_intercept else 0
-        for i in range(start, num_rows):
-            for j, name in enumerate(intrinsic_params):
-                if name in intercept_only:
-                    mask[i, j] = 0.0
-                else:
-                    mask[i, j] = float(np.random.random() < free_prob)
-
-        return mask
+        return parameter_mask, design_config
 
     def build_random_discrete_mask(
         self,

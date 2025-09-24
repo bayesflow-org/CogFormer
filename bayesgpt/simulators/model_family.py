@@ -41,19 +41,19 @@ class NestedModelFamily:
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
+            print("Design config not provided. Generating random param mask and design config.")
+
             kwargs = mask_randomizer_kwargs or {}
-            parameter_mask = self.context_manager.build_random_parameter_mask(
+            parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
                 intrinsic_params=self.intrinsic_params,
                 num_regressors=num_regressors,
+                max_num_regressors=max_num_regressors,
+                max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
-                **kwargs,
-            )
-            design_config = self.context_manager.mask_to_design_config(
-                parameter_mask=parameter_mask,
-                intrinsic_params=self.intrinsic_params,
-                keep_intercept=keep_intercept,
+                **kwargs
             )
         else:
+            print("Design config provided. Using it to generate param mask.")
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
@@ -146,6 +146,7 @@ class NestedModelFamily:
             max_num_obs: int = 600,
             min_num_regressors: int = 0,
             max_num_regressors: int = 10,
+            max_num_categories: int = 5,
             discrete_prob: float = 0.5,
             keep_intercept: bool = False,
     ):
@@ -170,11 +171,13 @@ class NestedModelFamily:
                 discrete_mask=None,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
-                max_num_regressors=max_num_regressors
+                max_num_regressors=max_num_regressors,
+                max_num_categories=max_num_categories,
             )
 
             sim_instance["num_obs"] = num_obs
             sim_instance["num_regressors"] = num_regressors
+            sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
 
         # batch = self.collate(list_batch)
@@ -189,19 +192,23 @@ class NestedModelFamily:
 
         # fixed padded width from first element
         max_num_regressors = list_batch[0]["max_num_regressors"]
+        max_num_categories = list_batch[0]["max_num_categories"]
         keep_intercept = list_batch[0]["keep_intercept"]
 
         # variable num_obs per item → pad to max
         max_num_obs = max(b["design_matrix"].shape[0] for b in list_batch)
 
+        # Get column width
+        num_cols = list_batch[0]["design_matrix"].shape[1]
+
         # Preallocate arrays
-        design_matrices = np.zeros((batch_size, max_num_obs, max_num_regressors), dtype=np.float32)
-        param_masks = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
-        param_matrices = np.zeros((batch_size, max_num_regressors, num_params), dtype=np.float32)
-        regressor_masks = np.zeros((batch_size, max_num_regressors), dtype=np.float32)
-        discrete_masks = np.zeros((batch_size, max_num_regressors - (1 if keep_intercept else 0)), dtype=np.float32)
-        num_obs_array = np.zeros(batch_size, dtype=np.int32)
-        num_regressors_array = np.zeros(batch_size, dtype=np.int32)
+        design_matrices = np.zeros((batch_size, max_num_obs, num_cols))
+        param_masks = np.zeros((batch_size, num_cols, num_params))
+        param_matrices = np.zeros((batch_size, num_cols, num_params))
+        regressor_masks = np.zeros((batch_size, num_cols))
+        discrete_masks = np.zeros((batch_size, num_cols - (1 if keep_intercept else 0)))
+        num_obs_array = np.zeros(batch_size)
+        num_regressors_array = np.zeros(batch_size)
 
         # Collect lists
         model_names, design_configs = [], []
