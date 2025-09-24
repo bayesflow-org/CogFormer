@@ -37,6 +37,7 @@ class NestedModelFamily:
         mask_randomizer_kwargs: dict | None = None,
         discrete_mask: np.ndarray | None = None,
         discrete_prob: float = 0.5,
+        free_prob: float = 0.5,
         keep_intercept: bool = False,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
@@ -50,7 +51,9 @@ class NestedModelFamily:
                 max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
-                **kwargs
+                free_prob=free_prob,
+                mandatory_intrinsics=kwargs.get("mandatory_intrinsics"),
+                intercept_only_intrinsics=kwargs.get("intercept_only_intrinsics")
             )
         else:
             print("Design config provided. Using it to generate param mask.")
