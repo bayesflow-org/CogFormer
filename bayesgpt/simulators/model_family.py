@@ -31,6 +31,7 @@ class NestedModelFamily:
         num_obs: int = 10,
         num_regressors: int = 0,
         max_num_regressors: int = 10,
+        max_num_categories: int = 5,
         link_fun: Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
@@ -56,6 +57,9 @@ class NestedModelFamily:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
+                max_num_regressors=max_num_regressors,
+                max_num_categories=max_num_categories,
+                keep_intercept=keep_intercept,
             )
 
         # Discrete mask
@@ -80,10 +84,10 @@ class NestedModelFamily:
             design_config=design_config,
             num_obs=num_obs,
             context=context,
-            discrete_mask=discrete_mask,
             discrete_prob=discrete_prob,
             keep_intercept=keep_intercept,
             max_num_regressors=max_num_regressors,
+            max_num_categories=max_num_categories,
         )
 
         # Parameter matrix
@@ -111,6 +115,7 @@ class NestedModelFamily:
         regressor_mask = self.context_manager.build_regressor_mask(
             num_regressors=num_regressors_from_config,
             max_num_regressors=max_num_regressors,
+            max_num_categories=max_num_categories,
             keep_intercept=keep_intercept
         )
 
