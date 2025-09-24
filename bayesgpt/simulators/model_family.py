@@ -191,7 +191,7 @@ class NestedModelFamily:
         num_params = len(self.intrinsic_params)
 
         # fixed padded width from first element
-        max_num_regressors = list_batch[0]["max_num_regressors"]
+        num_regressors = list_batch[0]["num_regressors"]
         max_num_categories = list_batch[0]["max_num_categories"]
         keep_intercept = list_batch[0]["keep_intercept"]
 
@@ -206,7 +206,7 @@ class NestedModelFamily:
         param_masks = np.zeros((batch_size, num_cols, num_params))
         param_matrices = np.zeros((batch_size, num_cols, num_params))
         regressor_masks = np.zeros((batch_size, num_cols))
-        discrete_masks = np.zeros((batch_size, num_cols - (1 if keep_intercept else 0)))
+        discrete_masks = np.zeros((batch_size, num_regressors - (1 if keep_intercept else 0)))
         num_obs_array = np.zeros(batch_size)
         num_regressors_array = np.zeros(batch_size)
 

@@ -169,7 +169,7 @@ class ContextManager:
 
         # Construct per-parameter column blocks
         block_width = max_num_categories - 1
-        num_cols = num_regressors * block_width + (1 if has_intercept else 0)
+        num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
 
         # Design matrix always includes intercept column if present in design_config
         design_matrix = np.zeros((num_obs, num_cols), dtype=np.float32)
