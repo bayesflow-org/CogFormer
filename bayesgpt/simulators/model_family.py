@@ -89,6 +89,7 @@ class NestedModelFamily:
             max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
         )
+        print(f"shape of design mat: {design_matrix.shape}")
 
         # Parameter matrix
         parameter_matrix = self.context_manager.sample_parameter_matrix(
@@ -96,6 +97,7 @@ class NestedModelFamily:
             prior_fun=self.prior_fun,
             intrinsic_params=self.intrinsic_params
         )
+        print(f"shape of param mat: {parameter_matrix.shape}")
 
         # Compose per-trial intrinsic values
         regressed_parameters = link_fun(design_matrix @ parameter_matrix)

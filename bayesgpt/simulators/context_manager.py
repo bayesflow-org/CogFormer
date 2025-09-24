@@ -116,7 +116,7 @@ class ContextManager:
         block_width = max_num_categories - 1
         num_cols = max_num_regressors * block_width + (1 if keep_intercept else 0)
         used_cols = num_regressors * block_width + (1 if keep_intercept else 0)
-        
+
         mask = np.zeros(num_cols, dtype=np.float32)
         mask[:used_cols] = 1.0
         return mask
@@ -147,6 +147,7 @@ class ContextManager:
 
         # Design matrix always includes intercept column if present in design_config
         design_matrix = np.zeros((num_obs, num_cols), dtype=np.float32)
+        print(f"shape of design_matrix: {design_matrix.shape}")
 
         # Generate discrete mask for the non-intercept regressors if none provided
         discrete_mask = self.build_random_discrete_mask(
@@ -179,14 +180,13 @@ class ContextManager:
                 # Infer num_categories and increment the column index
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
-                col_idx += num_categories
+                #col_idx += num_categories
             else:
                 design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
-                col_idx += 1
+                #col_idx += 1
 
         return design_matrix
-        # Heuristic: treat the very first row as intercept if any nonzero exists there.
-        is_intercept_row0 = parameter_mask[0].any()
+
     def mask_to_design_config(
             self,
             parameter_mask: np.ndarray,
@@ -253,16 +253,13 @@ class ContextManager:
     def sample_dummies(
         self,
         num_obs: int,
-        discrete_prob: float = 0.5,
         min_num_categories: int = 2,
         max_num_categories: int = 5,
     ):
-        if np.random.rand() < discrete_prob:
-            num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
-            if num_categories < 2:
-                num_categories = 2
+        # Randomly generate a num_categories
+        num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
 
-            p = float(np.ones(num_categories) / num_categories)
-            one_hot_encoder = np.random.multinomial(1, p, size=num_obs).astype(np.float32)
-            dummies = one_hot_encoder[:, :num_categories - 1]
-            return dummies
+        p = float(1.0 / num_categories)
+        one_hot= np.random.multinomial(1, [p] * num_categories, size=num_obs).astype(np.float32)
+        dummies = one_hot[:, :num_categories - 1]
+        return dummies
