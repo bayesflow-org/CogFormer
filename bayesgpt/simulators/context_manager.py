@@ -25,7 +25,6 @@ class ContextManager:
         num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
 
         mask = np.zeros((num_cols, num_intrinsic_params), dtype=np.float32)
-        print(f"shape of param mask: {mask.shape}")
 
         # Building the matrix
         # Start with intercept
@@ -127,7 +126,6 @@ class ContextManager:
             return np.array([])
 
         discrete_mask = np.array(1 * (np.random.rand(num_regressors) < discrete_prob))
-        print(discrete_mask)
         return discrete_mask
 
     def build_regressor_mask(
@@ -171,7 +169,6 @@ class ContextManager:
 
         # Design matrix always includes intercept column if present in design_config
         design_matrix = np.zeros((num_obs, num_cols))
-        print(f"shape of design_matrix: {design_matrix.shape}")
 
         # Generate discrete mask for the non-intercept regressors if none provided
         discrete_mask = self.build_random_discrete_mask(
@@ -186,7 +183,6 @@ class ContextManager:
 
         for j, key in enumerate(regressor_keys):
             start = col_idx + j * block_width
-            end = start + block_width
 
             if key in context:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
@@ -204,10 +200,8 @@ class ContextManager:
                 # Infer num_categories and increment the column index
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
-                #col_idx += num_categories
             else:
                 design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
-                #col_idx += 1
 
         return design_matrix
 

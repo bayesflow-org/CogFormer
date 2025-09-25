@@ -41,8 +41,6 @@ class NestedModelFamily:
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
-            print("Design config not provided. Generating random param mask and design config.")
-
             kwargs = mask_randomizer_kwargs or {}
             parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
                 intrinsic_params=self.intrinsic_params,
@@ -55,7 +53,6 @@ class NestedModelFamily:
                 fixed_intrinsics=kwargs.get("fixed_intrinsics")
             )
         else:
-            print("Design config provided. Using it to generate param mask.")
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
@@ -83,7 +80,6 @@ class NestedModelFamily:
             max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
         )
-        print(f"shape of design mat: {design_matrix.shape}")
 
         # Parameter matrix
         parameter_matrix = self.context_manager.sample_parameter_matrix(
@@ -91,7 +87,6 @@ class NestedModelFamily:
             prior_fun=self.prior_fun,
             intrinsic_params=self.intrinsic_params
         )
-        print(f"shape of param mat: {parameter_matrix.shape}")
 
         # Compose per-trial intrinsic values
         regressed_parameters = link_fun(design_matrix @ parameter_matrix)
@@ -193,7 +188,6 @@ class NestedModelFamily:
 
         # Get column width
         num_cols = list_batch[0]["design_matrix"].shape[1]
-        print(num_cols)
 
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, num_cols))
@@ -201,8 +195,8 @@ class NestedModelFamily:
         param_matrices = np.zeros((batch_size, num_cols, num_params))
         regressor_masks = np.zeros((batch_size, num_cols))
         discrete_masks = np.zeros((batch_size, max_num_regressors))
-        num_obs_array = np.zeros(batch_size)
-        num_regressors_array = np.zeros(batch_size)
+        num_obs_array = np.zeros((batch_size, 1))
+        num_regressors_array = np.zeros((batch_size, 1))
 
         # Collect lists
         model_names, design_configs = [], []
