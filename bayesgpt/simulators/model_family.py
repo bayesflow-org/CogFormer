@@ -170,6 +170,7 @@ class NestedModelFamily:
 
             sim_instance["num_obs"] = num_obs
             sim_instance["num_regressors"] = num_regressors
+            sim_instance["max_num_regressors"] = max_num_regressors
             sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
 
@@ -185,20 +186,21 @@ class NestedModelFamily:
 
         # fixed padded width from first element
         num_regressors = list_batch[0]["num_regressors"]
-        keep_intercept = list_batch[0]["keep_intercept"]
+        max_num_regressors = list_batch[0]["max_num_regressors"]
 
         # variable num_obs per item → pad to max
         max_num_obs = max(b["design_matrix"].shape[0] for b in list_batch)
 
         # Get column width
         num_cols = list_batch[0]["design_matrix"].shape[1]
+        print(num_cols)
 
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, num_cols))
         param_masks = np.zeros((batch_size, num_cols, num_params))
         param_matrices = np.zeros((batch_size, num_cols, num_params))
         regressor_masks = np.zeros((batch_size, num_cols))
-        discrete_masks = np.zeros((batch_size, num_regressors - (1 if keep_intercept else 0)))
+        discrete_masks = np.zeros((batch_size, max_num_regressors))
         num_obs_array = np.zeros(batch_size)
         num_regressors_array = np.zeros(batch_size)
 
@@ -218,7 +220,7 @@ class NestedModelFamily:
             param_masks[i] = b["param_mask"]
             param_matrices[i] = b["param_matrix"]
             regressor_masks[i] = b["regressor_mask"]
-            discrete_masks[i] = b["discrete_mask"]
+            discrete_masks[i, :num_regressors] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]
 

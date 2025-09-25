@@ -49,7 +49,6 @@ class ContextManager:
 
         return mask
 
-
     def build_random_design_config(
         self,
         intrinsic_params: list[str],
@@ -82,7 +81,6 @@ class ContextManager:
             config[key] = names
 
         return config
-
 
     def build_random_parameter_mask(
             self,
@@ -128,7 +126,7 @@ class ContextManager:
         if num_regressors == 0:
             return np.array([])
 
-        discrete_mask = 1 * (np.random.rand(num_regressors) < discrete_prob)
+        discrete_mask = np.array(1 * (np.random.rand(num_regressors) < discrete_prob))
         print(discrete_mask)
         return discrete_mask
 
