@@ -77,7 +77,7 @@ class ContextManager:
             for param in intrinsic_params:
                 if param in intercept_only:
                     continue
-                elif param in mandatory or (np.random.rand() < free_prob):
+                elif param in mandatory and (np.random.rand() < free_prob):
                     names.append(param)
             config[key] = names
 
@@ -94,7 +94,7 @@ class ContextManager:
             intercept_only_intrinsics: list[str] | set[str] | None = None,
             free_prob: float = 0.5,     # Probability of a param being free
             keep_intercept: bool = False
-    ) -> np.ndarray:
+    ) -> tuple:
 
         design_config = self.build_random_design_config(
             intrinsic_params=intrinsic_params,
@@ -222,7 +222,7 @@ class ContextManager:
     ) -> dict[str, list[str]]:
         """
         Convert a (num_regressors × num_intrinsics) binary mask into a design_config dict.
-        Row 0 -> key "1" (intercept), rows 1.. -> "u_1", "u_2", ...
+        Row 0 -> key "1" (intercept), rows 1 -> "u_1", "u_2", ...
         """
         num_rows, num_intrinsic_params = parameter_mask.shape
         config: dict[str, list[str]] = {}
@@ -247,7 +247,7 @@ class ContextManager:
     def sample_parameter_matrix(
         self,
         parameter_mask: np.ndarray,
-        prior_fun: dict[str, Callable],
+        prior_fun: dict[str, Callable | dict[str, Callable]],
         intrinsic_params: list[str],
     ) -> np.ndarray:
         """
