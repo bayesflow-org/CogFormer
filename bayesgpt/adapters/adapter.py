@@ -14,10 +14,10 @@ class Adapter:
     ):
         """Cast to dtype (supports ndarray, Mapping, Sequence)."""
         if isinstance(x, Mapping):
-            return Adapter.apply_mapping(x, lambda v: Adapter.convert_one(v, dtype, copy))
+            return Adapter.apply_mapping(x, lambda v: Adapter._convert(v, dtype, copy))
         if isinstance(x, Sequence) and not isinstance(x, (str, bytes)):
-            return Adapter.apply_sequence(x, lambda v: Adapter.convert_one(v, dtype, copy))
-        return Adapter._convert_one(x, dtype, copy)
+            return Adapter.apply_sequence(x, lambda v: Adapter._convert(v, dtype, copy))
+        return Adapter._convert(x, dtype, copy)
 
     @staticmethod
     def atleast_2d(x, orientation: str = "row"):
@@ -59,7 +59,7 @@ class Adapter:
             for a in arrs:
                 tgt = list(target)
                 tgt[axis] = a.shape[axis]
-                padded.append(Adapter.pad_to_shape(a, tuple(tgt), pad_value=pad_value))
+                padded.append(Adapter.pad(a, tuple(tgt), pad_value=pad_value))
             arrs = padded
 
         out = np.concatenate(arrs, axis=axis)
@@ -81,20 +81,20 @@ class Adapter:
         return [fn(v) for v in seq]
 
     @staticmethod
-    def pad_to_shape(x: np.ndarray, target_shape: tuple[int, ...], pad_value: float = 0.0) -> np.ndarray:
-        if x.shape == target_shape:
+    def pad(x: np.ndarray, to_shape: tuple[int, ...], pad_value: float = 0.0) -> np.ndarray:
+        if x.shape == to_shape:
             return x
-        if len(target_shape) != x.ndim:
-            raise ValueError(f"ndim mismatch: {x.ndim} vs target {len(target_shape)}")
+        if len(to_shape) != x.ndim:
+            raise ValueError(f"ndim mismatch: {x.ndim} vs target {len(to_shape)}")
         pads = []
-        for curr, targ in zip(x.shape, target_shape):
+        for curr, targ in zip(x.shape, to_shape):
             if targ < curr:
-                raise ValueError(f"Cannot pad to smaller size: {x.shape} -> {target_shape}")
+                raise ValueError(f"Cannot pad to smaller size: {x.shape} -> {to_shape}")
             pads.append((0, targ - curr))
         return np.pad(x, pads, mode="constant", constant_values=pad_value)
 
     @staticmethod
-    def _convert_one(v, dtype, copy):
+    def _convert(v, dtype, copy):
         a = Adapter.asarray(v)
         return a.astype(dtype, copy=copy, casting="same_kind")
 

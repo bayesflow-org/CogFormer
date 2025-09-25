@@ -138,7 +138,7 @@ class NestedModelFamily:
         max_num_categories: int = 4,
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
-    ):
+    ) -> list[dict] | dict:
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
 
@@ -169,8 +169,7 @@ class NestedModelFamily:
             sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
 
-        # batch = self.collate(list_batch)
-        batch = list_batch
+        batch = self.collate(list_batch)
         return batch
 
     def collate(self, list_batch: list[dict]) -> dict[str, np.ndarray]:
@@ -194,7 +193,7 @@ class NestedModelFamily:
         param_masks = np.zeros((batch_size, num_cols, num_params))
         param_matrices = np.zeros((batch_size, num_cols, num_params))
         regressor_masks = np.zeros((batch_size, num_cols))
-        discrete_masks = np.zeros((batch_size, max_num_regressors))
+        discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
 
