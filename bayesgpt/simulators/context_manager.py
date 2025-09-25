@@ -55,12 +55,12 @@ class ContextManager:
         num_regressors: int,
         free_prob: float = 0.5,
         keep_intercept: bool = False,
-        mandatory_intrinsics: list[str] | set[str] | None = None,
-        intercept_only_intrinsics: list[str] | set[str] | None = None,
+        free_intrinsics: list[str] | set[str] | None = None,
+        fixed_intrinsics: list[str] | set[str] | None = None,
     ) -> dict[str, list[str]]:
 
-        mandatory = set(mandatory_intrinsics or [])
-        intercept_only = set(intercept_only_intrinsics or [])
+        mandatory = set(free_intrinsics or [])
+        intercept_only = set(fixed_intrinsics or [])
         config: dict[str, list[str]] = {}
 
         if keep_intercept:
@@ -88,8 +88,8 @@ class ContextManager:
             num_regressors: int,
             max_num_regressors: int = 10,
             max_num_categories: int = 4,
-            mandatory_intrinsics: list[str] | set[str] | None = None,
-            intercept_only_intrinsics: list[str] | set[str] | None = None,
+            free_intrinsics: list[str] | set[str] | None = None,
+            fixed_intrinsics: list[str] | set[str] | None = None,
             free_prob: float = 0.5,     # Probability of a param being free
             keep_intercept: bool = False
     ) -> tuple:
@@ -99,8 +99,8 @@ class ContextManager:
             num_regressors=num_regressors,
             free_prob=free_prob,
             keep_intercept=keep_intercept,
-            mandatory_intrinsics=mandatory_intrinsics,
-            intercept_only_intrinsics=intercept_only_intrinsics
+            free_intrinsics=free_intrinsics,    # Intercept + slope
+            fixed_intrinsics=fixed_intrinsics   # Intercept only
         )
 
         parameter_mask = self.build_parameter_mask(
@@ -170,7 +170,7 @@ class ContextManager:
         num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
 
         # Design matrix always includes intercept column if present in design_config
-        design_matrix = np.zeros((num_obs, num_cols), dtype=np.float32)
+        design_matrix = np.zeros((num_obs, num_cols))
         print(f"shape of design_matrix: {design_matrix.shape}")
 
         # Generate discrete mask for the non-intercept regressors if none provided
@@ -256,7 +256,7 @@ class ContextManager:
         - Entries with mask==0 are 0.0
         """
         num_regressors, num_intrinsic_params = parameter_mask.shape
-        parameter_matrix = np.zeros((num_regressors, num_intrinsic_params), dtype=np.float32)
+        parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
         # Heuristic: treat the very first row as intercept if any nonzero exists there.
         has_intercept = parameter_mask[0].any()
@@ -284,6 +284,6 @@ class ContextManager:
         num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
 
         p = float(1.0 / num_categories)
-        one_hot= np.random.multinomial(1, [p] * num_categories, size=num_obs).astype(np.float32)
+        one_hot= np.random.multinomial(1, [p] * num_categories, size=num_obs)
         dummies = one_hot[:, :num_categories - 1]
         return dummies

@@ -51,8 +51,8 @@ class NestedModelFamily:
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
                 free_prob=free_prob,
-                mandatory_intrinsics=kwargs.get("mandatory_intrinsics"),
-                intercept_only_intrinsics=kwargs.get("intercept_only_intrinsics")
+                free_intrinsics=kwargs.get("free_intrinsics"),
+                fixed_intrinsics=kwargs.get("fixed_intrinsics")
             )
         else:
             print("Design config provided. Using it to generate param mask.")
