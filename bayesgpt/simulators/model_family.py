@@ -106,7 +106,6 @@ class NestedModelFamily:
         # Regressor mask
         regressor_mask = self.context_manager.build_regressor_mask(
             num_regressors=num_regressors_from_config,
-            max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
             keep_intercept=keep_intercept
         )
@@ -115,7 +114,6 @@ class NestedModelFamily:
         if flatten_param_outputs:
             parameter_mask = parameter_mask.flatten()
             parameter_matrix = parameter_matrix.flatten()
-            print(parameter_matrix.shape, parameter_mask.shape)
 
         return {
             "model_name": f"{self.name}",
@@ -147,24 +145,27 @@ class NestedModelFamily:
         keep_intercept: bool = False,
         flatten_param_outputs: bool = True,
     ) -> list[dict] | dict:
-        # Sample num_obs and num_regressors
-        num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
-        num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
+        # Sample num_obs and num_regressors per batch element if not provided
+        if num_obs is None:
+            num_obs_array = np.random.randint(min_num_obs, max_num_obs + 1, size=batch_size)
+        else:
+            num_obs_array = np.full(batch_size, num_obs)
+
+        if num_regressors is None:
+            num_regressors_array = np.random.randint(min_num_regressors, max_num_regressors + 1, size=batch_size)
+        else:
+            num_regressors_array = np.full(batch_size, num_regressors)
 
         # Initialize batch and keep track of the maximum num_obs
         list_batch = []
-        list_num_obs = np.zeros(batch_size)
-        list_num_regressors = np.zeros(batch_size)
 
         for i in range(batch_size):
-            list_num_obs[i] = num_obs
-            list_num_regressors[i] = num_regressors
 
             sim_instance = self.sample(
                 design_config=design_config,
-                num_obs=num_obs,
+                num_obs=num_obs_array[i],
                 context=context,
-                num_regressors=num_regressors,
+                num_regressors=num_regressors_array[i],
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
@@ -173,8 +174,8 @@ class NestedModelFamily:
                 flatten_param_outputs=flatten_param_outputs
             )
 
-            sim_instance["num_obs"] = num_obs
-            sim_instance["num_regressors"] = num_regressors
+            sim_instance["num_obs"] = num_obs_array[i]
+            sim_instance["num_regressors"] = num_regressors_array[i]
             sim_instance["max_num_regressors"] = max_num_regressors
             sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
@@ -187,22 +188,19 @@ class NestedModelFamily:
         # Infer batch size
         batch_size = len(list_batch)
         num_params = len(self.intrinsic_params)
+        max_num_obs = max(b["num_obs"] for b in list_batch)
+        max_num_regressors = max(b["num_regressors"] for b in list_batch)
+        max_num_categories = list_batch[0]["max_num_categories"]
 
-        # fixed padded width from first element
-        num_regressors = list_batch[0]["num_regressors"]
-        max_num_regressors = list_batch[0]["max_num_regressors"]
-
-        # variable num_obs per item → pad to max
-        max_num_obs = max(b["design_matrix"].shape[0] for b in list_batch)
-
-        # Get column width
-        num_cols = list_batch[0]["design_matrix"].shape[1]
+        # Calculate max column width
+        block_width = max_num_categories - 1
+        max_num_cols = max_num_regressors * block_width + (1 if list_batch[0]["keep_intercept"] else 0)
 
         # Preallocate arrays
-        design_matrices = np.zeros((batch_size, max_num_obs, num_cols))
-        param_masks = np.zeros((batch_size, num_cols * num_params))
-        param_matrices = np.zeros((batch_size, num_cols * num_params))
-        regressor_masks = np.zeros((batch_size, num_cols))
+        design_matrices = np.zeros((batch_size, max_num_obs, max_num_cols))
+        param_masks = np.zeros((batch_size, max_num_cols * num_params))
+        param_matrices = np.zeros((batch_size, max_num_cols * num_params))
+        regressor_masks = np.zeros((batch_size, max_num_cols))
         discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
@@ -219,10 +217,15 @@ class NestedModelFamily:
             model_names.append(b["model_name"])
             design_configs.append(b["design_config"])
 
-            design_matrices[i] = b["design_matrix"]
-            param_masks[i] = b["param_mask"]
-            param_matrices[i] = b["param_matrix"]
-            regressor_masks[i] = b["regressor_mask"]
+            # Pad design_matrix, param_mask, param_matrix, and regressor_mask to max_num_regressors
+            num_obs = b["num_obs"]
+            num_regressors = b["num_regressors"]
+            num_cols = num_regressors * block_width + (1 if b["keep_intercept"] else 0)
+
+            design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
+            param_masks[i, :num_cols * num_params] = b["param_mask"]
+            param_matrices[i, :num_cols * num_params] = b["param_matrix"]
+            regressor_masks[i, :num_cols] = b["regressor_mask"]
             discrete_masks[i, :num_regressors] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]

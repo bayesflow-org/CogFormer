@@ -20,9 +20,10 @@ class ContextManager:
         regressor_keys = [k for k in regressor_keys if k != "1"]
 
         # Figure out block width and total number of columns
+        num_regressors = len(regressor_keys)
         block_width = max_num_categories - 1
         num_intrinsic_params = len(intrinsic_params)
-        num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
+        num_cols = num_regressors * block_width + (1 if has_intercept else 0)
 
         mask = np.zeros((num_cols, num_intrinsic_params), dtype=np.float32)
 
@@ -131,16 +132,13 @@ class ContextManager:
     def build_regressor_mask(
         self,
         num_regressors: int,
-        max_num_regressors: int = 10,
         max_num_categories: int = 4,
-        keep_intercept: bool = False
+        keep_intercept: bool = False,
     ) -> np.ndarray:
         block_width = max_num_categories - 1
-        num_cols = max_num_regressors * block_width + (1 if keep_intercept else 0)
-        used_cols = num_regressors * block_width + (1 if keep_intercept else 0)
+        num_cols = num_regressors * block_width + (1 if keep_intercept else 0)
+        mask = np.ones(num_cols, dtype=np.float32)
 
-        mask = np.zeros(num_cols, dtype=np.float32)
-        mask[:used_cols] = 1.0
         return mask
 
     def build_design_matrix(
@@ -165,7 +163,7 @@ class ContextManager:
 
         # Construct per-parameter column blocks
         block_width = max_num_categories - 1
-        num_cols = max_num_regressors * block_width + (1 if has_intercept else 0)
+        num_cols = num_regressors * block_width + (1 if has_intercept else 0)
 
         # Design matrix always includes intercept column if present in design_config
         design_matrix = np.zeros((num_obs, num_cols))
@@ -242,13 +240,7 @@ class ContextManager:
         prior_fun: dict[str, Callable | dict[str, Callable]],
         intrinsic_params: list[str],
     ) -> np.ndarray:
-        """
-        Build parameter_matrix with shape (num_regressors, num_intrinsic_params) by sampling
-        entry-wise wherever parameter_mask==1.
-        - Row 0 (intercept) uses prior_fun[intrinsic]['intercept']()
-        - Rows >=1 (slopes)  use prior_fun[intrinsic]['slope']()
-        - Entries with mask==0 are 0.0
-        """
+
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
