@@ -38,7 +38,7 @@ class NestedModelFamily:
         discrete_prob: float = 0.5,
         free_prob: float = 0.5,
         keep_intercept: bool = False,
-        flatten_param_outputs: bool = False,
+        flatten_param_outputs: bool = True,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
@@ -115,6 +115,7 @@ class NestedModelFamily:
         if flatten_param_outputs:
             parameter_mask = parameter_mask.flatten()
             parameter_matrix = parameter_matrix.flatten()
+            print(parameter_matrix.shape, parameter_mask.shape)
 
         return {
             "model_name": f"{self.name}",
@@ -144,8 +145,9 @@ class NestedModelFamily:
         max_num_categories: int = 4,
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
-        flatten_param_outputs: bool = False,
+        flatten_param_outputs: bool = True,
     ) -> list[dict] | dict:
+        # Sample num_obs and num_regressors
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
 
@@ -198,8 +200,8 @@ class NestedModelFamily:
 
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, num_cols))
-        param_masks = np.zeros((batch_size, num_cols, num_params))
-        param_matrices = np.zeros((batch_size, num_cols, num_params))
+        param_masks = np.zeros((batch_size, num_cols * num_params))
+        param_matrices = np.zeros((batch_size, num_cols * num_params))
         regressor_masks = np.zeros((batch_size, num_cols))
         discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))

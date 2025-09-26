@@ -67,6 +67,26 @@ class Adapter:
             out = out.astype(dtype, copy=False, casting="same_kind")
         return out
 
+    @staticmethod
+    def encode_position(x, cosine: bool = False, normalize: bool = False) -> np.ndarray:
+
+        # Make sure that the position is one-dimensional
+        if x.ndim > 1:
+            if x.shape[-1] != 1:
+                raise ValueError("Position must be 1-dimensional.")
+            else:
+                x = x.squeeze()
+
+        # By default, positions are encoded as a linear sequence
+        positions = np.linspace(0, len(x), len(x))
+        if cosine:
+            positions = np.cos(positions)
+        elif normalize:
+            positions = positions / np.max(positions)
+
+        return positions
+
+
     # ----------------- helpers -----------------
     @staticmethod
     def asarray(x) -> np.ndarray:
