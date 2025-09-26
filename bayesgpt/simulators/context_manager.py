@@ -244,6 +244,10 @@ class ContextManager:
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
+        # Handle empty parameter_mask
+        if num_regressors == 0:
+            return parameter_matrix
+
         # Heuristic: treat the very first row as intercept if any nonzero exists there.
         has_intercept = parameter_mask[0].any()
 
