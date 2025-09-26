@@ -4,6 +4,7 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 from utils.simulator_utils import shifted_softplus
+from adapters import Adapter
 
 
 class NestedModelFamily:
@@ -204,6 +205,7 @@ class NestedModelFamily:
         discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
+        position_encodings = np.zeros((batch_size, max_num_cols * num_params))
 
         # Collect lists
         model_names, design_configs = [], []
@@ -229,6 +231,9 @@ class NestedModelFamily:
             discrete_masks[i, :num_regressors] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]
+            position_encodings[i, :num_cols * num_params] = Adapter.encode_position(
+                np.arange(num_cols * num_params), sinusoidal=True
+            )
 
             for k in sim_keys:
                 v = b["sim_trials"][k]
@@ -244,5 +249,6 @@ class NestedModelFamily:
             "regressor_masks": regressor_masks,
             "discrete_masks": discrete_masks,
             "num_obs": num_obs_array,
-            "num_regressors": num_regressors_array
+            "num_regressors": num_regressors_array,
+            "position_encodings": position_encodings,
         }

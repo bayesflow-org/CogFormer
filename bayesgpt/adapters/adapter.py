@@ -68,7 +68,11 @@ class Adapter:
         return out
 
     @staticmethod
-    def encode_position(x, cosine: bool = False, normalize: bool = False) -> np.ndarray:
+    def encode_position(
+        x,
+        sinusoidal: bool = False,
+        normalize: bool = False
+    ) -> np.ndarray:
 
         # Make sure that the position is one-dimensional
         if x.ndim > 1:
@@ -79,7 +83,7 @@ class Adapter:
 
         # By default, positions are encoded as a linear sequence
         positions = np.linspace(0, len(x), len(x))
-        if cosine:
+        if sinusoidal:
             positions = np.cos(positions)
         elif normalize:
             positions = positions / np.max(positions)
