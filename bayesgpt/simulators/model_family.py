@@ -38,6 +38,7 @@ class NestedModelFamily:
         discrete_prob: float = 0.5,
         free_prob: float = 0.5,
         keep_intercept: bool = False,
+        flatten_param_outputs: bool = False,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
@@ -110,6 +111,11 @@ class NestedModelFamily:
             keep_intercept=keep_intercept
         )
 
+        # Flatten param outputs
+        if flatten_param_outputs:
+            parameter_mask = parameter_mask.flatten()
+            parameter_matrix = parameter_matrix.flatten()
+
         return {
             "model_name": f"{self.name}",
             "design_config": design_config,
@@ -138,6 +144,7 @@ class NestedModelFamily:
         max_num_categories: int = 4,
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
+        flatten_param_outputs: bool = False,
     ) -> list[dict] | dict:
         num_obs = num_obs or np.random.randint(min_num_obs, max_num_obs + 1)
         num_regressors = num_regressors or np.random.randint(min_num_regressors, max_num_regressors + 1)
@@ -161,6 +168,7 @@ class NestedModelFamily:
                 keep_intercept=keep_intercept,
                 max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
+                flatten_param_outputs=flatten_param_outputs
             )
 
             sim_instance["num_obs"] = num_obs
