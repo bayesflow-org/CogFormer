@@ -71,7 +71,6 @@ def sample_rdm_prior() -> np.ndarray:
 class RDM(Model):
 
     def __init__(self, dt: float = 1e-3, max_steps: int = 1e4):
-        super().__init__()
         self.dt = dt
         self.max_steps = max_steps
 
@@ -82,40 +81,46 @@ class RDM(Model):
         context: dict[str, np.ndarray] | None = None,
     ) -> dict[str, np.ndarray]:
         """
-        Expand per-trial scalar drifts into K-way vectors using context.
-        Expects in `params`: v, (optional) v_diff, a, tau, decay
-        Expects in `context`: 'correct_idx' (len==num_obs), and either 'num_alternatives' or infer K from correct_idx.
+        Build per-trial K-way drift from scalars; no dtype control here.
+        Expects in `params`: v, optional v_diff, a, tau, decay (len == num_obs or scalars).
+        Expects in `context`: 'correct_idx' (len == num_obs), optional 'num_alternatives'.
         """
         context = context or {}
-        v_base = params["v"].astype(np.float32, copy=False)
-        v_diff = params.get("v_diff", np.zeros_like(v_base)).astype(np.float32, copy=False)
 
-        # For debug
         if "correct_idx" not in context:
-            raise ValueError("RDM requires context['correct_idx'] as int indices per trial.")
-        correct_idx = np.asarray(context["correct_idx"], dtype=np.int32).reshape(-1)
-
-        # For debug
+            raise ValueError("RDM requires context['correct_idx'].")
+        correct_idx = np.asarray(context["correct_idx"]).reshape(-1)
         if correct_idx.shape[0] != num_obs:
             raise ValueError(f"correct_idx length {correct_idx.shape[0]} != num_obs {num_obs}")
 
         num_alternatives = int(context.get("num_alternatives", int(correct_idx.max()) + 1))
+        if num_alternatives < 1:
+            raise ValueError("num_alternatives must be >= 1.")
 
-        # Build per-trial K-vector drift:
+        # Helper: broadcast to (num_obs,) if scalar; validate length; no dtype conversion.
+        def as_1d(x):
+            a = np.asarray(x).reshape(-1)
+            if a.size == 1:
+                a = np.full((num_obs,), a.item())
+            if a.size != num_obs:
+                raise ValueError(f"Parameter has length {a.size}, expected {num_obs}.")
+            return a
+
+        v_base = as_1d(params["v"])
+        v_diff = as_1d(params.get("v_diff", np.zeros_like(v_base)))
+        a      = as_1d(params["a"])
+        tau    = as_1d(params["tau"])
+        decay  = as_1d(params["decay"])
+
+        # Build per-trial K-vector drift
         v_correct   = v_base + 0.5 * v_diff
         v_incorrect = v_base - 0.5 * v_diff
-        v = np.full((num_obs, num_alternatives), 0.0, dtype=np.float32)
+        v = np.full((num_obs, num_alternatives), 0.0)
         for i in range(num_obs):
             v[i, :] = v_incorrect[i]
             v[i, correct_idx[i]] = v_correct[i]
 
-        # Return normalized/broadcast params for the kernel
-        return {
-            "v": v,
-            "a": params["a"].astype(np.float32, copy=False),
-            "tau": params["tau"].astype(np.float32, copy=False),
-            "decay": params["decay"].astype(np.float32, copy=False),
-        }
+        return {"v": v, "a": a, "tau": tau, "decay": decay}
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_rdm(**params, dt=self.dt, max_steps=self.max_steps)
