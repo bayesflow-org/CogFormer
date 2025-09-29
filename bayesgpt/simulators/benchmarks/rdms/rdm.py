@@ -122,6 +122,11 @@ class RDM(Model):
 
         return {"v": v, "a": a, "tau": tau, "decay": decay}
 
+    @staticmethod
+    def build_context(num_obs: int, num_alternatives: int) -> dict[str, np.ndarray]:
+        correct_idx = np.random.randint(0, num_alternatives, size=num_obs)
+        return {"correct_idx": correct_idx, "num_alternatives": num_alternatives}
+
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_rdm(**params, dt=self.dt, max_steps=self.max_steps)
         return {"rts": results[:, 0], "choices": results[:, 1]}

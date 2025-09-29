@@ -157,16 +157,31 @@ class NestedModelFamily:
         else:
             num_regressors_array = np.full(batch_size, num_regressors)
 
+
         # Initialize batch and keep track of the maximum num_obs
         list_batch = []
 
         for i in range(batch_size):
+            num_obs = num_obs_array[i]
+            num_regressors = num_regressors_array[i]
+
+            # Resolve context per item:
+            if context is None:
+                ctx_i = None
+            elif callable(context):
+                # If the whole context is a callable, let it build a dict with n_obs
+                ctx_i = context(num_obs)
+            else:
+                # If context is a dict, allow callable values that depend on n_obs
+                ctx_i = {}
+                for k, v in context.items():
+                    ctx_i[k] = v(num_obs) if callable(v) else v
 
             sim_instance = self.sample(
                 design_config=design_config,
-                num_obs=num_obs_array[i],
-                context=context,
-                num_regressors=num_regressors_array[i],
+                num_obs=num_obs,
+                context=ctx_i,
+                num_regressors=num_regressors,
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
