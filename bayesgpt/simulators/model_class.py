@@ -11,7 +11,7 @@ class ModelClass:
 
     def sample(
         self,
-        model: list[Model],
+        model_families: list[NestedModelFamily],
         priors: dict[str, dict[str, float | Callable]],
         batch_size: int = 32,
     ) -> dict[str, np.ndarray]:
