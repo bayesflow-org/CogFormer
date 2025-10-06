@@ -1,29 +1,27 @@
 import numpy as np
 from collections.abc import Callable
-from simulators import NestedModelFamily, ContextManager, Model
+from simulators import NestedModelFamily
 
 
 class ModelClass:
 
-    def __init__(self, models: list[Model]):
+    def __init__(self, model_families: list[NestedModelFamily]):
         super().__init__()
-        self.models = models
+        self.model_families = model_families
 
     def sample(
         self,
         model_families: list[NestedModelFamily],
-        priors: dict[str, dict[str, float | Callable]],
         batch_size: int = 32,
     ) -> dict[str, np.ndarray]:
 
         samples = {}
-        model_id = np.random.choice(len(self.models))
-        context_manager = ContextManager()
-        # model_family = NestedModelFamily(
-        #     context_manager=context_manager,
-        #     model=self.models[model_id],
-        #     priors=priors,
-        #     intrinsic_params=
-        # )
+        for model_family in model_families:
+            # Call batch_sample for each model family
+            batch = model_family.batch_sample(
+                batch_size=batch_size
+            )
+            # Store results keyed by model family name
+            samples[model_family.name] = batch
 
         return samples
