@@ -127,6 +127,12 @@ class RDM(Model):
         correct_idx = np.random.randint(0, num_alternatives, size=num_obs)
         return {"correct_idx": correct_idx, "num_alternatives": num_alternatives}
 
+    @staticmethod
+    def build_default_context(num_obs: int) -> dict[str, np.ndarray]:
+        num_alternatives = np.random.randint(2, 5)  # Randomly pick 2-4 alternatives per batch
+        print(f"# alternatives: {num_alternatives}")
+        return RDM.build_context(num_obs, num_alternatives)
+
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_rdm(**params, dt=self.dt, max_steps=self.max_steps)
         return {"rts": results[:, 0], "choices": results[:, 1]}
