@@ -151,6 +151,12 @@ class CDM(Model):
             raise ValueError("Unsupported theta_mode.")
         return {"theta": theta}
 
+    @staticmethod
+    def build_default_context(num_obs: int) -> dict[str, np.ndarray]:
+        theta_mode = np.random.choice(["random_uniform", "zeros"])  # Randomly pick per batch
+        print(f"Theta mode: {theta_mode}")
+        return CDM.build_context(num_obs, theta_mode)
+
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_cdm(**params, dt=self.dt, max_steps=self.max_steps)
         return {"rts": results[:, 0], "choices": results[:, 1]}

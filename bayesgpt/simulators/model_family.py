@@ -67,10 +67,13 @@ class NestedModelFamily:
         regressor_keys = [k for k in design_config.keys() if k != "1"]
         num_regressors_from_config = len(regressor_keys)
 
-
         discrete_mask = self.context_manager.build_random_discrete_mask(
             num_regressors=num_regressors_from_config, discrete_prob=discrete_prob
         )
+
+        # Check if there is a context for the model
+        if context is None and hasattr(self.model, 'build_default_context'):
+            context = self.model.build_default_context(num_obs=num_obs)
 
         # Design matrix
         design_matrix = self.context_manager.build_design_matrix(
@@ -167,7 +170,11 @@ class NestedModelFamily:
 
             # Resolve context per item:
             if context is None:
-                ctx_i = None
+                if hasattr(self.model, 'build_default_context'):
+                    print("No context provided. Building default context from the model.")
+                    ctx_i = self.model.build_default_context(num_obs=num_obs)
+                else:
+                    ctx_i = None
             elif callable(context):
                 # If the whole context is a callable, let it build a dict with n_obs
                 ctx_i = context(num_obs)
