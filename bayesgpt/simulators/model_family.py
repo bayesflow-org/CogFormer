@@ -196,10 +196,10 @@ class NestedModelFamily:
             sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
 
-        batch = self.collate(list_batch)
+        batch = self.collate(list_batch, flatten_param_outputs=flatten_param_outputs)
         return batch
 
-    def collate(self, list_batch: list[dict]) -> dict[str, np.ndarray]:
+    def collate(self, list_batch: list[dict], flatten_param_outputs: bool = True) -> dict[str, np.ndarray]:
 
         # Infer batch size
         batch_size = len(list_batch)
@@ -212,16 +212,20 @@ class NestedModelFamily:
         block_width = max_num_categories - 1
         max_num_cols = max_num_regressors * block_width + (1 if list_batch[0]["keep_intercept"] else 0)
 
+        if flatten_param_outputs:
+            param_outputs_shape = (batch_size, max_num_cols * num_params)
+        else:
+            param_outputs_shape = (batch_size, max_num_cols, num_params)
+
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, max_num_cols))
-        # TODO: bring back the original shape, flatten later
-        param_masks = np.zeros((batch_size, max_num_cols, num_params))
-        param_matrices = np.zeros((batch_size, max_num_cols, num_params))
+        param_masks = np.zeros(param_outputs_shape)
+        param_matrices = np.zeros(param_outputs_shape)
         regressor_masks = np.zeros((batch_size, max_num_cols))
         discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
-        position_encodings = np.zeros((batch_size, max_num_cols, num_params))
+        position_encodings = np.zeros((batch_size, max_num_cols * num_params))
 
         # Collect lists
         model_names, design_configs = [], []
@@ -241,13 +245,21 @@ class NestedModelFamily:
             num_cols = num_regressors * block_width + (1 if b["keep_intercept"] else 0)
 
             design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
-            param_masks[i, :num_cols, :num_params] = b["param_mask"]
-            param_matrices[i, :num_cols, :num_params] = b["param_matrix"]
+
+            if flatten_param_outputs:
+                print(b["param_matrix"].shape, b["param_mask"].shape)
+                param_masks[i, :num_cols * num_params] = b["param_mask"]
+                param_matrices[i, :num_cols * num_params] = b["param_matrix"]
+            else:
+                print(b["param_matrix"].shape, b["param_mask"].shape)
+                param_masks[i, :num_cols, :num_params] = b["param_mask"]
+                param_matrices[i, :num_cols, :num_params] = b["param_matrix"]
+
             regressor_masks[i, :num_cols] = b["regressor_mask"]
             discrete_masks[i, :num_regressors] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]
-            position_encodings[i, :num_cols, :num_params] = Adapter.encode_position(
+            position_encodings[i, :num_cols * num_params] = Adapter.encode_position(
                 np.arange(num_cols * num_params), sinusoidal=True
             )
 
