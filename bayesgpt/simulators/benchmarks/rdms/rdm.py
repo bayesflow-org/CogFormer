@@ -130,7 +130,6 @@ class RDM(Model):
     @staticmethod
     def build_default_context(num_obs: int) -> dict[str, np.ndarray]:
         num_alternatives = np.random.randint(2, 5)  # Randomly pick 2-4 alternatives per batch
-        print(f"# alternatives: {num_alternatives}")
         return RDM.build_context(num_obs, num_alternatives)
 
     def simulate(self, params: dict[str, np.ndarray], context=None):

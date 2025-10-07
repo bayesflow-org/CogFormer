@@ -174,7 +174,6 @@ class NestedModelFamily:
             # Resolve context per item:
             if context is None:
                 if hasattr(self.model, 'build_default_context'):
-                    print("No context provided. Building default context from the model.")
                     ctx_i = self.model.build_default_context(num_obs=num_obs)
                 else:
                     ctx_i = None
@@ -260,11 +259,9 @@ class NestedModelFamily:
             design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
 
             if flatten_param_outputs:
-                print(b["param_matrix"].shape, b["param_mask"].shape)
                 param_masks[i, :num_cols * num_params] = b["param_mask"]
                 param_matrices[i, :num_cols * num_params] = b["param_matrix"]
             else:
-                print(b["param_matrix"].shape, b["param_mask"].shape)
                 param_masks[i, :num_cols, :num_params] = b["param_mask"]
                 param_matrices[i, :num_cols, :num_params] = b["param_matrix"]
 
@@ -296,7 +293,7 @@ class NestedModelFamily:
 
     def visualize(
         self,
-        batch: dict[str, np.ndarray | list],
+        batch: dict[str, np.ndarray],
         intrinsic_params: list[str]
     ):
         # Design configs (whole)

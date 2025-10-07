@@ -21,7 +21,7 @@ def simulate_cdm_trial(
     for i_iter in range(max_steps):
         x += v * dt + c * np.random.randn(2)
         if np.linalg.norm(x, 2) >= threshold[i_iter]:
-            return np.array([tau + i_iter * dt, np.arctan2(x[1], x[0])/np.pi])
+            return np.array([tau + i_iter * dt, np.arctan2(x[1], x[0]) / np.pi])
     # No decision within max_steps
     return np.array([-1.0, -1.0])
 
@@ -154,7 +154,6 @@ class CDM(Model):
     @staticmethod
     def build_default_context(num_obs: int) -> dict[str, np.ndarray]:
         theta_mode = np.random.choice(["random_uniform", "zeros"])  # Randomly pick per batch
-        print(f"Theta mode: {theta_mode}")
         return CDM.build_context(num_obs, theta_mode)
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
