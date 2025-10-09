@@ -40,7 +40,7 @@ class NestedModelFamily:
         mask_randomizer_kwargs: dict | None = None,
         discrete_prob: float = 0.5,
         free_prob: float = 0.5,
-        keep_intercept: bool = False,
+        keep_intercept: bool = True,
         flatten_param_outputs: bool = True,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
@@ -148,7 +148,8 @@ class NestedModelFamily:
         max_num_regressors: int = 10,
         max_num_categories: int = 4,
         discrete_prob: float = 0.5,
-        keep_intercept: bool = False,
+        keep_intercept: bool = True,
+        remove_intercept_on_collate: bool = True,
         flatten_param_outputs: bool = True,
         visualize: bool = False,
     ) -> list[dict] | dict:
@@ -205,13 +206,22 @@ class NestedModelFamily:
             sim_instance["max_num_categories"] = max_num_categories
             list_batch.append(sim_instance)
 
-        batch = self.collate(list_batch, flatten_param_outputs=flatten_param_outputs)
+        batch = self.collate(
+            list_batch,
+            flatten_param_outputs=flatten_param_outputs,
+            remove_intercept=remove_intercept_on_collate
+        )
 
         if visualize:
             self.visualize(batch, intrinsic_params=self.intrinsic_params)
         return batch
 
-    def collate(self, list_batch: list[dict], flatten_param_outputs: bool = True) -> dict[str, np.ndarray]:
+    def collate(
+        self,
+        list_batch: list[dict],
+        flatten_param_outputs: bool = True,
+        remove_intercept: bool = True
+    ) -> dict[str, np.ndarray]:
 
         # Infer batch size
         batch_size = len(list_batch)
@@ -276,6 +286,9 @@ class NestedModelFamily:
             for k in sim_keys:
                 v = b["sim_trials"][k]
                 sim_data[k][i, :v.shape[0]] = v
+
+        if remove_intercept:
+            design_matrices = design_matrices[:, :, 1:]
 
         return {
             "model_names": model_names,
