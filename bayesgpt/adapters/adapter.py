@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 from collections.abc import Mapping, Sequence
 from typing import Iterable
@@ -130,3 +131,7 @@ class Adapter:
         if a.ndim == 0:
             return a.reshape(1, 1)
         return a.reshape(1, -1) if orientation == "row" else a.reshape(-1, 1)
+
+    @staticmethod
+    def to_torch_tensor(x: np.ndarray, copy: bool = False) -> torch.Tensor:
+        return torch.tensor(x) if copy else torch.from_numpy(x)
