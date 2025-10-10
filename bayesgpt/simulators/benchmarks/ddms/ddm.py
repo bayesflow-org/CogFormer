@@ -101,4 +101,6 @@ class DDM(Model):
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
         results = simulate_ddm(**params, z=0.5, sigma=1.0, dt=self.dt, max_steps=self.max_steps)
-        return {"rts": results[:, 0], "choices": results[:, 1]}
+        rts = results[:, 0][..., None]
+        choices = results[:, 1][..., None]
+        return {"rts": rts, "choices": choices}
