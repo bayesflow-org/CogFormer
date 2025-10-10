@@ -133,5 +133,13 @@ class Adapter:
         return a.reshape(1, -1) if orientation == "row" else a.reshape(-1, 1)
 
     @staticmethod
-    def to_torch_tensor(x: np.ndarray, copy: bool = False) -> torch.Tensor:
-        return torch.tensor(x) if copy else torch.from_numpy(x)
+    def stack(x: dict[str: np.ndarray] | list[np.ndarray], axis=-1) -> np.ndarray:
+        if isinstance(x, dict):
+            shapes = [v.shape[0] for v in x.values()]
+        else:
+            shapes = [v.shape[0] for v in x]
+
+        assert len(set(shapes)) == 1, "Arrays must have the same shape."
+        return Adapter.concatenate(list(x.values()) if isinstance(x, dict) else x, axis=axis)
+
+
