@@ -155,9 +155,7 @@ class NestedModelFamily:
     ) -> list[dict] | dict:
         # Sample num_obs and num_regressors per batch element if not provided
         if num_obs is None:
-            num_obs_array = np.random.randint(min_num_obs, max_num_obs + 1, size=batch_size)
-        else:
-            num_obs_array = np.full(batch_size, num_obs)
+            num_obs = np.random.randint(min_num_obs, max_num_obs + 1)
 
         if num_regressors is None:
             num_regressors_array = np.random.randint(min_num_regressors, max_num_regressors + 1, size=batch_size)
@@ -169,7 +167,7 @@ class NestedModelFamily:
         list_batch = []
 
         for i in range(batch_size):
-            num_obs = num_obs_array[i]
+
             num_regressors = num_regressors_array[i]
 
             # Resolve context per item:
@@ -200,7 +198,7 @@ class NestedModelFamily:
                 flatten_param_outputs=flatten_param_outputs
             )
 
-            sim_instance["num_obs"] = num_obs_array[i]
+            sim_instance["num_obs"] = num_obs
             sim_instance["num_regressors"] = num_regressors_array[i]
             sim_instance["max_num_regressors"] = max_num_regressors
             sim_instance["max_num_categories"] = max_num_categories
@@ -227,7 +225,8 @@ class NestedModelFamily:
         batch_size = len(list_batch)
         num_params = len(self.intrinsic_params)
         max_num_obs = max(b["num_obs"] for b in list_batch)
-        max_num_regressors = max(b["num_regressors"] for b in list_batch)
+        # max_num_regressors = max(b["num_regressors"] for b in list_batch)
+        max_num_regressors = list_batch[0]["max_num_regressors"]
         max_num_categories = list_batch[0]["max_num_categories"]
 
         # Calculate max column width
@@ -236,8 +235,10 @@ class NestedModelFamily:
 
         if flatten_param_outputs:
             param_outputs_shape = (batch_size, max_num_cols * num_params)
+            param_indices_shape = (batch_size, max_num_regressors * block_width * num_params)
         else:
             param_outputs_shape = (batch_size, max_num_cols, num_params)
+            param_indices_shape = (batch_size, max_num_regressors * block_width, num_params)
 
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, max_num_cols))
@@ -254,7 +255,7 @@ class NestedModelFamily:
 
         # Initialize sim_data dict with zero arrays
         sim_keys = list_batch[0]["sim_trials"].keys()
-        sim_data = {k: np.empty((batch_size, max_num_obs)) for k in sim_keys}
+        sim_data = {k: np.empty((batch_size, max_num_obs, 1)) for k in sim_keys}
 
         # Collate batch entries
         for i, b in enumerate(list_batch):
@@ -302,6 +303,8 @@ class NestedModelFamily:
             "num_obs": num_obs_array,
             "num_regressors": num_regressors_array,
             "position_encodings": position_encodings,
+            "max_num_regressors": max_num_regressors,
+            "max_num_categories": max_num_categories,
         }
 
     def visualize(

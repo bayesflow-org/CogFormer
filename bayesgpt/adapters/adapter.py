@@ -142,4 +142,69 @@ class Adapter:
         assert len(set(shapes)) == 1, "Arrays must have the same shape."
         return Adapter.concatenate(list(x.values()) if isinstance(x, dict) else x, axis=axis)
 
+    @staticmethod
+    def build_parameter_indices(
+        intrinsic_params: list[str],
+        num_regressors: int,
+        num_categories: int,
+    ) -> np.ndarray:
+        # Get number of intrinsic params
+        num_intrinsic_params = len(intrinsic_params)
+        num_tiles = num_regressors * (num_categories - 1) + 1
+        indices = np.tile(np.linspace(0.0, 1.0, num_intrinsic_params), num_tiles)[..., None]
+        return indices
+
+    @staticmethod
+    def build_regressor_indices(
+        intrinsic_params: list[str],
+        num_regressors: int,
+        num_categories: int,
+    ):
+        num_intrinsic_params = len(intrinsic_params)
+        num_indices = num_regressors * (num_categories - 1) + 1
+        indices = np.repeat(np.linspace(0.0, 1.0, num_indices), num_intrinsic_params)[..., None]
+        return indices
+
+    @staticmethod
+    def to_torch_tensor(x: np.ndarray, copy: bool = False) -> torch.Tensor:
+        return torch.tensor(x) if copy else torch.from_numpy(x)
+
+    @staticmethod
+    def adapt(samples: dict, intrinsic_params: list[str]) -> dict:
+
+        design_matrices = samples["design_matrices"]
+        batch_size = design_matrices.shape[0]
+        rts = samples["sim_data"]["rts"]
+        choices = samples["sim_data"]["choices"]
+
+        input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
+        input_data = Adapter.to_torch_tensor(input_data)
+        input_data = input_data.to(torch.float32)
+
+        param_indices = [Adapter.build_parameter_indices(
+            intrinsic_params,
+            num_regressors=samples["max_num_regressors"],
+            num_categories=samples["max_num_categories"],
+        ) for _ in range(batch_size)]
+        param_indices = Adapter.to_torch_tensor(np.array(param_indices))
+        param_indices = param_indices.to(torch.float32)
+
+        regressor_indices = [Adapter.build_regressor_indices(
+            intrinsic_params,
+            num_regressors=samples["max_num_regressors"],
+            num_categories=samples["max_num_categories"],
+        ) for _ in range(batch_size)]
+
+        regressor_indices = Adapter.to_torch_tensor(np.array(regressor_indices)).to(torch.float32)
+
+        param_masks = Adapter.to_torch_tensor(samples["param_masks"]).to(torch.float32)
+        param_matrices = Adapter.to_torch_tensor(samples["param_matrices"]).to(torch.float32)
+
+        return {
+            "input_data": input_data,
+            "param_indices": param_indices,
+            "regressor_indices": regressor_indices,
+            "param_masks": param_masks,
+            "param_matrices": param_matrices,
+        }
 

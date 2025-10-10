@@ -83,15 +83,15 @@ class ContextManager:
         return config
 
     def build_random_parameter_mask(
-            self,
-            intrinsic_params: list[str],
-            num_regressors: int,
-            max_num_regressors: int = 10,
-            max_num_categories: int = 4,
-            free_intrinsics: list[str] | set[str] | None = None,
-            fixed_intrinsics: list[str] | set[str] | None = None,
-            free_prob: float = 0.5,     # Probability of a param being free
-            keep_intercept: bool = False
+        self,
+        intrinsic_params: list[str],
+        num_regressors: int,
+        max_num_regressors: int = 10,
+        max_num_categories: int = 4,
+        free_intrinsics: list[str] | set[str] | None = None,
+        fixed_intrinsics: list[str] | set[str] | None = None,
+        free_prob: float = 0.5,     # Probability of a param being free
+        keep_intercept: bool = False
     ) -> tuple:
 
         design_config = self.build_random_design_config(
@@ -203,12 +203,26 @@ class ContextManager:
 
         return design_matrix
 
+    def build_parameter_indices(
+        self,
+        intrinsic_params: list[str],
+        num_regressors: int,
+        num_categories: int,
+    ) -> np.ndarray:
+        # Get number of intrinsic params
+        num_intrinsic_params = len(intrinsic_params)
+        indices = np.tile(
+            np.repeat(np.linspace(0.0, 1.0, num_intrinsic_params), num_categories - 1),
+            num_regressors
+        )
+        return indices
+
     def mask_to_design_config(
-            self,
-            parameter_mask: np.ndarray,
-            intrinsic_params: list[str],
-            keep_intercept: bool = False,
-            ignore_padding: bool = True
+        self,
+        parameter_mask: np.ndarray,
+        intrinsic_params: list[str],
+        keep_intercept: bool = False,
+        ignore_padding: bool = True
     ) -> dict[str, list[str]]:
         """
         Convert a (num_regressors × num_intrinsics) binary mask into a design_config dict.
