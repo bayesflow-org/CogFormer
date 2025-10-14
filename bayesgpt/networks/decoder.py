@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
+from .sab import SAB
 
 
 class Decoder(nn.Module):
