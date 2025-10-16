@@ -170,7 +170,7 @@ class Adapter:
         return torch.tensor(x) if copy else torch.from_numpy(x)
 
     @staticmethod
-    def adapt(samples: dict, intrinsic_params: list[str]) -> dict:
+    def adapt(samples: dict, intrinsic_params: list[str], device: str | torch.device = torch.device("cuda")) -> dict:
 
         design_matrices = samples["design_matrices"]
         batch_size = design_matrices.shape[0]
@@ -200,13 +200,15 @@ class Adapter:
         param_masks = Adapter.to_torch_tensor(samples["param_masks"]).to(torch.float32)
         param_matrices = Adapter.to_torch_tensor(samples["param_matrices"]).to(torch.float32)
 
-        return {
+        out = {
             "input_data": input_data,
             "param_indices": param_indices,
             "regressor_indices": regressor_indices,
             "param_masks": param_masks,
             "param_matrices": param_matrices,
         }
+
+        return Adapter.to_device(out, device)
 
     @staticmethod
     def to_device(batch, device):
