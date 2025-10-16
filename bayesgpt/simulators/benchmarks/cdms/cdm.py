@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit, prange
 from simulators import Model
+from utils.simulator_utils import as_1d
 
 
 @njit
@@ -96,44 +97,31 @@ class CDM(Model):
         """
         context = context or {}
 
-        def as_1d(x):
-            x = np.asarray(x).reshape(-1)
-            if x.size == 1:
-                x = np.full((num_obs,), x.item())
-            if x.size != num_obs:
-                raise ValueError(f"Expected length {num_obs}, got {x.size}")
-            return x
+        v_angle  = as_1d(params["v_angle"],  num_obs, "v_angle")
+        v_length = as_1d(params["v_length"], num_obs, "v_length")
+        a        = as_1d(params["a"],        num_obs, "a")
+        tau      = as_1d(params["tau"],      num_obs, "tau")
+        decay    = as_1d(params["decay"],    num_obs, "decay")
+        s_v      = as_1d(params["s_v"],      num_obs, "s_v")
+        s_tau    = as_1d(params["s_tau"],     num_obs, "s_tau")
+        
+        # Polar -> Cartesian
+        v_x = v_length * np.cos(v_angle)
+        v_y = v_length * np.sin(v_angle)
+        v   = np.stack([v_x, v_y], axis=1)
 
-        # Build v (num_obs, 2)
-        if "v" in params and np.asarray(params["v"]).ndim == 2 and np.asarray(params["v"]).shape[1] == 2:
-            v_vec = np.asarray(params["v"])
-            if v_vec.shape[0] != num_obs:
-                raise ValueError(f"v has {v_vec.shape[0]} rows; expected {num_obs}")
-        elif "v_x" in params and "v_y" in params:
-            v_x = as_1d(params["v_x"])
-            v_y = as_1d(params["v_y"])
-            v_vec = np.stack([v_x, v_y], axis=1)
-        elif "v" in params and "v_theta" in params:
-            v_mag = as_1d(params["v"])
-            v_th = as_1d(params["v_theta"])
-            # Allow context override of angles (optional, RDM-inspired)
-            if "theta" in context:
-                theta_ctx = as_1d(context["theta"])
-                v_th = theta_ctx
-            v_vec = np.stack([v_mag * np.cos(v_th), v_mag * np.sin(v_th)], axis=1)
-        else:
-            raise ValueError("Provide (v_x,v_y) or (v,v_theta) or v as (n,2).")
+        # Inter-trial drift variability (isotropic)
+        if np.any(s_v > 0):
+            v = v + np.random.normal(0.0, s_v[:, None], size=(num_obs, 2))
 
-        a = as_1d(params["a"])
-        tau = as_1d(params["tau"])
-        decay = as_1d(params["decay"])
+        # Inter-trial nondecision variability
+        if np.any(s_tau > 0):
+            low  = tau - 0.5 * s_tau
+            high = tau + 0.5 * s_tau
+            tau  = np.random.uniform(low, high)
+            tau  = np.maximum(tau, 0.0)
 
-        return {
-            "v": v_vec.astype(np.float32, copy=False),
-            "a": a.astype(np.float32, copy=False),
-            "tau": tau.astype(np.float32, copy=False),
-            "decay": decay.astype(np.float32, copy=False),
-        }
+        return {"v": v, "a": a, "tau": tau, "decay": decay}
 
     @staticmethod
     def build_context(num_obs: int, theta_mode: str = "random_uniform") -> dict[str, np.ndarray]:
@@ -161,4 +149,3 @@ class CDM(Model):
         rts = results[:, 0][..., None]
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
-

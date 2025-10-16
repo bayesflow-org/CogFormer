@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit, prange
 from simulators import Model
+from utils.simulator_utils import as_1d
 
 @njit
 def sample_rdm_trial(
@@ -96,15 +97,6 @@ class RDM(Model):
         num_alternatives = int(context.get("num_alternatives", int(correct_idx.max()) + 1))
         if num_alternatives < 1:
             raise ValueError("num_alternatives must be >= 1.")
-
-        # Helper: broadcast to (num_obs,) if scalar; validate length; no dtype conversion.
-        def as_1d(x, name: str):
-            a = np.asarray(x).reshape(-1)
-            if a.size == 1:
-                a = np.full((num_obs,), a.item())
-            if a.size != num_obs:
-                raise ValueError(f"{name} has length {a.size}, expected {num_obs}.")
-            return a
 
         v_base = as_1d(params["v"], "v")
         v_diff = as_1d(params["v_diff"], "v_diff")
