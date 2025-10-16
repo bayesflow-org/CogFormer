@@ -4,7 +4,6 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 
-from adapters import Adapter
 from utils.simulator_utils import shifted_softplus
 from viz import visualize_matrix, visualize_matrices, visualize_design_configs
 
@@ -235,10 +234,8 @@ class NestedModelFamily:
 
         if flatten_param_outputs:
             param_outputs_shape = (batch_size, max_num_cols * num_params)
-            param_indices_shape = (batch_size, max_num_regressors * block_width * num_params)
         else:
             param_outputs_shape = (batch_size, max_num_cols, num_params)
-            param_indices_shape = (batch_size, max_num_regressors * block_width, num_params)
 
         # Preallocate arrays
         design_matrices = np.zeros((batch_size, max_num_obs, max_num_cols))
@@ -248,7 +245,6 @@ class NestedModelFamily:
         discrete_masks = -np.ones((batch_size, max_num_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
-        position_encodings = np.zeros((batch_size, max_num_cols * num_params))
 
         # Collect lists
         model_names, design_configs = [], []
@@ -280,9 +276,6 @@ class NestedModelFamily:
             discrete_masks[i, :num_regressors] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]
-            position_encodings[i, :num_cols * num_params] = Adapter.encode_position(
-                np.arange(num_cols * num_params), sinusoidal=True
-            )
 
             for k in sim_keys:
                 v = b["sim_trials"][k]
@@ -302,7 +295,6 @@ class NestedModelFamily:
             "discrete_masks": discrete_masks,
             "num_obs": num_obs_array,
             "num_regressors": num_regressors_array,
-            "position_encodings": position_encodings,
             "max_num_regressors": max_num_regressors,
             "max_num_categories": max_num_categories,
         }
