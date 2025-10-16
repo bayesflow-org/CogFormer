@@ -98,19 +98,20 @@ class RDM(Model):
             raise ValueError("num_alternatives must be >= 1.")
 
         # Helper: broadcast to (num_obs,) if scalar; validate length; no dtype conversion.
-        def as_1d(x):
+        def as_1d(x, name: str):
             a = np.asarray(x).reshape(-1)
             if a.size == 1:
                 a = np.full((num_obs,), a.item())
             if a.size != num_obs:
-                raise ValueError(f"Parameter has length {a.size}, expected {num_obs}.")
+                raise ValueError(f"{name} has length {a.size}, expected {num_obs}.")
             return a
 
-        v_base = as_1d(params["v"])
-        v_diff = as_1d(params.get("v_diff", np.zeros_like(v_base)))
-        a      = as_1d(params["a"])
-        tau    = as_1d(params["tau"])
-        decay  = as_1d(params["decay"])
+        v_base = as_1d(params["v"], "v")
+        v_diff = as_1d(params["v_diff"], "v_diff")
+        a      = as_1d(params["a"], "a")
+        tau    = as_1d(params["tau"], "tau")
+        decay  = as_1d(params["decay"], "decay")
+
 
         # Build per-trial K-vector drift
         v_correct   = v_base + 0.5 * v_diff
