@@ -208,3 +208,14 @@ class Adapter:
             "param_matrices": param_matrices,
         }
 
+    @staticmethod
+    def to_device(batch, device):
+        """Recursively move tensors in mappings/sequences to the given device."""
+        if isinstance(batch, Mapping):
+            return {k: Adapter.to_device(v, device) for k, v in batch.items()}
+        elif isinstance(batch, Sequence) and not isinstance(batch, (str, bytes)):
+            return [Adapter.to_device(v, device) for v in batch]
+        elif hasattr(batch, "to"):
+            return batch.to(device)
+        else:
+            return batch
