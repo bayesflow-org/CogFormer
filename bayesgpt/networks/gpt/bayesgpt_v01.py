@@ -1,0 +1,60 @@
+import torch
+import torch.nn as nn
+from ..encoder import Encoder
+from ..decoder import Decoder
+
+
+class BayesGPTv1(nn.Module):
+
+    def __init__(
+        self,
+        encoder_input_dim: int = 32,
+        decoder_input_dim: int = 2,
+        proj_dim: int = 64,
+        encoder_num_layers: int = 3,
+        decoder_num_layers: int = 3,
+        encoder_num_heads: int = 4,
+        decoder_num_heads: int = 4,
+        num_seeds: int = 10,
+        seed_dim: int = 128,
+        ln: bool = True,
+        dropout: float = 0.0,
+        layer_dropout: float = 0.0,
+    ):
+        super().__init__()
+
+        self.encoder = Encoder(
+            input_dim=encoder_input_dim,
+            num_layers=encoder_num_layers,
+            num_seeds=num_seeds,
+            seed_dim=seed_dim,
+            num_heads=encoder_num_heads,
+            ln=ln,
+            dropout=dropout,
+            layer_dropout=layer_dropout,
+        )
+
+        self.decoder = Decoder(
+            input_dim=decoder_input_dim,
+            seed_dim=seed_dim,
+            proj_dim=proj_dim,
+            num_layers=decoder_num_layers,
+            num_heads=decoder_num_heads,
+            ln=ln,
+            dropout=dropout,
+            layer_dropout=layer_dropout,
+        )
+
+    def forward(self, input_data, param_indices, regressor_indices, params_mask=None):
+
+        encoder_tokens = self.encoder(input_data)
+
+        pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)
+
+        decoded_mu, decoded_logvar = self.decoder(
+            query=pos_embeddings,
+            key=encoder_tokens,
+            query_mask=params_mask
+        )
+
+        return decoded_mu, decoded_logvar
