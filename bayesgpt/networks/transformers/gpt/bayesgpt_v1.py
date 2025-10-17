@@ -1,22 +1,23 @@
 import torch
 import torch.nn as nn
+from networks.transformers.encoder import Encoder
+from networks.transformers.decoder import Decoder
 
-from ..encoder import Encoder
-from ..decoder import Decoder
 
-
-class BayesGPTv0(nn.Module):
+class BayesGPTv1(nn.Module):
 
     def __init__(
         self,
-        encoder_input_dim: int,
+        encoder_input_dim: int = 32,
+        decoder_input_dim: int = 2,
         proj_dim: int = 64,
         encoder_num_layers: int = 3,
         decoder_num_layers: int = 3,
         encoder_num_heads: int = 4,
         decoder_num_heads: int = 4,
+        num_seeds: int = 10,
         seed_dim: int = 128,
-        ln: bool = True,
+        layer_norm: bool = True,
         dropout: float = 0.0,
         layer_dropout: float = 0.0,
     ):
@@ -25,30 +26,35 @@ class BayesGPTv0(nn.Module):
         self.encoder = Encoder(
             input_dim=encoder_input_dim,
             num_layers=encoder_num_layers,
+            num_seeds=num_seeds,
             seed_dim=seed_dim,
             num_heads=encoder_num_heads,
-            ln=ln,
+            layer_norm=layer_norm,
             dropout=dropout,
             layer_dropout=layer_dropout,
         )
 
         self.decoder = Decoder(
-            input_dim=seed_dim+2,
+            input_dim=decoder_input_dim,
+            seed_dim=seed_dim,
             proj_dim=proj_dim,
             num_layers=decoder_num_layers,
             num_heads=decoder_num_heads,
-            ln=ln,
+            layer_norm=layer_norm,
             dropout=dropout,
             layer_dropout=layer_dropout,
         )
 
-    def forward(self, input_data, param_indices, regressor_indices, attn_mask=None, key_padding_mask=None):
+    def forward(self, input_data, param_indices, regressor_indices, params_mask=None):
 
-        data_rep = self.encoder(input_data)
-        data_rep = data_rep.repeat(1, regressor_indices.size(1), 1)
+        encoder_tokens = self.encoder(input_data)
 
-        data_rep_pos = torch.cat([data_rep, param_indices, regressor_indices], dim=-1)
+        pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)
 
-        decoded_mu, decoded_logvar = self.decoder(data_rep_pos, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
+        decoded_mu, decoded_logvar = self.decoder(
+            query=pos_embeddings,
+            key=encoder_tokens,
+            query_mask=params_mask
+        )
 
         return decoded_mu, decoded_logvar

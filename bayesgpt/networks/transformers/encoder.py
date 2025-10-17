@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-from .sab import SAB
-from .pma import PMA
+from .self_attention_block import SelfAttentionBlock
+from .pooling_by_multihead_attention import PoolingByMultiheadAttention
 
 
 class Encoder(nn.Module):
@@ -14,7 +14,7 @@ class Encoder(nn.Module):
         num_layers: int = 3,
         num_seeds: int = 1,
         num_heads: int = 4,
-        ln: bool = False,
+        layer_norm: bool = False,
         dropout: float = 0.0,
         layer_dropout: float = 0.0,
     ):
@@ -24,21 +24,25 @@ class Encoder(nn.Module):
         self.input_embedding = nn.Linear(input_dim, embed_dim)
 
         self.layers = nn.ModuleList(
-            [SAB(input_dim=embed_dim, num_heads=num_heads, ln=ln, dropout=dropout)
-             for _ in range(num_layers)]
+            [SelfAttentionBlock(
+                input_dim=embed_dim,
+                num_heads=num_heads,
+                layer_norm=layer_norm,
+                dropout=dropout
+            ) for _ in range(num_layers)]
         )
         self.post_dropout = nn.Dropout(layer_dropout) if layer_dropout > 0 else nn.Identity()
 
-        self.pma = PMA(
+        self.pma = PoolingByMultiheadAttention(
             input_dim=embed_dim,
             seed_dim=seed_dim,
             num_seeds=num_seeds,
             num_heads=num_heads,
-            ln=ln,
+            layer_norm=layer_norm,
             dropout=dropout
         )
 
-    def forward(self, x, attn_mask=None, key_padding_mask=None):
+    def forward(self, x, attn_mask=None):
         """
         X: (B, T, C)
         attn_mask: optional (T, T) or (B*num_heads, T, T)
@@ -48,7 +52,7 @@ class Encoder(nn.Module):
         out = self.input_embedding(x)
 
         for sab in self.layers:
-            out = sab(out, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
+            out = sab(out, attn_mask=attn_mask)
             out = self.post_dropout(out)
 
         pooled = self.pma(out)

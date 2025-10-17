@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class MAB(nn.Module):
+class MultiheadAttentionBlock(nn.Module):
     """
     Multihead Attention Block using torch.nn.MultiheadAttention.
 
@@ -11,9 +11,16 @@ class MAB(nn.Module):
         query_dim:  feature dim of Q input  (B, T_q, dim_Q)
         key_dim:  feature dim of K input  (B, T_k, dim_K)
         num_heads: number of attention heads
-        ln: whether to use LayerNorm before/after the FFN residual
+        layer_norm: whether to use LayerNorm before/after the FFN residual
     """
-    def __init__(self, query_dim: int, key_dim: int = None, num_heads: int = 4, ln: bool = False, dropout: float = 0.0):
+    def __init__(
+        self,
+        query_dim: int,
+        key_dim: int = None,
+        num_heads: int = 4,
+        layer_norm: bool = False,
+        dropout: float = 0.0
+    ):
         super().__init__()
 
         if key_dim is None:
@@ -29,8 +36,8 @@ class MAB(nn.Module):
             batch_first=True,
         )
 
-        self.ln0 = nn.LayerNorm(query_dim) if ln else None
-        self.ln1 = nn.LayerNorm(query_dim) if ln else None
+        self.layer_norm_0 = nn.LayerNorm(query_dim) if layer_norm else None
+        self.layer_norm_1 = nn.LayerNorm(query_dim) if layer_norm else None
 
         self.fc_o = nn.Linear(query_dim, query_dim)
 
@@ -58,12 +65,12 @@ class MAB(nn.Module):
 
         # 3) First residual (q + attention), optional LayerNorm
         out = query + attn_out
-        if self.ln0 is not None:
-            out = self.ln0(out)
+        if self.layer_norm_0 is not None:
+            out = self.layer_norm_0(out)
 
         # 4) Simple FFN + residual (match original: ReLU then linear)
         out = out + F.gelu(self.fc_o(out))
-        if self.ln1 is not None:
-            out = self.ln1(out)
+        if self.layer_norm_1 is not None:
+            out = self.layer_norm_1(out)
 
         return out
