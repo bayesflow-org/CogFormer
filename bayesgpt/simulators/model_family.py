@@ -13,15 +13,22 @@ class NestedModelFamily:
         self,
         name: str,
         model: Model,
-        context_manager: ContextManager,
-        prior_fun: dict[str, Callable],
-        intrinsic_params: list[str],
+        prior_fun: dict[str, dict[str, Callable]],
+        intrinsic_params: list[str] | None = None,
+        context_manager: ContextManager | None = None,
     ):
         self.name = name
         self.model = model
-        self.context_manager = context_manager
         self.prior_fun = prior_fun
+
+        if context_manager is None:
+            context_manager = ContextManager()
+        self.context_manager = context_manager
+
+        if intrinsic_params is None:
+            intrinsic_params = list(prior_fun.keys())
         self.intrinsic_params = intrinsic_params
+
 
     @property
     def parameter_names(self) -> list[str]:
