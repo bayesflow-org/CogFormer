@@ -172,3 +172,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# wandb
+*.wandb
+*.pt
+wandb-metadata.json
+wandb-summary.json
+bayesgpt/wandb
