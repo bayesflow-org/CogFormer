@@ -58,3 +58,18 @@ class BayesGPTv1(nn.Module):
         )
 
         return decoded_mu, decoded_logvar
+
+
+    def compute_loss(self, true_params, mu, log_var, param_masks) -> torch.Tensor:
+        """
+        Heteroskedastic Gaussian NLL with masking.
+        """
+        mu = mu.squeeze(dim=-1)
+        log_var = log_var.squeeze(dim=-1)
+
+        inv_var = torch.exp(-log_var)
+        nll = 0.5 * ((true_params - mu) ** 2 * inv_var + log_var)
+
+        nll_masked = nll * param_masks
+        num_active_params = param_masks.sum(dim=-1)
+        return torch.mean(nll_masked.sum(dim=-1) / num_active_params)

@@ -19,4 +19,4 @@ class SelfAttentionBlock(nn.Module):
         )
 
     def forward(self, x, attn_mask=None, key_padding_mask=None):
-        return self.mab(x, x, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
+        return self.mab(query=x, key=x, attn_mask=attn_mask, key_padding_mask=key_padding_mask)

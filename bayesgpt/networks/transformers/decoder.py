@@ -58,9 +58,12 @@ class Decoder(nn.Module):
             attn_mask = None
 
 
-        for sab in self.layers:
-            out = sab(out, attn_mask=attn_mask)
+        for mab in self.layers:
+            out = mab(query=out, key=key, attn_mask=attn_mask)
             out = self.post_dropout(out)
+
+            if query_mask is not None:
+                out = out * query_mask[..., None]
 
         mu, log_var = self.output_proj(out).chunk(2, dim=-1)
 

@@ -25,4 +25,4 @@ class PoolingByMultiheadAttention(nn.Module):
         )
 
     def forward(self, x):
-        return self.mab(self.S.repeat(x.size(0), 1, 1), x)
+        return self.mab(self.seed.repeat(x.size(0), 1, 1), x)
