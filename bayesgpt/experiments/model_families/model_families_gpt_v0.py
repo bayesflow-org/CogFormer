@@ -23,13 +23,22 @@ class BayesGPTTrainer:
         grad_clip_norm: float | None = 5.0,
         # sampling
         sample_kwargs: dict | None = None,    # passed to model_family.batch_sample(...)
+        # validation
+        do_validation: bool = True,
+        val_every: int = 1,  # run validation every N epochs
+        val_use_fixed: bool = True,  # fixed held-out set vs re-sample
+        val_sample_kwargs: dict | None = None,  # overrides for val sampling
         # wandb
         use_wandb: bool = True,
-        wandb_project: str = "sbi-bayesgpt",
+        wandb_project: str = "bayesgpt-testing",
         wandb_run_name: str | None = None,
         wandb_tags: list[str] | None = None,
         wandb_watch_log: str = "gradients",   # "all" | "gradients" | "parameters" | None
         wandb_watch_freq: int = 200,
+        # recovery plot
+        log_scatter_every: int = 10,
+        scatter_max_points: int = 5000,
+        scatter_figsize_scale: float = 3.0,
     ):
         self.model_family = model_family
         self.adapter = adapter
@@ -50,6 +59,11 @@ class BayesGPTTrainer:
         self.epochs = epochs
         self.steps_per_epoch = steps_per_epoch
 
+        # Validation
+        self.do_validation = do_validation
+        self.val_every = val_every
+        self.val_use_fixed = val_use_fixed
+
         # sampling cfg
         self.sample_kwargs = sample_kwargs or dict(
             batch_size=batch_size,
@@ -60,6 +74,30 @@ class BayesGPTTrainer:
             num_obs=200,
             flatten_param_outputs=True,
         )
+
+        # default val sampling cfg (smaller batch OK)
+        self.val_sample_kwargs = val_sample_kwargs or dict(
+            batch_size=100,
+            mask_randomizer_kwargs=dict(
+                free_intrinsics={"v", "a", "tau", "s_v", "decay"},
+                fixed_intrinsics={"s_tau"},
+            ),
+            num_obs=200,
+            flatten_param_outputs=True,
+        )
+
+        # optional fixed validation set (synthetic but held-out)
+        self._fixed_val_adapted = None
+        if self.do_validation and self.val_use_fixed:
+            with torch.no_grad():
+                val_samples = self.model_family.batch_sample(**self.val_sample_kwargs)
+                self._fixed_val_adapted = self.adapter.adapt(
+                    val_samples, intrinsic_params=self.intrinsic_params, device=self.device
+                )
+
+        self.log_scatter_every = log_scatter_every
+        self.scatter_max_points = scatter_max_points
+        self.scatter_figsize_scale = scatter_figsize_scale
 
         # wandb
         self.use_wandb = use_wandb
@@ -127,6 +165,10 @@ class BayesGPTTrainer:
             pbar.close()
             self.scheduler.step()
 
+            # --- validation hook ---
+            if self.do_validation and ((ep + 1) % self.val_every == 0):
+                self._validate(epoch_idx=ep, global_step=global_step)
+
             if self.use_wandb:
                 wandb.log({"epoch_end/epoch": ep + 1}, step=global_step)
 
@@ -134,6 +176,187 @@ class BayesGPTTrainer:
         torch.save(self.model.state_dict(), checkpoint_path)
         if self.use_wandb:
             wandb.save(checkpoint_path)
+
+    def _validate(self, epoch_idx: int, global_step: int):
+        if not self.do_validation:
+            return
+
+        was_training = self.model.training
+        self.model.eval()
+
+        with torch.no_grad():
+            if self.val_use_fixed and (self._fixed_val_adapted is not None):
+                adapted = self._fixed_val_adapted
+            else:
+                val_samples = self.model_family.batch_sample(**self.val_sample_kwargs)
+                adapted = self.adapter.adapt(val_samples, intrinsic_params=self.intrinsic_params, device=self.device)
+
+            mu, log_var = self.model(
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+            )
+
+            # --- normalize shapes to (B, D) ---
+            def squeeze2d(t: torch.Tensor) -> torch.Tensor:
+                # remove trailing singleton if network returns (B, D, 1)
+                return t.squeeze(-1) if (t.ndim == 3 and t.shape[-1] == 1) else t
+
+            mu = squeeze2d(mu).to(torch.float32)
+            true_params = squeeze2d(adapted["param_matrices"]).to(torch.float32)
+            mask = squeeze2d(adapted["param_masks"]).to(torch.float32)
+
+            B = mu.shape[0]
+            D = mu.shape[1] if mu.ndim >= 2 else mu.numel() // B
+
+            def align_bd(x: torch.Tensor) -> torch.Tensor:
+                # Expect (B, D). Fix common issues: (D, B), (B, B), flat, etc.
+                if x.ndim == 1:  # flattened
+                    if x.numel() == B * D:
+                        return x.view(B, D)
+                if x.ndim == 2:
+                    if x.shape == (D, B):
+                        return x.t()
+                    if x.shape == (B, B) and B * B == B * D:
+                        # extremely unlikely unless D == B; keep as is otherwise
+                        pass
+                    if x.shape[0] == B and x.shape[1] != D and (x.numel() == B * D):
+                        return x.reshape(B, D)
+                    if x.shape[1] == B and x.shape[0] != D and (x.numel() == B * D):
+                        return x.t().reshape(B, D)
+                if x.ndim > 2 and x.numel() == B * D:
+                    return x.view(B, D)
+                return x  # assume already (B, D)
+
+            true_params = align_bd(true_params)
+            mask = align_bd(mask)
+
+            # final sanity check (raise a clear error if still off)
+            assert mu.shape == true_params.shape == mask.shape, (
+                f"Shape mismatch after alignment: mu{mu.shape}, true{true_params.shape}, mask{mask.shape}"
+            )
+
+            # --- masked MSE ---
+            diff = (mu - true_params) * mask
+            denom = mask.sum().clamp_min(1.0)
+            val_mse = (diff.pow(2).sum() / denom).item()
+
+            # --- masked global Pearson r (optional) ---
+            y = (true_params * mask).view(-1)
+            yhat = (mu * mask).view(-1)
+            m = (mask.view(-1) > 0.5)
+            if m.any():
+                y = y[m];
+                yhat = yhat[m]
+                y_mean = y.mean();
+                yhat_mean = yhat.mean()
+                num = ((y - y_mean) * (yhat - yhat_mean)).sum()
+                den = (y - y_mean).pow(2).sum().sqrt() * (yhat - yhat_mean).pow(2).sum().sqrt()
+                val_pearson = (num / den.clamp_min(1e-12)).item()
+            else:
+                val_pearson = float("nan")
+
+            if self.use_wandb:
+                # log metrics + debug shapes for traceability
+                wandb.log(
+                    {
+                        "val/masked_mse": val_mse,
+                        "val/pearson": val_pearson,
+                        "val/epoch": epoch_idx + 1,
+                        "val/debug/mu_shape": str(tuple(mu.shape)),
+                        "val/debug/true_shape": str(tuple(true_params.shape)),
+                        "val/debug/mask_shape": str(tuple(mask.shape)),
+                    },
+                    step=global_step,
+                )
+
+            # recovery scatter (periodic)
+            if self.use_wandb and self.log_scatter_every and ((epoch_idx + 1) % self.log_scatter_every == 0):
+                self._log_recovery_plot(mu, true_params, mask, epoch_idx, global_step)
+
+        if was_training:
+            self.model.train()
+
+    def _log_recovery_plot(
+        self,
+        mu: torch.Tensor,
+        true_params: torch.Tensor,
+        mask: torch.Tensor,
+        epoch_idx: int,
+        global_step: int,
+    ):
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # (B, D) — squeeze optional trailing dim
+        def squeeze2d(t):
+            return t.squeeze(-1) if t.ndim == 3 and t.shape[-1] == 1 else t
+        mu = squeeze2d(mu).detach().cpu()
+        true_params = squeeze2d(true_params).detach().cpu()
+        mask = squeeze2d(mask).detach().cpu()
+
+        B, D = mu.shape
+        P = len(self.intrinsic_params)  # number of intrinsic parameters
+
+        # Build per-parameter index slices: [i, i+P, i+2P, ...]
+        per_param_indices = [np.arange(i, D, P) for i in range(P)]
+
+        fig, axes = plt.subplots(
+            1, P, figsize=(self.scatter_figsize_scale * P, self.scatter_figsize_scale),
+            squeeze=False
+        )
+        axes = axes[0]
+
+        for i, ax in enumerate(axes):
+            cols = per_param_indices[i]
+            y_true = true_params[:, cols]
+            y_pred = mu[:, cols]
+            m = mask[:, cols] > 0.5  # only real (non-padded) entries
+
+            if m.sum().item() == 0:
+                ax.set_title(f"{self.intrinsic_params[i]} (no data)")
+                ax.axis("off")
+                continue
+
+            # collect masked values
+            yt = y_true[m]
+            yp = y_pred[m]
+
+            # subsample for readability
+            if yt.numel() > self.scatter_max_points:
+                idx = torch.randperm(yt.numel())[: self.scatter_max_points]
+                yt = yt[idx]
+                yp = yp[idx]
+
+            yt_np = yt.numpy()
+            yp_np = yp.numpy()
+
+            # scatter
+            ax.scatter(yt_np, yp_np, s=6, alpha=0.6)
+
+            # quadratic axes + y=x line
+            lo = float(min(yt_np.min(), yp_np.min()))
+            hi = float(max(yt_np.max(), yp_np.max()))
+            eps = (hi - lo) * 0.1 if hi > lo else 1.0
+            ax.set_xlim(lo - eps, hi + eps)
+            ax.set_ylim(lo - eps, hi + eps)
+            ax.plot([lo - eps, hi + eps], [lo - eps, hi + eps], linestyle="--", linewidth=1.0)
+
+            ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.3)
+            ax.set_xlabel("Ground Truth")
+            if i == 0:
+                ax.set_ylabel("Estimation")
+            ax.set_title(self.intrinsic_params[i])
+
+        fig.tight_layout()
+
+        if self.use_wandb:
+            wandb.log(
+                {"fig/recovery": wandb.Image(fig), "fig/epoch": epoch_idx + 1},
+                step=global_step,
+            )
+        plt.close(fig)
 
     def finish(self):
         if self.use_wandb and self.wandb_run is not None:
@@ -149,12 +372,20 @@ if __name__ == "__main__":
     from networks.transformers.gpt import BayesGPTv1
 
     ddm_priors = {
-        "v": {"intercept": lambda: np.random.gamma(3.0, 0.8), "slope": lambda: np.random.normal(0.0, 3.0)},
-        "a": {"intercept": lambda: np.random.gamma(10.0, 0.3), "slope": lambda: np.random.normal(0.0, 1.0)},
-        "tau": {"intercept": lambda: np.random.gamma(3.0, 0.2), "slope": lambda: 0.0},
-        "s_v": {"intercept": lambda: np.random.gamma(1.0, 0.2), "slope": lambda: 0.0},
-        "s_tau": {"intercept": lambda: np.random.uniform(0.0, 0.4), "slope": lambda: 0.0},
-        "decay": {"intercept": lambda: np.random.gamma(1.0, 0.4), "slope": lambda: 0.0},
+        "v":        {"intercept": lambda: np.random.gamma(1.5, 0.5),
+                     "slope": lambda: 0.0},
+                     # "slope": lambda: np.random.normal(0.0, 3.0)},
+        "a":        {"intercept": lambda: np.random.gamma(10.0, 0.3),
+                     "slope": lambda: 0.0},
+                     # "slope": lambda: np.random.normal(0.0, 1.0)},
+        "tau":      {"intercept": lambda: np.random.gamma(3.0, 0.2),
+                     "slope": lambda: 0.0},
+        "s_v":      {"intercept": lambda: np.random.gamma(1.0, 0.2),
+                     "slope": lambda: 0.0},
+        "s_tau":    {"intercept": lambda: np.random.uniform(0.0, 0.4),
+                     "slope": lambda: 0.0},
+        "decay":    {"intercept": lambda: np.random.gamma(1.0, 0.4),
+                     "slope": lambda: 0.0},
     }
 
     model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_priors)
@@ -166,7 +397,7 @@ if __name__ == "__main__":
         net_cls=BayesGPTv1,
         net_kwargs=dict(encoder_num_layers=4, decoder_num_layers=4, seed_dim=64, num_seeds=10),
         batch_size=32,
-        epochs=200,
+        epochs=100,
         steps_per_epoch=500,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
