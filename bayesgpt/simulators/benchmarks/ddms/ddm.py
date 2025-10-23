@@ -14,7 +14,7 @@ def simulate_ddm_trial(
     z: float = 0.5,
     sigma: float = 1.0,
     dt: float = 0.001,
-    max_steps: int = 100000,
+    max_steps: int = 10000,
 ) -> (float, float):
 
     v_i = np.random.normal(v, s_v)
