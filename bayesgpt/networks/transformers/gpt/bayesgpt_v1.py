@@ -8,7 +8,7 @@ class BayesGPTv1(nn.Module):
 
     def __init__(
         self,
-        encoder_input_dim: int = 32,
+        encoder_input_dim: int = 17,
         decoder_input_dim: int = 2,
         proj_dim: int = 64,
         encoder_num_layers: int = 3,
