@@ -11,7 +11,7 @@ def simulate_ddm_trial(
     s_tau: float,
     s_v: float,
     decay: float,
-    z: float = 0.5,
+    z: float = 0.0,
     sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000,
@@ -104,3 +104,13 @@ class DDM(Model):
         rts = results[:, 0][..., None]
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
+
+    def sample(self, batch_size: int, params: dict[str, np.ndarray], context=None):
+        rts = []
+        choices = []
+        for i in range(batch_size):
+            results = self.simulate(params=params, context=context)
+            rts.append(results["rts"])
+            choices.append(results["choices"])
+
+        return {"rts": np.array(rts), "choices": np.array(choices)}
