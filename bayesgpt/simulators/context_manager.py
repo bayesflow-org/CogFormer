@@ -10,7 +10,7 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
-        max_num_regressors: int = 10,
+        max_num_regressors: int = 5,
         max_num_categories: int = 5,
         keep_intercept: bool = False
     ) -> np.ndarray:
@@ -93,7 +93,7 @@ class ContextManager:
         self,
         intrinsic_params: list[str],
         num_regressors: int,
-        max_num_regressors: int = 10,
+        max_num_regressors: int = 5,
         max_num_categories: int = 4,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
@@ -152,7 +152,7 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         num_obs: int,
-        max_num_regressors: int = 10,
+        max_num_regressors: int = 5,
         context: dict[str, np.ndarray] | None = None,
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
