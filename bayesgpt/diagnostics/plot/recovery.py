@@ -4,7 +4,13 @@ import seaborn as sns
 
 from bayesgpt.utils.plot_utils import make_quadratic
 
-def recovery(true: np.ndarray, pred: np.ndarray, params: list[str], color: str = "#000787", figsize: tuple = None):
+def recovery(
+    true: np.ndarray,
+    pred: np.ndarray,
+    params: list[str],
+    color: str = "#000787",
+    figsize: tuple = None
+):
 
     num_params = len(params)
 
@@ -14,7 +20,7 @@ def recovery(true: np.ndarray, pred: np.ndarray, params: list[str], color: str =
     f, axarr = plt.subplots(1, num_params, figsize=figsize)
 
     for i, ax in enumerate(axarr.flatten()):
-        sns.scatterplot(x=true[:, i], y=pred[:, i], ax=ax, color="#000787")
+        sns.scatterplot(x=true[:, i], y=pred[:, i], ax=ax, color=color)
 
         make_quadratic(ax, true[:, i], pred[:, i])
 
