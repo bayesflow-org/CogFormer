@@ -92,11 +92,11 @@ def sample_ddm_priors() -> np.ndarray:
     s_tau       = np.random.uniform(0.0, tau * 2.0)
     return np.array([v_intercept, v_slope, s_v, a_intercept, a_slope, decay, tau, s_tau], dtype=np.float32)
 
-def sample_ddm_baseline_priors():
+def sample_ddm_baseline_priors(flat_bound: bool = True):
     return {
         "v":     np.random.gamma(1.5, 0.5),
         "a":     np.random.gamma(8.0, 0.2),
-        "decay": np.random.gamma(1.0, 0.4),
+        "decay": 0.0 if flat_bound else np.random.gamma(1.0, 0.4),
         "tau":   np.random.gamma(3.0, 0.2),
         "s_v":   np.random.gamma(1.0, 0.2),
         "s_tau": np.random.uniform(0.0, 0.4),
