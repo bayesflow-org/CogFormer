@@ -81,7 +81,7 @@ def simulate_ddm(
     return sim_data
 
 @njit
-def sample_ddm_prior():
+def sample_ddm_priors() -> np.ndarray:
     v_intercept = np.random.gamma(3.0, 0.8)
     v_slope     = np.random.normal(0.0, 3.0)
     s_v         = np.random.gamma(1.0, 0.2)
@@ -91,6 +91,17 @@ def sample_ddm_prior():
     tau         = np.random.gamma(3.0, 0.2)
     s_tau       = np.random.uniform(0.0, tau * 2.0)
     return np.array([v_intercept, v_slope, s_v, a_intercept, a_slope, decay, tau, s_tau], dtype=np.float32)
+
+def sample_ddm_baseline_priors():
+    return {
+        "v":     np.random.gamma(1.5, 0.5),
+        "a":     np.random.gamma(8.0, 0.2),
+        "decay": np.random.gamma(1.0, 0.4),
+        "tau":   np.random.gamma(3.0, 0.2),
+        "s_v":   np.random.gamma(1.0, 0.2),
+        "s_tau": np.random.uniform(0.0, 0.4),
+    }
+
 
 
 class DDM(Model):
@@ -105,12 +116,21 @@ class DDM(Model):
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
 
-    def sample(self, batch_size: int, params: dict[str, np.ndarray], context=None):
+    def sample(self, batch_size: int, num_obs: int = 200, context=None):
         rts = []
         choices = []
+        prior_draws = sample_ddm_baseline_priors()
+        for k, v in prior_draws.items():
+            prior_draws[k] = np.zeros((batch_size, 1), dtype=np.float32)
+
         for i in range(batch_size):
-            results = self.simulate(params=params, context=context)
+            priors = sample_ddm_baseline_priors()
+            for k, v in priors.items():
+                prior_draws[k][i] = v
+                priors[k] = np.full(num_obs, v)
+            results = self.simulate(params=priors, context=context)
             rts.append(results["rts"])
             choices.append(results["choices"])
 
-        return {"rts": np.array(rts), "choices": np.array(choices)}
+        sim_data = {"rts": np.array(rts), "choices": np.array(choices)}
+        return prior_draws | sim_data
