@@ -8,9 +8,9 @@ def simulate_ddm_trial(
     v: float,
     a: float,
     tau: float,
-    s_tau: float,
     s_v: float,
-    decay: float,
+    s_tau: float,
+    decay: float = 0.0,
     z: float = 0.0,
     sigma: float = 1.0,
     dt: float = 0.001,
@@ -51,8 +51,8 @@ def simulate_ddm(
     v: np.ndarray,
     a: np.ndarray,
     tau: np.ndarray,
-    s_tau: np.ndarray,
     s_v: np.ndarray,
+    s_tau: np.ndarray,
     decay: np.ndarray,
     z: float = 0.5,
     sigma: float = 1.0,
@@ -62,6 +62,7 @@ def simulate_ddm(
 
     n = v.shape[0]
     sim_data = np.zeros((n, 2), dtype=np.float32)
+
 
     for i in prange(n):
         sim_trial = simulate_ddm_trial(
