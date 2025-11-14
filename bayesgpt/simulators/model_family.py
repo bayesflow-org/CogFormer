@@ -168,7 +168,6 @@ class NestedModelFamily:
         else:
             num_regressors_array = np.full(batch_size, num_regressors)
 
-
         # Initialize batch and keep track of the maximum num_obs
         list_batch = []
 
