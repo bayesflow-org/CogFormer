@@ -25,7 +25,7 @@ def sample_rdm_trial(
         for i in range(num_alternatives):
             X[i] += v[i] * dt + noise[i]
             if X[i] >= threshold[i_iter]:
-                return np.array([np.float32(tau + i_iter * dt), np.float32(i)])
+                return np.array([tau + i_iter * dt, i], dtype=np.float32)
     # No decision within max_steps
     return np.array([-1.0, -1.0], dtype=np.float32)
 
