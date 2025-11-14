@@ -3,6 +3,10 @@ from typing import Callable
 
 
 class ContextManager:
+    """
+    Utility class for constructing design configurations, parameter masks,
+    design matrices, and sampled parameter matrices for NestedModelFamily.
+    """
     def __init__(self, parameter_names: list[str] = None):
         self.parameter_names = parameter_names or []
 
@@ -14,7 +18,10 @@ class ContextManager:
         max_num_categories: int = 5,
         keep_intercept: bool = False
     ) -> np.ndarray:
-
+        """
+        Convert a design_config dict into a binary parameter mask mapping
+        regressors (rows) to intrinsic parameters (columns).
+        """
         regressor_keys = list(design_config.keys())
         has_intercept = ("1" in regressor_keys) and keep_intercept
         regressor_keys = [k for k in regressor_keys if k != "1"]
@@ -59,7 +66,10 @@ class ContextManager:
         free_prob: float = 0.5,
         intercept_prob: float = 0.5
     ) -> dict[str, list[str]]:
-
+        """
+        Randomly build a design_config mapping regressors and optional intercept
+        to subsets of intrinsic parameters.
+        """
         # Set up mandatory and intercept only params based on free and fixed intrinsics
         mandatory = set(free_intrinsics or [])
         intercept_only = set(fixed_intrinsics or [])
@@ -100,7 +110,9 @@ class ContextManager:
         free_prob: float = 0.5,     # Probability of a param being free
         keep_intercept: bool = False
     ) -> tuple:
-
+        """
+        Randomly generate both a design_config and its corresponding parameter mask.
+        """
         design_config = self.build_random_design_config(
             intrinsic_params=intrinsic_params,
             num_regressors=num_regressors,
