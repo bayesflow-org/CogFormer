@@ -53,7 +53,6 @@ def simulate_ddm(
     tau: np.ndarray,
     s_v: np.ndarray,
     s_tau: np.ndarray,
-    decay: np.ndarray,
     z: float = 0.5,
     sigma: float = 1.0,
     dt: float = 0.001,
@@ -71,7 +70,6 @@ def simulate_ddm(
             tau=tau[i],
             s_tau=s_tau[i],
             s_v=s_v[i],
-            decay=decay[i],
             z=z,
             sigma=sigma,
             dt=dt,
@@ -102,7 +100,6 @@ def sample_ddm_baseline_priors(flat_bound: bool = True):
         "s_v":   np.random.gamma(1.0, 0.2),
         "s_tau": np.random.uniform(0.0, 0.4),
     }
-
 
 
 class DDM(Model):
