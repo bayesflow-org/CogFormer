@@ -1,9 +1,13 @@
 import time
 import torch
+import wandb
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import tqdm
-import wandb
+
+from networks.loss import mse_loss
+
+
 
 class BayesGPTTrainer:
     """Minimal end-to-end trainer with optional Weights & Biases logging."""
@@ -17,8 +21,8 @@ class BayesGPTTrainer:
         device: torch.device | None = None,
         # training
         batch_size: int = 32,
-        epochs: int = 200,
-        steps_per_epoch: int = 500,
+        epochs: int = 100,
+        steps_per_epoch: int = 100,
         learning_rate: float = 2e-4,
         grad_clip_norm: float | None = 5.0,
         # sampling
@@ -68,10 +72,10 @@ class BayesGPTTrainer:
         self.sample_kwargs = sample_kwargs or dict(
             batch_size=batch_size,
             mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v", "decay"},
+                free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"},
             ),
-            num_obs=200,
+            num_obs=1000,
             flatten_param_outputs=True,
         )
 
@@ -79,10 +83,10 @@ class BayesGPTTrainer:
         self.val_sample_kwargs = val_sample_kwargs or dict(
             batch_size=100,
             mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v", "decay"},
+                free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"},
             ),
-            num_obs=200,
+            num_obs=1000,
             flatten_param_outputs=True,
         )
 
@@ -133,7 +137,7 @@ class BayesGPTTrainer:
             adapted["regressor_indices"],
             adapted["param_masks"],
         )
-        loss = self.model.compute_loss(adapted["param_matrices"], mu, log_var, adapted["param_masks"])
+        loss = mse_loss(adapted["param_matrices"], mu, log_var, adapted["param_masks"])
         loss.backward()
 
         if self.grad_clip_norm is not None:
@@ -247,9 +251,9 @@ class BayesGPTTrainer:
             yhat = (mu * mask).view(-1)
             m = (mask.view(-1) > 0.5)
             if m.any():
-                y = y[m];
+                y = y[m]
                 yhat = yhat[m]
-                y_mean = y.mean();
+                y_mean = y.mean()
                 yhat_mean = yhat.mean()
                 num = ((y - y_mean) * (yhat - yhat_mean)).sum()
                 den = (y - y_mean).pow(2).sum().sqrt() * (yhat - yhat_mean).pow(2).sum().sqrt()
@@ -378,8 +382,8 @@ if __name__ == "__main__":
         "a":        {"intercept": lambda: np.random.gamma(10.0, 0.3),
                      "slope": lambda: 0.0},
                      # "slope": lambda: np.random.normal(0.0, 1.0)},
-        "decay":    {"intercept": lambda: 0.0, # np.random.gamma(1.0, 0.4),
-                     "slope": lambda: 0.0},
+        # "decay":    {"intercept": lambda: 0.0, # np.random.gamma(1.0, 0.4),
+        #              "slope": lambda: 0.0},
         "tau":      {"intercept": lambda: np.random.gamma(3.0, 0.2),
                      "slope": lambda: 0.0},
         "s_v":      {"intercept": lambda: np.random.gamma(1.0, 0.2),
@@ -397,8 +401,8 @@ if __name__ == "__main__":
         net_cls=BayesGPTv1,
         net_kwargs=dict(encoder_num_layers=4, decoder_num_layers=4, seed_dim=32, num_seeds=10),
         batch_size=32,
-        epochs=500,
-        steps_per_epoch=500,
+        epochs=100,
+        steps_per_epoch=100,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
         # sample_kwargs can override defaults if you want
