@@ -98,11 +98,11 @@ class RDM(Model):
         if num_alternatives < 1:
             raise ValueError("num_alternatives must be >= 1.")
 
-        v_base = as_1d(params["v"], "v")
-        v_diff = as_1d(params["v_diff"], "v_diff")
-        a      = as_1d(params["a"], "a")
-        tau    = as_1d(params["tau"], "tau")
-        decay  = as_1d(params["decay"], "decay")
+        v_base = as_1d(params["v"], num_obs)
+        v_diff = as_1d(params["v_diff"], num_obs)
+        a      = as_1d(params["a"], num_obs)
+        tau    = as_1d(params["tau"], num_obs)
+        decay  = as_1d(params["decay"], num_obs)
 
 
         # Build per-trial K-vector drift
