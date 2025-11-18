@@ -143,8 +143,8 @@ class Adapter:
 
     @staticmethod
     def build_token_embeddings(
-        regressor_indices: np.ndarray,
-        parameter_indices: np.ndarray,
+        regressor_indices: np.ndarray | torch.Tensor,
+        parameter_indices: np.ndarray | torch.Tensor,
         additional_tokens: np.ndarray
     ):
         regressor_indices = np.atleast_2d(regressor_indices)
