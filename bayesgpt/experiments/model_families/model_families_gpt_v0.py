@@ -50,7 +50,7 @@ class BayesGPTTrainer:
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # network
-        net_kwargs = net_kwargs or dict(encoder_num_layers=4, decoder_num_layers=4, seed_dim=64, num_seeds=10)
+        self.net_kwargs = net_kwargs
         self.model = net_cls(**net_kwargs).to(self.device).train()
 
         # optim/sched
@@ -72,21 +72,21 @@ class BayesGPTTrainer:
         self.sample_kwargs = sample_kwargs or dict(
             batch_size=batch_size,
             mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v"},
-                fixed_intrinsics={"s_tau"},
+                free_intrinsics={"v", "a", "tau", "s_v", "s_tau"},
+                fixed_intrinsics={},
             ),
-            num_obs=1000,
+            num_obs=500,
             flatten_param_outputs=True,
         )
 
         # default val sampling cfg (smaller batch OK)
         self.val_sample_kwargs = val_sample_kwargs or dict(
-            batch_size=100,
+            batch_size=300,
             mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v"},
-                fixed_intrinsics={"s_tau"},
+                free_intrinsics={"v", "a", "tau", "s_v", "s_tau"},
+                fixed_intrinsics={},
             ),
-            num_obs=1000,
+            num_obs=500,
             flatten_param_outputs=True,
         )
 
@@ -169,14 +169,12 @@ class BayesGPTTrainer:
             pbar.close()
             self.scheduler.step()
 
-            # --- validation hook ---
             if self.do_validation and ((ep + 1) % self.val_every == 0):
                 self._validate(epoch_idx=ep, global_step=global_step)
 
             if self.use_wandb:
                 wandb.log({"epoch_end/epoch": ep + 1}, step=global_step)
 
-        # save + upload
         torch.save(self.model.state_dict(), checkpoint_path)
         if self.use_wandb:
             wandb.save(checkpoint_path)
@@ -241,12 +239,10 @@ class BayesGPTTrainer:
                 f"Shape mismatch after alignment: mu{mu.shape}, true{true_params.shape}, mask{mask.shape}"
             )
 
-            # --- masked MSE ---
             diff = (mu - true_params) * mask
             denom = mask.sum().clamp_min(1.0)
             val_mse = (diff.pow(2).sum() / denom).item()
 
-            # --- masked global Pearson r (optional) ---
             y = (true_params * mask).view(-1)
             yhat = (mu * mask).view(-1)
             m = (mask.view(-1) > 0.5)
@@ -375,34 +371,42 @@ if __name__ == "__main__":
     from adapters import Adapter
     from networks.transformers.gpt import BayesGPTv1
 
-    ddm_priors = {
-        "v":        {"intercept": lambda: np.random.gamma(1.5, 0.5),
-                     "slope": lambda: 0.0},
-                     # "slope": lambda: np.random.normal(0.0, 3.0)},
-        "a":        {"intercept": lambda: np.random.gamma(10.0, 0.3),
-                     "slope": lambda: 0.0},
-                     # "slope": lambda: np.random.normal(0.0, 1.0)},
-        # "decay":    {"intercept": lambda: 0.0, # np.random.gamma(1.0, 0.4),
-        #              "slope": lambda: 0.0},
-        "tau":      {"intercept": lambda: np.random.gamma(3.0, 0.2),
-                     "slope": lambda: 0.0},
-        "s_v":      {"intercept": lambda: np.random.gamma(1.0, 0.2),
-                     "slope": lambda: 0.0},
-        "s_tau":    {"intercept": lambda: np.random.uniform(0.0, 0.4),
-                     "slope": lambda: 0.0},
+    ddm_log_priors = {
+        "v": {"intercept": lambda: np.random.normal(0., 1.),
+              "slope": lambda: 0.0},
+        "a": {"intercept": lambda: np.random.normal(0, 0.05),
+              "slope": lambda: 0.0},
+        "tau": {"intercept": lambda: np.random.normal(-1.0, 0.3),
+                "slope": lambda: 0.0},
+        "s_v": {"intercept": lambda: np.random.normal(-1.2, 0.5),
+                "slope": lambda: 0.0},
+        "s_tau": {"intercept": lambda: np.random.beta(1.0, 3.0),
+                  "slope": lambda: 0.0}
     }
 
-    model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_priors)
+    net_kwargs = {
+        "encoder_num_layers": 8,
+        "decoder_num_layers": 8,
+        "encoder_num_heads": 8,
+        "decoder_num_heads": 8,
+        "num_seeds": 40,
+        "seed_dim": 128,
+        "proj_dim": 64,
+        "dropout": 0.1,
+        "layer_dropout": 0.1,
+    }
+
+    model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_log_priors)
     adapter = Adapter()
 
     trainer = BayesGPTTrainer(
         model_family=model_family,
         adapter=adapter,
         net_cls=BayesGPTv1,
-        net_kwargs=dict(encoder_num_layers=4, decoder_num_layers=4, seed_dim=32, num_seeds=10),
+        net_kwargs=net_kwargs,
         batch_size=32,
-        epochs=100,
-        steps_per_epoch=100,
+        epochs=200,
+        steps_per_epoch=200,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
         # sample_kwargs can override defaults if you want
@@ -414,5 +418,5 @@ if __name__ == "__main__":
         wandb_watch_freq=200,
     )
 
-    trainer.train(checkpoint_path="bayesgpt_ddm.pt")
+    trainer.train(checkpoint_path="bayesgpt_ddm_8l_8h_40s_100.pt")
     trainer.finish()
