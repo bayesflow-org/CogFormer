@@ -125,7 +125,7 @@ class BayesGPTTrainer:
             if wandb_watch_log:
                 wandb.watch(self.model, log=wandb_watch_log, log_freq=wandb_watch_freq)
 
-    def _step(self, global_step: int, epoch_idx: int):
+    def step(self, global_step: int, epoch_idx: int):
         samples = self.model_family.batch_sample(**self.sample_kwargs)
         adapted = self.adapter.adapt(samples, intrinsic_params=self.intrinsic_params, device=self.device)
 
@@ -163,7 +163,7 @@ class BayesGPTTrainer:
             pbar = tqdm(total=self.steps_per_epoch, desc=f"Epoch {ep + 1}/{self.epochs}", miniters=100)
             for _ in range(self.steps_per_epoch):
                 global_step += 1
-                loss_val, lr = self._step(global_step, ep)
+                loss_val, lr = self.step(global_step, ep)
                 pbar.set_postfix(loss=f"{loss_val:.4f}", lr=f"{lr:.2e}")
                 pbar.update(1)
             pbar.close()
@@ -297,13 +297,13 @@ class BayesGPTTrainer:
         mask = squeeze2d(mask).detach().cpu()
 
         B, D = mu.shape
-        P = len(self.intrinsic_params)  # number of intrinsic parameters
+        num_intrinsic_params = len(self.intrinsic_params)  # number of intrinsic parameters
 
         # Build per-parameter index slices: [i, i+P, i+2P, ...]
-        per_param_indices = [np.arange(i, D, P) for i in range(P)]
+        per_param_indices = [np.arange(i, D, num_intrinsic_params) for i in range(num_intrinsic_params)]
 
         fig, axes = plt.subplots(
-            1, P, figsize=(self.scatter_figsize_scale * P, self.scatter_figsize_scale),
+            1, num_intrinsic_params, figsize=(self.scatter_figsize_scale * num_intrinsic_params, self.scatter_figsize_scale),
             squeeze=False
         )
         axes = axes[0]
@@ -353,7 +353,10 @@ class BayesGPTTrainer:
 
         if self.use_wandb:
             wandb.log(
-                {"fig/recovery": wandb.Image(fig), "fig/epoch": epoch_idx + 1},
+            {
+                "fig/recovery": wandb.Image(fig),
+                "fig/epoch": epoch_idx + 1
+            },
                 step=global_step,
             )
         plt.close(fig)
