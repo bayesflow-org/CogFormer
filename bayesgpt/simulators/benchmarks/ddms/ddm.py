@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit, prange
 from simulators import Model
+from scipy.stats import halfnorm
 
 
 @njit
@@ -21,7 +22,7 @@ def simulate_ddm_trial(
     if log_transform:
         a = np.exp(a)
         tau = np.exp(tau)
-        s_v = np.exp(s_v)
+        # s_v = np.exp(s_v)
 
     v_i = np.random.normal(v, s_v)
 
@@ -81,13 +82,14 @@ def simulate_ddm(
     return sim_data
 
 def sample_ddm_baseline_priors():
-    return {
-        "v":     np.random.gamma(1.5, 0.5),
-        "a":     np.random.gamma(8.0, 0.2),
+    return{
+        "v":     np.random.gamma(2., 1.),
+        # "v":     np.random.normal(1., 1.),
+        "a":     np.random.normal(-.1, 0.3),
         # "decay": 0.0 if flat_bound else np.random.gamma(1.0, 0.4),
-        "tau":   np.random.gamma(3.0, 0.2),
-        "s_v":   np.random.gamma(1.0, 0.2),
-        "s_tau": np.random.uniform(0.0, 0.4),
+        "tau":   np.random.normal(-1.5, 0.3),
+        "s_v":   halfnorm.rvs(loc=0.0, scale=1.0, size=1),
+        "s_tau": np.random.beta(1.0, 3.0),
     }
 
 class DDM(Model):
