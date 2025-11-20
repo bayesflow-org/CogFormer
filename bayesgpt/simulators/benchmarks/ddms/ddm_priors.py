@@ -38,14 +38,15 @@ def ddm_priors():
 
 def ddm_log_priors():
     return {
-        "v":        {"intercept": lambda: np.random.gamma(2.5, 0.5),
+        "v":        {"intercept": lambda: np.random.gamma(2., 1.),
                      "slope": lambda: 0.0},
-        "a":        {"intercept": lambda: np.random.normal(0, 0.05),
+        "a":        {"intercept": lambda: np.random.normal(-1, 0.3),
                      "slope": lambda: 0.0},
-        "tau":      {"intercept": lambda: np.random.normal(-1.0, 0.3),
+        "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
                      "slope": lambda: 0.0},
-        "s_v":      {"intercept": lambda: np.random.normal(-1.2, 0.5),
+        "s_v":      {"intercept": lambda: halfnorm(loc=0.0, scale=1.0),
                      "slope": lambda: 0.0},
-        "s_tau":    {"intercept": lambda: np.random.normal(0.5, 0.2),
+        "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
                      "slope": lambda: 0.0}
     }
+

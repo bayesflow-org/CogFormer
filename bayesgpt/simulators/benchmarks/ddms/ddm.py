@@ -88,7 +88,7 @@ def sample_ddm_baseline_priors():
         "a":     np.random.normal(-.1, 0.3),
         # "decay": 0.0 if flat_bound else np.random.gamma(1.0, 0.4),
         "tau":   np.random.normal(-1.5, 0.3),
-        "s_v":   halfnorm.rvs(loc=0.0, scale=1.0, size=1),
+        "s_v":   halfnorm.rvs(loc=0.0, scale=1.0),
         "s_tau": np.random.beta(1.0, 3.0),
     }
 
