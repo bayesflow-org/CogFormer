@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from tqdm.auto import tqdm
 
 from networks.loss import mse_loss
+from scipy.stats import halfnorm
 
 
 
@@ -375,16 +376,16 @@ if __name__ == "__main__":
     from networks.transformers.gpt import BayesGPTv1
 
     ddm_log_priors = {
-        "v": {"intercept": lambda: np.random.normal(1., 1.),
-              "slope": lambda: 0.0},
-        "a": {"intercept": lambda: np.random.normal(-0.1, 0.3),
-              "slope": lambda: 0.0},
-        "tau": {"intercept": lambda: np.random.normal(-1.5, 0.3),
-                "slope": lambda: 0.0},
-        "s_v": {"intercept": lambda: np.random.normal(-1.2, 0.5),
-                "slope": lambda: 0.0},
-        "s_tau": {"intercept": lambda: np.random.beta(1.0, 3.0),
-                  "slope": lambda: 0.0}
+        "v":        {"intercept": lambda: np.random.gamma(2., 1.),
+                     "slope": lambda: 0.0},
+        "a":        {"intercept": lambda: np.random.normal(-1, 0.3),
+                     "slope": lambda: 0.0},
+        "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
+                     "slope": lambda: 0.0},
+        "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
+                     "slope": lambda: 0.0},
+        "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
+                     "slope": lambda: 0.0}
     }
 
     net_kwargs = {
