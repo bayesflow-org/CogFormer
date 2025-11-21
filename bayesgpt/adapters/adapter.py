@@ -191,9 +191,10 @@ class Adapter:
     ) -> dict:
         # Fetch inputs from samples and adapt
         design_matrices = samples["design_matrices"]
-        batch_size = design_matrices.shape[0]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
+
+        batch_size, max_num_obs, max_num_cols = design_matrices.shape
 
         input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
         input_data = Adapter.to_torch_tensor(input_data).to(torch.float32)
@@ -248,3 +249,65 @@ class Adapter:
         }
 
         return Adapter.to_device(out, device)
+
+    @staticmethod
+    def adapt_v2(
+            samples: dict,
+            intrinsic_params: list[str],
+            device: str | torch.device = torch.device("cuda"),
+    ) -> dict:
+        # Unpack
+        design = samples["design_matrices"].astype(np.float32)  # (B, T, C)
+        param_masks = (samples["param_masks"] > 0.5).astype(np.float32)
+        param_matrices = samples["param_matrices"].astype(np.float32)
+
+        batch_size, max_obs, max_cols = design.shape
+        block = samples["max_num_categories"] - 1
+        keep_intercept = "keep_intercept" in samples and samples["keep_intercept"]
+
+        # === 1. Build regressor_id per column (0 = intercept, 1..N = regressors) ===
+        regressor_id = np.zeros((batch_size, max_cols), dtype=np.float32)
+        col = 0
+        if keep_intercept:
+            regressor_id[:, col] = 0.0
+            col += 1
+        for r in range(samples["max_num_regressors"]):
+            regressor_id[:, col:col + block] = r + 1
+            col += block
+
+        # Broadcast to (B, T, C)
+        regressor_id = regressor_id[:, np.newaxis, :]  # (B,1,C)
+        regressor_id = np.broadcast_to(regressor_id, (batch_size, max_obs, max_cols))
+
+        # 2. Encoder input: [design_value, regressor_id]
+        encoder_input = np.stack([design, regressor_id], axis=-1)  # (B,T,C,2)
+
+        # 3. Decoder query inputs (exactly what BayesGPTv1.forward expects)
+        num_params = len(intrinsic_params)
+        param_idx = np.arange(num_params, dtype=np.float32)  # (P,)
+        param_idx = np.tile(param_idx, max_cols)  # (C*P,)
+        param_idx = param_idx.reshape(max_cols, num_params)  # (C, P)
+
+        # Regressor index per column (same for all parameters)
+        reg_idx_per_col = regressor_id[0, 0]  # (C,)
+        reg_idx = np.repeat(reg_idx_per_col, num_params)  # (C*P,)
+
+        # Build final tensors
+        param_indices = torch.from_numpy(param_idx).unsqueeze(0).to(device)  # (1, C, P)
+        regressor_indices = torch.from_numpy(reg_idx).reshape(1, max_cols, num_params).to(device)  # (1, C, P)
+
+        # Expand to full batch+trial dim
+        param_indices = param_indices.expand(batch_size, -1, -1)
+        regressor_indices = regressor_indices.expand(batch_size, -1, -1)
+
+        # 4. Final batch
+        out = {
+            "input_data": torch.from_numpy(encoder_input).to(device),  # (B,T,C,2)
+            "param_indices": param_indices,  # (B, C, P)
+            "regressor_indices": regressor_indices,  # (B, C, P)
+            "params_mask": torch.from_numpy(param_masks).to(device),  # (B, C*P) or (B, C, P)
+            "target_mu": torch.from_numpy(param_matrices).to(device),
+            "rts": torch.from_numpy(samples["sim_data"]["rts"]).to(device),
+            "choices": torch.from_numpy(samples["sim_data"]["choices"]).to(device),
+        }
+        return out
