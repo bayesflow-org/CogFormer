@@ -256,18 +256,23 @@ class Adapter:
         intrinsic_params: list[str],
         device: str | torch.device = torch.device("cuda"),
     ) -> dict:
-        # Unpack (B, T, C)
-        design = samples["design_matrices"].astype(np.float32)
-        param_masks_np = (samples["param_masks"] > 0.5).astype(np.float32)
-        param_mats_np  = samples["param_matrices"].astype(np.float32)
+        # Fetch inputs from samples and adapt
+        design_matrices = samples["design_matrices"]
+        rts = samples["sim_data"]["rts"]
+        choices = samples["sim_data"]["choices"]
 
-        B, T, C = design.shape
-        P = len(intrinsic_params)
+        batch_size, max_num_obs, max_num_cols = design_matrices.shape
+
+        input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
+        input_data = Adapter.to_torch_tensor(input_data).to(torch.float32)
+
+        # TODO - This is very, very wrong
+        num_params = len(intrinsic_params)
         block = samples["max_num_categories"] - 1
-        keep_intercept = samples.get("keep_intercept", False)
+        keep_intercept = samples.get("keep_intercept", True)
 
         # regressor_id per column (B, C) with 0=intercept, 1..R
-        regressor_id = np.zeros((B, C), dtype=np.float32)
+        regressor_id = np.zeros((batch_size, max_num_cols), dtype=np.float32)
         col = 0
         if keep_intercept:
             regressor_id[:, col] = 0.0
@@ -277,37 +282,35 @@ class Adapter:
             col += block
 
         # Broadcast to encoder time dimension: (B, T, C)
-        regressor_id_3d = np.broadcast_to(regressor_id[:, None, :], (B, T, C))
+        regressor_id_3d = np.broadcast_to(regressor_id[:, None, :], (batch_size, max_num_obs, max_num_cols))
 
-        encoder_input = np.stack([design, regressor_id_3d], axis=-1).astype(np.float32)
+        encoder_input = np.stack([design_matrices, regressor_id_3d], axis=-1).astype(np.float32)
 
         # param_indices: last dim 0..P-1 for every column
-        param_idx = np.tile(np.arange(P, dtype=np.float32)[None, None, :], (B, C, 1))
+        param_idx = np.tile(np.arange(num_params, dtype=np.float32)[None, None, :], (batch_size, max_num_cols, 1))
 
         # regressor_indices: duplicate each column’s regressor id across parameters
-        reg_idx = np.repeat(regressor_id[:, :, None], P, axis=2).astype(np.float32)
+        reg_idx = np.repeat(regressor_id[:, :, None], num_params, axis=2).astype(np.float32)
 
         input_data = torch.from_numpy(encoder_input).to(device)
         param_indices = torch.from_numpy(param_idx).to(device)
         regressor_indices = torch.from_numpy(reg_idx).to(device)
 
-        # masks/targets to torch
-        params_mask = torch.from_numpy(param_masks_np).to(device)
-        target_mu   = torch.from_numpy(param_mats_np).to(device)
-
         # rts/choices
         rts = torch.from_numpy(samples["sim_data"]["rts"]).to(device)
         choices = torch.from_numpy(samples["sim_data"]["choices"]).to(device)
+
+        # Convert to torch tensor
+        param_masks = torch.from_numpy(samples["param_masks"]).to(device)
+        param_matrices = torch.from_numpy(samples["param_matrices"]).to(device)
 
         # Return (keep both key spellings for compatibility with trainer)
         out = {
             "input_data": input_data,
             "param_indices": param_indices,
             "regressor_indices": regressor_indices,
-            "params_mask": params_mask,
-            "param_masks": params_mask,               # for later use in trainer
-            "target_mu": target_mu,                   # name used in v2 draft
-            "param_matrices": target_mu,              # name used by trainer loss
+            "param_masks": param_masks,               # for later use in trainer
+            "param_matrices": param_matrices,
             "rts": rts,
             "choices": choices,
         }

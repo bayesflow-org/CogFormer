@@ -135,7 +135,7 @@ class BayesGPTTrainer:
         input_data = adapted["input_data"]
         param_indices = adapted["param_indices"]
         regressor_indices = adapted["regressor_indices"]
-        params_mask = adapted["params_mask"]
+        param_masks = adapted["param_masks"]
 
         B, T, C, D = input_data.shape
         input_data = input_data.reshape(B, T * C, D)
@@ -144,7 +144,7 @@ class BayesGPTTrainer:
             input_data=input_data,
             param_indices=param_indices,
             regressor_indices=regressor_indices,
-            params_mask=params_mask,
+            params_mask=param_masks,
         )
 
         # Loss
@@ -156,7 +156,7 @@ class BayesGPTTrainer:
         if log_var.ndim == 3:
             log_var = log_var.squeeze(-1)
 
-        loss = mse_loss(true_params, mu, log_var, params_mask.reshape(B, -1))
+        loss = mse_loss(true_params, mu, log_var, param_masks.reshape(B, -1))
 
         # Backward and optimization
         loss.backward()
@@ -437,6 +437,7 @@ if __name__ == "__main__":
         "dropout": 0.1,
         "layer_dropout": 0.1,
     }
+
     model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_log_priors)
     # model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_full_priors)
 
@@ -448,8 +449,8 @@ if __name__ == "__main__":
         net_cls=BayesGPTv2,
         net_kwargs=net_kwargs,
         batch_size=32,
-        epochs=500,
-        steps_per_epoch=500,
+        epochs=100,
+        steps_per_epoch=100,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
         use_wandb=True,

@@ -84,6 +84,5 @@ class BayesGPTv2(nn.Module):
     #     num_active_params = param_masks.sum(dim=-1)
     #     return torch.mean(nll_masked.sum(dim=-1) / num_active_params)
 
-
     # Original:
     # num_seeds =
