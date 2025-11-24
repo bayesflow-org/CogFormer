@@ -287,10 +287,13 @@ class Adapter:
         param_idx = np.arange(num_params, dtype=np.float32)  # (P,)
         param_idx = np.tile(param_idx, max_cols)  # (C*P,)
         param_idx = param_idx.reshape(max_cols, num_params)  # (C, P)
+        param_idx = np.broadcast_to(param_idx, (batch_size, max_cols, num_params))
 
         # Regressor index per column (same for all parameters)
         reg_idx_per_col = regressor_id[0, 0]  # (C,)
         reg_idx = np.repeat(reg_idx_per_col, num_params)  # (C*P,)
+        reg_idx = np.broadcast_to(reg_idx, (B, num_params, max_cols))
+        reg_idx = reg_idx.transpose(0, 2, 1)
 
         # Build final tensors
         param_indices = torch.from_numpy(param_idx).unsqueeze(0).to(device)  # (1, C, P)
@@ -300,11 +303,11 @@ class Adapter:
         param_indices = param_indices.expand(batch_size, -1, -1)
         regressor_indices = regressor_indices.expand(batch_size, -1, -1)
 
-        # 4. Final batch
+        # Final batch
         out = {
             "input_data": torch.from_numpy(encoder_input).to(device),  # (B,T,C,2)
-            "param_indices": param_indices,  # (B, C, P)
-            "regressor_indices": regressor_indices,  # (B, C, P)
+            "param_indices": torch.from_numpy(param_indices).to(device),  # (B, C, P)
+            "regressor_indices": torch.from_numpy(regressor_indices).to(device),  # (B, C, P)
             "params_mask": torch.from_numpy(param_masks).to(device),  # (B, C*P) or (B, C, P)
             "target_mu": torch.from_numpy(param_matrices).to(device),
             "rts": torch.from_numpy(samples["sim_data"]["rts"]).to(device),
