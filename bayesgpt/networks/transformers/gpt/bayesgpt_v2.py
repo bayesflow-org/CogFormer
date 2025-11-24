@@ -49,12 +49,22 @@ class BayesGPTv2(nn.Module):
 
         encoder_tokens = self.encoder(input_data)
 
-        pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)
+        decoder_query = torch.stack([param_indices, regressor_indices], dim=-1)
+
+        batch_size, num_regressors, num_params, _ = decoder_query.shape
+        decoder_query = decoder_query.reshape(batch_size, num_regressors * num_params, 2)
+
+        query_mask = None
+        if params_mask is not None:
+            if params_mask.ndim == 3:
+                query_mask = params_mask.reshape(batch_size, num_regressors * num_params)
+            else:
+                query_mask = params_mask
 
         decoded_mu, decoded_logvar = self.decoder(
-            query=pos_embeddings,
+            query=decoder_query,
             key=encoder_tokens,
-            query_mask=params_mask
+            query_mask=query_mask
         )
 
         return decoded_mu, decoded_logvar
