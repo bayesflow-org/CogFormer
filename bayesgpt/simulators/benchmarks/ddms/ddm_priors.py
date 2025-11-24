@@ -44,7 +44,7 @@ def ddm_log_priors():
                      "slope": lambda: 0.0},
         "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
                      "slope": lambda: 0.0},
-        "s_v":      {"intercept": lambda: halfnorm(loc=0.0, scale=1.0),
+        "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
                      "slope": lambda: 0.0},
         "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
                      "slope": lambda: 0.0}
@@ -58,7 +58,7 @@ def ddm_full_priors():
                      "slope": lambda: np.random.normal(0., 1.)},
         "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
                      "slope": lambda: np.random.normal(0., 1.)},
-        "s_v":      {"intercept": lambda: halfnorm(loc=0.0, scale=1.0),
+        "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
                      "slope": lambda: np.random.normal(0., 1.)},
         "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
                      "slope": lambda: np.random.normal(0., 1.)}
