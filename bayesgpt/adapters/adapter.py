@@ -266,6 +266,21 @@ class Adapter:
         input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
         input_data = Adapter.to_torch_tensor(input_data).to(torch.float32)
 
+        # Build indices
+        parameter_indices = [Adapter.build_parameter_indices(
+            intrinsic_params,
+            num_regressors=samples["max_num_regressors"],
+            num_categories=samples["max_num_categories"],
+        ) for _ in range(batch_size)]
+        parameter_indices = Adapter.to_torch_tensor(np.array(parameter_indices)).to(torch.float32)
+
+        regressor_indices = [Adapter.build_regressor_indices(
+            intrinsic_params,
+            num_regressors=samples["max_num_regressors"],
+            num_categories=samples["max_num_categories"],
+        ) for _ in range(batch_size)]
+        regressor_indices = Adapter.to_torch_tensor(np.array(regressor_indices)).to(torch.float32)
+
         # TODO - This is very, very wrong
         num_params = len(intrinsic_params)
         block = samples["max_num_categories"] - 1
