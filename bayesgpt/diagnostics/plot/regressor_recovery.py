@@ -10,33 +10,39 @@ def regressor_recovery(
     true: np.ndarray,
     pred: np.ndarray,
     params: list[str],
-    param_matrix: np.ndarray,
+    param_matrices: np.ndarray,
+    max_num_regressors: int = 5,
+    max_num_categories: int = 3,
+    keep_intercept: bool = True,
     color: str = "#000787",
     figsize: tuple = None
 ):
+    num_obs = param_matrices.shape[0]
+    num_params = len(params)
 
-    num_params, num_regressors = param_matrix.shape
+    # Reshape the data
+    num_elements_per_param = max_num_regressors * max_num_categories + (1 if keep_intercept else 0)
+    num_cols = max_num_regressors + (1 if keep_intercept else 0)
+    param_matrices = param_matrices.reshape(num_obs, num_elements_per_param, num_params)
+
+    if keep_intercept:
+        intercept = param_matrices[:, 0, :]
+        regressors = param_matrices[:, 1:, :]
+    else:
+        regressors = param_matrices
+
+    regressors = regressors.reshape(num_obs, max_num_regressors, max_num_categories, num_params)
+
 
     if figsize is None:
-        figsize = (3 * num_params, 3 * num_regressors)
+        figsize = (3 * num_params, 3 * num_cols)
 
-    f, axarr = plt.subplots(num_params, num_regressors, figsize=figsize, sharex=True, sharey=True)
+    f, axarr = plt.subplots(num_params, num_cols, figsize=figsize, sharex=True, sharey=True)
 
     for i, ax in enumerate(axarr.flatten()):
         row = np.floor(i / num_params)
-        col = i % num_params
+        col = np.int(i % num_params)
 
-        if param_matrix[row, col] == 0:
-            sns.scatterplot(x=true[:, i], y=pred[:, i], ax=ax, color=color)
-
-            make_quadratic(ax, true[:, i], pred[:, i])
-
-            ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
-            ax.set_xlabel("Ground Truth")
-            if i % num_params == 0:
-                ax.set_ylabel("Estimation")
-            ax.set_title(params[i])
-            sns.despine(ax=ax)
 
     f.tight_layout()
     return f

@@ -128,7 +128,7 @@ class BayesGPTTrainer:
 
     def step(self, global_step: int, epoch_idx: int):
         samples = self.model_family.batch_sample(**self.sample_kwargs)
-        adapted = self.adapter.adapt_v2(samples, intrinsic_params=self.intrinsic_params, device=self.device)
+        adapted = self.adapter.adapt(samples, intrinsic_params=self.intrinsic_params, device=self.device)
 
         self.optimizer.zero_grad()
 
