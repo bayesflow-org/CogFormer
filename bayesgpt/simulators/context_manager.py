@@ -307,6 +307,6 @@ class ContextManager:
         num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
 
         p = float(1.0 / num_categories)
-        one_hot= np.random.multinomial(1, [p] * num_categories, size=num_obs)
+        one_hot = np.random.multinomial(1, [p] * num_categories, size=num_obs)
         dummies = one_hot[:, :num_categories - 1]
         return dummies

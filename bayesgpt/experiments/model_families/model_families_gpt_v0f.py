@@ -7,7 +7,7 @@ from tqdm.auto import tqdm
 
 from networks.loss import mse_loss
 from scipy.stats import halfnorm
-
+from diagnostics.plot import recovery
 
 
 class BayesGPTTrainer:
@@ -17,7 +17,7 @@ class BayesGPTTrainer:
         self,
         model_family,                 # e.g., NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_priors)
         adapter,                      # e.g., Adapter()
-        net_cls,                      # e.g., BayesGPTv2
+        net_cls,                      # e.g., BayesGPTv1
         net_kwargs: dict | None = None,
         device: torch.device | None = None,
         # training
@@ -132,36 +132,18 @@ class BayesGPTTrainer:
 
         self.optimizer.zero_grad()
 
-        input_data = adapted["input_data"]
-        param_indices = adapted["param_indices"]
-        regressor_indices = adapted["regressor_indices"]
-        param_masks = adapted["param_masks"]
-
-        B, T, C, D = input_data.shape
-        input_data = input_data.reshape(B, T * C, D)
-
         mu, log_var = self.model(
-            input_data=input_data,
-            param_indices=param_indices,
-            regressor_indices=regressor_indices,
-            params_mask=param_masks,
+            adapted["input_data"],
+            adapted["param_indices"],
+            adapted["regressor_indices"],
+            adapted["param_masks"],
         )
-
-        # Loss
-        true_params = adapted["param_matrices"]
-        if true_params.ndim == 3:
-            true_params = true_params.reshape(B, -1)
-        if mu.ndim == 3:
-            mu = mu.reshape(B, -1)
-        if log_var.ndim == 3:
-            log_var = log_var.squeeze(-1)
-
-        loss = mse_loss(true_params, mu, log_var, param_masks.reshape(B, -1))
-
-        # Backward and optimization
+        loss = mse_loss(adapted["param_matrices"], mu, log_var, adapted["param_masks"])
         loss.backward()
+
         if self.grad_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip_norm)
+
         self.optimizer.step()
 
         # logging
@@ -170,12 +152,7 @@ class BayesGPTTrainer:
 
         if self.use_wandb:
             wandb.log(
-            {
-                    "train/loss": loss_val,
-                    "train/lr": lr,
-                    "train/epoch": epoch_idx + 1,
-                    "train/step": global_step
-                },
+                {"train/loss": loss_val, "train/lr": lr, "train/epoch": epoch_idx + 1, "train/step": global_step},
                 step=global_step,
             )
 
@@ -396,9 +373,8 @@ if __name__ == "__main__":
     from simulators import NestedModelFamily
     from simulators.benchmarks import DDM
     from adapters import Adapter
-    from networks.transformers.gpt import BayesGPTv2
+    from networks.transformers.gpt import BayesGPTv1
 
-    # For testing purposes only
     ddm_log_priors = {
         "v":        {"intercept": lambda: np.random.gamma(2., 1.),
                      "slope": lambda: 0.0},
@@ -411,20 +387,6 @@ if __name__ == "__main__":
         "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
                      "slope": lambda: 0.0}
     }
-
-    # Actual prior
-    # ddm_full_priors = {
-    #     "v": {"intercept": lambda: np.random.gamma(2., 1.),
-    #           "slope": lambda: np.random.normal(0., 1.)},
-    #     "a": {"intercept": lambda: np.random.normal(-1, 0.3),
-    #           "slope": lambda: np.random.normal(0., 1.)},
-    #     "tau": {"intercept": lambda: np.random.normal(-1.5, 0.3),
-    #             "slope": lambda: np.random.normal(0., 1.)},
-    #     "s_v": {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
-    #             "slope": lambda: np.random.normal(0., 1.)},
-    #     "s_tau": {"intercept": lambda: np.random.beta(1.0, 3.0),
-    #               "slope": lambda: np.random.normal(0., 1.)}
-    # }
 
     net_kwargs = {
         "encoder_num_layers": 8,
@@ -439,27 +401,25 @@ if __name__ == "__main__":
     }
 
     model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_log_priors)
-    # model_family = NestedModelFamily(name="DDM", model=DDM(), prior_fun=ddm_full_priors)
-
     adapter = Adapter()
 
     trainer = BayesGPTTrainer(
         model_family=model_family,
         adapter=adapter,
-        net_cls=BayesGPTv2,
+        net_cls=BayesGPTv1,
         net_kwargs=net_kwargs,
         batch_size=32,
-        epochs=100,
-        steps_per_epoch=100,
+        epochs=500,
+        steps_per_epoch=500,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
         use_wandb=True,
         wandb_project="bayesgpt-testing",
         wandb_run_name=None,
-        wandb_tags=["DDM", "BayesGPTv2"],
+        wandb_tags=["DDM", "BayesGPTv1"],
         wandb_watch_log="gradients",
         wandb_watch_freq=200,
     )
 
-    trainer.train(checkpoint_path="bayesgpt_v2_ddm_8l_8h_40s_100.pt")
+    trainer.train(checkpoint_path="bayesgpt_ddm_8l_8h_40s_100f.pt")
     trainer.finish()

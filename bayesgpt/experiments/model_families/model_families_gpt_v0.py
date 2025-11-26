@@ -413,7 +413,6 @@ if __name__ == "__main__":
         steps_per_epoch=500,
         learning_rate=2e-4,
         grad_clip_norm=5.0,
-        # sample_kwargs can override defaults if you want
         use_wandb=True,
         wandb_project="bayesgpt-testing",
         wandb_run_name=None,
