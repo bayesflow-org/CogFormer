@@ -82,19 +82,6 @@ class Adapter:
         return [fn(v) for v in seq]
 
     @staticmethod
-    def pad(x: np.ndarray, to_shape: tuple[int, ...], pad_value: float = 0.0) -> np.ndarray:
-        if x.shape == to_shape:
-            return x
-        if len(to_shape) != x.ndim:
-            raise ValueError(f"ndim mismatch: {x.ndim} vs target {len(to_shape)}")
-        pads = []
-        for curr, targ in zip(x.shape, to_shape):
-            if targ < curr:
-                raise ValueError(f"Cannot pad to smaller size: {x.shape} -> {to_shape}")
-            pads.append((0, targ - curr))
-        return np.pad(x, pads, mode="constant", constant_values=pad_value)
-
-    @staticmethod
     def _convert(v, dtype, copy):
         a = Adapter.asarray(v)
         return a.astype(dtype, copy=copy, casting="same_kind")
@@ -107,16 +94,6 @@ class Adapter:
         if a.ndim == 0:
             return a.reshape(1, 1)
         return a.reshape(1, -1) if orientation == "row" else a.reshape(-1, 1)
-
-    @staticmethod
-    def stack(x: dict[str: np.ndarray] | list[np.ndarray], axis=-1) -> np.ndarray:
-        if isinstance(x, dict):
-            shapes = [v.shape[0] for v in x.values()]
-        else:
-            shapes = [v.shape[0] for v in x]
-
-        assert len(set(shapes)) == 1, "Arrays must have the same shape."
-        return Adapter.concatenate(list(x.values()) if isinstance(x, dict) else x, axis=axis)
 
     @staticmethod
     def build_parameter_indices(
