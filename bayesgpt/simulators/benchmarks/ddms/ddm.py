@@ -105,7 +105,7 @@ class DDM(Model):
         return {"rts": rts, "choices": choices}
 
     def sample(self, batch_size: int | tuple, num_obs: int = 500, context=None):
-
+        # Infer batch size if none exist
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
 

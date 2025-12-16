@@ -171,6 +171,10 @@ class ContextManager:
         min_num_categories: int = 2,
         max_num_categories: int = 4
     ) -> np.ndarray:
+        """
+        Build design matrix based on the respective configuration of free intrinsic parameters.
+        The design matrix should have the shape of
+        """
         # Provide context
         context = context or {}
         regressor_keys = list(design_config.keys())
@@ -273,7 +277,11 @@ class ContextManager:
         prior_fun: dict[str, Callable | dict[str, Callable]],
         intrinsic_params: list[str],
     ) -> np.ndarray:
+        """
+        Sample parameter matrix based on the given parameter mask and the associated priors.
+        This has shape (num_regressors, num_intrinsic_params).
 
+        """
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
@@ -286,6 +294,7 @@ class ContextManager:
 
         for design_index in range(num_regressors):
             for param_index, intrinsic in enumerate(intrinsic_params):
+                # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:
 
                     if (design_index == 0) and has_intercept:
@@ -303,6 +312,9 @@ class ContextManager:
         min_num_categories: int = 2,
         max_num_categories: int = 4,
     ):
+        """
+        Generate categorical dummy encoding for the design matrix.
+        """
         # Randomly generate a num_categories
         num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
 
