@@ -3,6 +3,7 @@ import torch
 import wandb
 from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.functional
 from tqdm.auto import tqdm
 
 from networks.loss import mse_loss
