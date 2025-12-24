@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import halfnorm
 
 
-def ddm_baseline_priors():
+def lba_baseline_priors():
     return {
         "v":     np.random.gamma(2., 1.),
         # "v":     np.random.normal(1., 1.),
@@ -13,7 +13,7 @@ def ddm_baseline_priors():
         "s_tau": np.random.beta(1.0, 3.0),
     }
 
-def ddm_test_priors():
+def lba_test_priors():
     return {
         "v": np.random.gamma(2.5, 0.5, size=1000),
         "a": np.random.lognormal(0, 0.5, size=1000),
@@ -22,7 +22,7 @@ def ddm_test_priors():
         "s_tau": np.random.gamma(0.5, 0.2, size=1000),
     }
 
-def ddm_priors():
+def lba_priors():
     return {
         "v":        {"intercept": lambda: np.random.gamma(2.5, 0.5),
                      "slope": lambda: 0.0},
@@ -50,7 +50,7 @@ def ddm_log_priors():
                      "slope": lambda: 0.0}
     }
 
-def ddm_full_priors():
+def lba_full_priors():
     return {
         "v":        {"intercept": lambda: np.random.gamma(2., 1.),
                      "slope": lambda: np.random.normal(0., 1.)},
