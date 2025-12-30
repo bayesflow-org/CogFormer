@@ -5,6 +5,9 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
+
+from playgrounds.testing_workflow import grad_clip_norm
+
 np.set_printoptions(suppress=True)
 
 
@@ -18,28 +21,91 @@ from networks.transformers.gpt import BayesGPTv1
 class BayesGPTTrainer:
     def __init__(
         self,
-        wandb_config,
+        model_family,
+        adapter,
+        net,
         train_config,
-        net
+        wandb_config,
     ):
         super().__init__()
-        self.train_config = train_config
-        self.wandb_config = wandb_config
+        self.model_family = model_family
+        self.adapter = adapter
         self.net = net
 
-    def train(self):
-        pass
+    def train(self, train_config: dict):
+        optimizer = Adam(self.net.parameters(), lr=train_config["learning_rate"])
+        scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
+        loss_fn = torch.nn.MSELoss()
 
-    def step(self, model_family):
-        samples = model_family.batch_sample(
+        for epoch in range(train_config["epochs"]):
+            pbar = tqdm(
+                total=train_config["steps_per_epoch"],
+                desc=f"Epoch {(epoch + 1)}/{train_config['epochs']}",
+                miniters=100,
+            )
+            for step in range(train_config["steps_per_epoch"]):
+                loss, current_lr = self.step(
+                    train_config=train_config,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    loss_fn=loss_fn
+                )
+
+                pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
+                pbar.update(1)
+
+            scheduler.step()
+            pbar.close()
+
+
+
+    def step(self, train_config, optimizer, scheduler, loss_fn):
+
+        # Generate samples
+        samples = self.model_family.batch_sample(
             batch_size=train_config.batch_size,
             mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v", "decay"},
+                free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"}
             ),
             num_obs = 500,
             flatten_param_outputs=True
         )
+
+        # Adapt for network
+        adapted = self.adapter.adapt(
+            samples,
+            intrinsic_params=self.model_family.intrinsic_params
+        )
+
+        # Optimizer
+        optimizer.zero_grad()
+
+        # Train
+        mu, logvar = self.net(
+            adapted['input_data'],
+            adapted['param_indices'],
+            adapted['regressor_indices'],
+            adapted['param_masks'],
+        )
+
+        # Compute loss
+        L = loss_fn(adapted["param_matrices"], mu, logvar, adapted["param_masks"])
+        L.backward()
+
+        if grad_clip_norm is not None:
+            torch.nn.utils.clip_grad_norm_(
+                self.net.parameters(),
+                train_config["gradient_clip_norm"],
+            )
+
+        optimizer.step()
+
+        loss = L.detach().item()
+        current_lr = scheduler.get_last_lr()[0]
+
+        return loss, current_lr
+
 
     def validate(self):
         pass
@@ -47,7 +113,10 @@ class BayesGPTTrainer:
 
 if __name__ == "__main__":
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
 
     train_config = {
         "epochs": 100,
