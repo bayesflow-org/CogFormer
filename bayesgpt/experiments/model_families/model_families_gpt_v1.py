@@ -33,6 +33,10 @@ class BayesGPTTrainer:
     def step(self, model_family):
         samples = model_family.batch_sample(
             batch_size=train_config.batch_size,
+            mask_randomizer_kwargs=dict(
+                free_intrinsics={"v", "a", "tau", "s_v", "decay"},
+                fixed_intrinsics={"s_tau"}
+            ),
             num_obs = 500,
             flatten_param_outputs=True
         )
