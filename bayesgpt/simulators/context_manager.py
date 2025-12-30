@@ -56,7 +56,6 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
-        max_num_regressors: int = 5,
         max_num_categories: int = 5,
         keep_intercept: bool = False
     ) -> np.ndarray:
