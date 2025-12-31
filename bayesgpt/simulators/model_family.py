@@ -55,7 +55,7 @@ class NestedModelFamily:
             parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
                 intrinsic_params=self.intrinsic_params,
                 num_regressors=num_regressors,
-                max_num_regressors=max_num_regressors,
+                # max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
                 free_prob=free_prob,
@@ -66,9 +66,9 @@ class NestedModelFamily:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
-                max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
+                # max_num_regressors=max_num_regressors,
             )
 
         # Discrete mask
@@ -198,7 +198,7 @@ class NestedModelFamily:
                 mask_randomizer_kwargs={} if mask_randomizer_kwargs is None else mask_randomizer_kwargs,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
-                max_num_regressors=max_num_regressors,
+                # max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
                 flatten_param_outputs=flatten_param_outputs
             )

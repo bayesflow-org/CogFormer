@@ -6,7 +6,7 @@ import seaborn as sns
 from bayesgpt.utils.plot_utils import make_quadratic
 
 
-def regressor_recovery(
+def full_recovery(
     true: np.ndarray,
     pred: np.ndarray,
     params: list[str],

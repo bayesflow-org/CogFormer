@@ -24,6 +24,7 @@ class ContextManager:
         Randomly build a design_config mapping regressors and optional intercept
         to subsets of intrinsic parameters.
         """
+        # TODO: consider "padding" num_regressors to a max
         # Set up mandatory and intercept only params based on free and fixed intrinsics
         mandatory = set(free_intrinsics or [])
         intercept_only = set(fixed_intrinsics or [])
@@ -123,7 +124,7 @@ class ContextManager:
         parameter_mask = self.build_parameter_mask(
             design_config=design_config,
             intrinsic_params=intrinsic_params,
-            max_num_regressors=max_num_regressors,
+            # max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
             keep_intercept=keep_intercept,
         )
