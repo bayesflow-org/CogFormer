@@ -8,6 +8,78 @@ class Adapter:
     """Utilities for dtype conversion, 2D normalization, and safe concatenation."""
 
     @staticmethod
+    def asarray(x) -> np.ndarray:
+        return x if isinstance(x, np.ndarray) else np.asarray(x)
+
+    @staticmethod
+    def pad(x: np.ndarray, to_shape: tuple[int, ...], pad_value: float = 0.0) -> np.ndarray:
+
+        if x.shape == to_shape:
+            return x
+
+        if len(to_shape) != x.ndim:
+            raise ValueError(f"ndim mismatch: {x.ndim} vs target {len(to_shape)}")
+
+        pads = []
+
+        for curr, targ in zip(x.shape, to_shape):
+
+            if targ < curr:
+                raise ValueError(f"Cannot pad to smaller size: {x.shape} -> {to_shape}")
+
+            pads.append((0, targ - curr))
+
+        return np.pad(x, pads, mode="constant", constant_values=pad_value)
+
+    @staticmethod
+    def concatenate(
+        arrays: Iterable,
+        axis: int = 0,
+        dtype: np.dtype | None = None,
+        pad: bool = False,
+        pad_value: float = 0.0,
+    ) -> np.ndarray:
+        """
+        Concatenate arrays along axis. If pad=True, pad other dims to max size.
+        """
+        arrs = [Adapter.asarray(a) for a in arrays]
+
+        if not arrs:
+            return np.array([], dtype=dtype if dtype is not None else np.float32)
+
+        if dtype is not None:
+            arrs = [a.astype(dtype, copy=False, casting="same_kind") for a in arrs]
+
+        if pad:
+            ndim = arrs[0].ndim
+            if any(a.ndim != ndim for a in arrs):
+                raise ValueError("All arrays must have the same ndim when padding.")
+            target = list(arrs[0].shape)
+            for a in arrs[1:]:
+                target = [max(s, t) if ax != axis else t for ax, (s, t) in enumerate(zip(a.shape, target))]
+            padded = []
+            for a in arrs:
+                tgt = list(target)
+                tgt[axis] = a.shape[axis]
+                padded.append(Adapter.pad(a, tuple(tgt), pad_value=pad_value))
+            arrs = padded
+
+        out = np.concatenate(arrs, axis=axis)
+        if dtype is not None and out.dtype != dtype:
+            out = out.astype(dtype, copy=False, casting="same_kind")
+        return out
+
+    @staticmethod
+    def stack(x: dict[str: np.ndarray] | list[np.ndarray], axis=-1) -> np.ndarray:
+        if isinstance(x, dict):
+            shapes = [v.shape[0] for v in x.values()]
+        else:
+            shapes = [v.shape[0] for v in x]
+
+        assert len(set(shapes)) == 1, "Arrays must have the same shape."
+        return Adapter.concatenate(list(x.values()) if isinstance(x, dict) else x, axis=axis)
+
+    @staticmethod
     def build_parameter_indices(
         intrinsic_params: list[str],
         num_regressors: int,
