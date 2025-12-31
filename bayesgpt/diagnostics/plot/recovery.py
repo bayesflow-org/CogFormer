@@ -15,7 +15,7 @@ def recovery(
     if figsize is None:
         figsize = (3 * num_params, 3)
 
-    f, axarr = plt.subplots(1, num_params, figsize=figsize, sharey=True)
+    f, axarr = plt.subplots(1, num_params, figsize=figsize)
 
     for i, ax in enumerate(axarr.flatten()):
         sns.scatterplot(x=true[:, i], y=pred[:, i], ax=ax, color=color)
