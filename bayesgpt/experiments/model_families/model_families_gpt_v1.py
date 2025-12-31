@@ -5,8 +5,8 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
+import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True)
-
 
 from simulators import NestedModelFamily
 from simulators.benchmarks import DDM
@@ -30,6 +30,9 @@ class BayesGPTTrainer:
         self.net = net
 
     def train(self, config, checkpoint_path="bayesgpt_model.pt"):
+        # Define global step
+        global_step = 0
+
         # Define optimizer, scheduler, and loss function from config
         optimizer = Adam(self.net.parameters(), lr=config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=config["epochs"])
@@ -43,15 +46,29 @@ class BayesGPTTrainer:
                 miniters=100,
             )
             for step in range(config["steps_per_epoch"]):
+                # Compute metrics
                 loss, current_lr = self.step(
                     config=train_config,
                     optimizer=optimizer,
                     scheduler=scheduler,
                     loss_fn=loss_fn
                 )
-
+                # Log metrics
+                wandb.log(
+                    {
+                        "train/loss": loss,
+                        "opt/lr": current_lr,
+                        "epoch": epoch + 1,
+                    },
+                    step=global_step,
+                )
+                # Update internal steps
+                global_step += 1
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
+
+            if (epoch + 1) % 5 == 0:
+                self.validate(config, global_step)
 
             scheduler.step()
             pbar.close()
@@ -95,7 +112,7 @@ class BayesGPTTrainer:
         if train_config["gradient_clip_norm"] is not None:
             torch.nn.utils.clip_grad_norm_(
                 self.net.parameters(),
-                train_config["gradient_clip_norm"],
+                config["gradient_clip_norm"],
             )
 
         # Update loss and learning rate
@@ -106,10 +123,10 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def validate(self, config):
+    def validate(self, config, global_step):
         # Generate training samples
         test_samples = self.model_family.batch_sample(
-            batch_size=config.batch_size,
+            batch_size=config["batch_size"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"}
@@ -135,7 +152,14 @@ class BayesGPTTrainer:
         true_set = adapted["param_matrices"].detach().cpu().numpy()
         pred_set = mu.detach().cpu().numpy()[:,:,0]
 
-        recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
+        # Log recovery plot
+        fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
+        wandb.log(
+            {"val/recovery": wandb.Image(fig)},
+            step=global_step,
+        )
+        plt.close(fig)
+        self.net.train()
 
     @staticmethod
     def finish():
@@ -178,6 +202,17 @@ if __name__ == "__main__":
         "layer_dropout": 0.1,
     }
 
+    # Initialize wandb
+    wandb.init(
+        project=wandb_config["project_name"],
+        name=wandb_config["run_name"],
+        tags=wandb_config["tags"],
+        config={
+            **train_config,
+            **{"bayesgpt": bayesgpt_config},
+        },
+    )
+
     # Define model family, adapter, and network
     model_family = NestedModelFamily(
         model=DDM(),
@@ -185,9 +220,7 @@ if __name__ == "__main__":
         prior_fun=ddm_full_priors()
     )
     adapter = Adapter()
-    bayesgpt = BayesGPTv1(**bayesgpt_config)
-    bayesgpt.to(device)
-    bayesgpt.train()
+    bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
 
     # Pass to trainer
     trainer = BayesGPTTrainer(
@@ -209,5 +242,3 @@ if __name__ == "__main__":
         checkpoint_path=checkpoint_path
     )
     trainer.finish()
-
-    # TODO: remember to push
