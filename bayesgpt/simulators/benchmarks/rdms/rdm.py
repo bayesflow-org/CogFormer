@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit, prange
 from simulators import Model
 from utils.simulator_utils import as_1d
+from rdm_priors import rdm_baseline_prior
 
 @njit
 def sample_rdm_trial(
@@ -55,19 +56,6 @@ def simulate_rdm(
         sim_data[i] = sim_trial
 
     return sim_data
-
-@njit
-def sample_rdm_prior() -> np.ndarray:
-    v_intercept = np.random.gamma(3.0, 0.8)
-    v_diff = np.random.normal(0.0, 2.0)
-    v_slope = np.random.normal(0.0, 3.0)
-    a_intercept = np.random.gamma(10.0, 0.3)
-    a_slope = np.random.normal(0.0, 1.0)
-    decay = np.random.gamma(1, 0.4)
-    tau = np.random.gamma(3.0, 0.2)
-    return np.array(
-        [v_intercept, v_diff, v_slope, a_intercept, a_slope, decay, tau]
-    )
 
 class RDM(Model):
 
@@ -131,3 +119,5 @@ class RDM(Model):
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
 
+    def sample(self):
+        raise NotImplementedError
