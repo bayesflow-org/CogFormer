@@ -53,25 +53,6 @@ def simulate_cdm(
 
     return sim_data
 
-@njit
-def sample_cdm_prior() -> np.ndarray:
-    v_intercept = np.random.normal(1, 2)
-    v_theta = 2.0 * np.pi * (np.random.beta(3.0, 3.0) - 0.5)
-    v_slope = np.random.normal(0, 2)
-    s_v = np.random.gamma(1, 0.2)
-    a_intercept = np.random.gamma(10.0, 0.3)
-    a_slope = np.random.normal(0.0, 1.0)
-    decay = np.random.gamma(1, 0.4)
-    tau = np.random.gamma(3.0, 0.2)
-    s_tau = np.random.uniform(0, tau*2)
-
-    return np.array(
-        [
-            v_intercept, v_theta, v_slope, s_v,
-            a_intercept, a_slope, decay, tau, s_tau
-        ]
-    )
-
 class CDM(Model):
 
     def __init__(self, dt: float = 1e-3, max_steps: int = 1e4):

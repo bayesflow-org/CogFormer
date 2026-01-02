@@ -1,0 +1,55 @@
+import numpy as np
+from numba import njit
+
+@njit
+def cdm_baseline_prior() -> np.ndarray:
+    v_intercept = np.random.normal(1, 2)
+    v_theta = 2.0 * np.pi * (np.random.beta(3.0, 3.0) - 0.5)
+    v_slope = np.random.normal(0, 2)
+    s_v = np.random.gamma(1, 0.2)
+    a_intercept = np.random.gamma(10.0, 0.3)
+    a_slope = np.random.normal(0.0, 1.0)
+    decay = np.random.gamma(1, 0.4)
+    tau = np.random.gamma(3.0, 0.2)
+    s_tau = np.random.uniform(0, tau*2)
+
+    return np.array(
+        [
+            v_intercept, v_theta, v_slope, s_v,
+            a_intercept, a_slope, decay, tau, s_tau
+        ]
+    )
+
+@njit
+def cdm_prior():
+    return {
+        "v":        {"intercept": np.random.normal(1.0, 2.0),
+                     "slope": 0.0},
+        "a":        {"intercept": np.random.gamma(10.0, 0.3),
+                     "slope": 0.0},
+        "tau":      {"intercept": np.random.gamma(3.0, 0.2),
+                     "slope": 0.0},
+        "decay":    {"intercept": np.random.gamma(1, 0.4),
+                     "slope": 0.0},
+        "s_v":      {"intercept": np.random.gamma(1, 0.2),
+                     "slope": 0.0},
+        "s_tau":    {"intercept": np.random.uniform(0, 2.0),    # Ideally, upper bound = tau * 2
+                     "slope": 0.0},
+    }
+
+@njit
+def cdm_full_prior():
+    return {
+        "v":        {"intercept": np.random.normal(1.0, 2.0),
+                     "slope": np.random.normal(0.0, 3.0)},
+        "a":        {"intercept": np.random.gamma(10.0, 0.3),
+                     "slope": np.random.normal(0.0, 1.0)},
+        "tau":      {"intercept": np.random.gamma(3.0, 0.2),
+                     "slope": np.random.normal(0.0, 1.0)},
+        "decay":    {"intercept": np.random.gamma(1, 0.4),
+                     "slope": np.random.normal(0.0, 1.0)},
+        "s_v":      {"intercept": np.random.gamma(1, 0.2),
+                     "slope": np.random.normal(0.0, 1.0)},
+        "s_tau":    {"intercept": np.random.uniform(0, 2.0),
+                     "slope": np.random.normal(0.0, 1.0)}
+    }

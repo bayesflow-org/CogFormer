@@ -80,7 +80,7 @@ def sample_lba_prior():
                      "slope": 0.0}
     }
 
-class LBA():
+class LBA(Model):
 
     def __init__(self, max_time: int = 10):
         self.max_time = max_time

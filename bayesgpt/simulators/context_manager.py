@@ -10,11 +10,53 @@ class ContextManager:
     def __init__(self, parameter_names: list[str] = None):
         self.parameter_names = parameter_names or []
 
+    def build_random_design_config(
+        self,
+        intrinsic_params: list[str],
+        num_regressors: int,
+        free_intrinsics: list[str] | set[str] | None = None,
+        fixed_intrinsics: list[str] | set[str] | None = None,
+        keep_intercept: bool = False,
+        free_prob: float = 0.5,
+        intercept_prob: float = 0.5
+    ) -> dict[str, list[str]]:
+        """
+        Randomly build a design_config mapping regressors and optional intercept
+        to subsets of intrinsic parameters.
+        """
+        # TODO: consider "padding" num_regressors to a max
+        # Set up mandatory and intercept only params based on free and fixed intrinsics
+        mandatory = set(free_intrinsics or [])
+        intercept_only = set(fixed_intrinsics or [])
+        config: dict[str, list[str]] = {}
+
+        if keep_intercept:
+            names = []
+            for param in intrinsic_params:
+                if param in mandatory:          # Free intrinsics always get an intercept
+                    names.append(param)
+                elif param in intercept_only:   # Fixed intrinsics sometimes get an intercept
+                    if np.random.rand() < intercept_prob:
+                        names.append(param)
+                else:
+                    if np.random.rand() < free_prob:
+                        names.append(param)
+            config["1"] = names
+
+        for r in range(num_regressors):
+            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
+            names = []
+            for param in intrinsic_params:
+                if (param not in intercept_only) and (np.random.rand() < free_prob):
+                    names.append(param)
+            config[key] = names
+
+        return config
+
     def build_parameter_mask(
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
-        max_num_regressors: int = 5,
         max_num_categories: int = 5,
         keep_intercept: bool = False
     ) -> np.ndarray:
@@ -56,49 +98,6 @@ class ContextManager:
 
         return mask
 
-    def build_random_design_config(
-        self,
-        intrinsic_params: list[str],
-        num_regressors: int,
-        free_intrinsics: list[str] | set[str] | None = None,
-        fixed_intrinsics: list[str] | set[str] | None = None,
-        keep_intercept: bool = False,
-        free_prob: float = 0.5,
-        intercept_prob: float = 0.5
-    ) -> dict[str, list[str]]:
-        """
-        Randomly build a design_config mapping regressors and optional intercept
-        to subsets of intrinsic parameters.
-        """
-        # Set up mandatory and intercept only params based on free and fixed intrinsics
-        mandatory = set(free_intrinsics or [])
-        intercept_only = set(fixed_intrinsics or [])
-        config: dict[str, list[str]] = {}
-
-        if keep_intercept:
-            names = []
-            for param in intrinsic_params:
-
-                if param in mandatory:          # Free intrinsics always get an intercept
-                    names.append(param)
-                elif param in intercept_only:   # Fixed intrinsics sometimes get an intercept
-                    if np.random.rand() < intercept_prob:
-                        names.append(param)
-                else:
-                    if np.random.rand() < free_prob:
-                        names.append(param)
-            config["1"] = names
-
-        for r in range(num_regressors):
-            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
-            names = []
-            for param in intrinsic_params:
-                if (param not in intercept_only) and (np.random.rand() < free_prob):
-                    names.append(param)
-            config[key] = names
-
-        return config
-
     def build_random_parameter_mask(
         self,
         intrinsic_params: list[str],
@@ -125,7 +124,7 @@ class ContextManager:
         parameter_mask = self.build_parameter_mask(
             design_config=design_config,
             intrinsic_params=intrinsic_params,
-            max_num_regressors=max_num_regressors,
+            # max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
             keep_intercept=keep_intercept,
         )
@@ -171,6 +170,10 @@ class ContextManager:
         min_num_categories: int = 2,
         max_num_categories: int = 4
     ) -> np.ndarray:
+        """
+        Build design matrix based on the respective configuration of free intrinsic parameters.
+        The design matrix should have the shape of
+        """
         # Provide context
         context = context or {}
         regressor_keys = list(design_config.keys())
@@ -273,7 +276,11 @@ class ContextManager:
         prior_fun: dict[str, Callable | dict[str, Callable]],
         intrinsic_params: list[str],
     ) -> np.ndarray:
+        """
+        Sample parameter matrix based on the given parameter mask and the associated priors.
+        This has shape (num_regressors, num_intrinsic_params).
 
+        """
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
@@ -286,6 +293,7 @@ class ContextManager:
 
         for design_index in range(num_regressors):
             for param_index, intrinsic in enumerate(intrinsic_params):
+                # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:
 
                     if (design_index == 0) and has_intercept:
@@ -303,6 +311,9 @@ class ContextManager:
         min_num_categories: int = 2,
         max_num_categories: int = 4,
     ):
+        """
+        Generate categorical dummy encoding for the design matrix.
+        """
         # Randomly generate a num_categories
         num_categories = np.random.randint(min_num_categories, max_num_categories + 1)
 

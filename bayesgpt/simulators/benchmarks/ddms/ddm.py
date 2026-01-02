@@ -3,6 +3,8 @@ from numba import njit, prange
 from simulators import Model
 from scipy.stats import halfnorm
 
+from .ddm_priors import ddm_baseline_priors
+
 
 @njit
 def simulate_ddm_trial(
@@ -17,7 +19,7 @@ def simulate_ddm_trial(
     dt: float = 0.001,
     max_steps: int = 10000,
     log_transform: bool = True,
-) -> (float, float):
+):
 
     if log_transform:
         a = np.exp(a)
@@ -64,7 +66,6 @@ def simulate_ddm(
     n = v.shape[0]
     sim_data = np.zeros((n, 2), dtype=np.float32)
 
-
     for i in prange(n):
         sim_trial = simulate_ddm_trial(
             v=v[i],
@@ -80,17 +81,6 @@ def simulate_ddm(
         sim_data[i] = sim_trial
 
     return sim_data
-
-def sample_ddm_baseline_priors():
-    return{
-        "v":     np.random.gamma(2., 1.),
-        # "v":     np.random.normal(1., 1.),
-        "a":     np.random.normal(-.1, 0.3),
-        # "decay": 0.0 if flat_bound else np.random.gamma(1.0, 0.4),
-        "tau":   np.random.normal(-1.5, 0.3),
-        "s_v":   halfnorm.rvs(loc=0.0, scale=1.0),
-        "s_tau": np.random.beta(1.0, 3.0),
-    }
 
 class DDM(Model):
 
@@ -109,7 +99,7 @@ class DDM(Model):
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
 
-        params = {k: [] for k in sample_ddm_baseline_priors().keys()}
+        params = {k: [] for k in ddm_baseline_priors().keys()}
         rts = []
         choices = []
         # prior_draws = sample_ddm_baseline_priors()
@@ -117,7 +107,7 @@ class DDM(Model):
         #     prior_draws[k] = np.zeros((batch_size, 1), dtype=np.float32)
 
         for i in range(batch_size):
-            prior_draw = sample_ddm_baseline_priors()
+            prior_draw = ddm_baseline_priors()
             for k, v in prior_draw.items():
                 params[k].append(v)
                 # prior_draws[k][i] = v

@@ -4,22 +4,21 @@ from scipy.stats import halfnorm
 
 def ddm_baseline_priors():
     return {
-        "v":     np.random.gamma(2., 1.),
-        # "v":     np.random.normal(1., 1.),
-        "a":     np.random.normal(-.1, 0.3),
-        # "decay": 0.0 if flat_bound else np.random.gamma(1.0, 0.4),
-        "tau":   np.random.normal(-1.5, 0.3),
-        "s_v":   halfnorm(loc=0.0, scale=1.0),
-        "s_tau": np.random.beta(1.0, 3.0),
+        "v":        np.random.gamma(2., 1.),
+        "a":        np.random.normal(-.1, 0.3),
+        "tau":      np.random.normal(-1.5, 0.3),
+        "s_v":      halfnorm(loc=0.0, scale=1.0),
+        "s_tau":    np.random.beta(1.0, 3.0),
+        # "decay":  np.random.gamma(1.0, 0.4),
     }
 
 def ddm_test_priors():
     return {
-        "v": np.random.gamma(2.5, 0.5, size=1000),
-        "a": np.random.lognormal(0, 0.5, size=1000),
-        "tau": np.random.gamma(2.0, 0.2, size=1000),
-        "s_v":  np.random.gamma(0.5, 0.2, size=1000),
-        "s_tau": np.random.gamma(0.5, 0.2, size=1000),
+        "v":        np.random.gamma(2.5, 0.5, size=1000),
+        "a":        np.random.lognormal(0, 0.5, size=1000),
+        "tau":      np.random.gamma(2.0, 0.2, size=1000),
+        "s_v":      np.random.gamma(0.5, 0.2, size=1000),
+        "s_tau":    np.random.gamma(0.5, 0.2, size=1000),
     }
 
 def ddm_priors():
@@ -57,7 +56,7 @@ def ddm_full_priors():
         "a":        {"intercept": lambda: np.random.normal(-1, 0.3),
                      "slope": lambda: np.random.normal(0., 1.)},
         "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
-                     "slope": lambda: np.random.normal(0., 1.)},
+                     "slope": lambda: np.random.normal(0., 0.5)},
         "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
                      "slope": lambda: np.random.normal(0., 1.)},
         "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
