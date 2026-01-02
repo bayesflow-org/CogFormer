@@ -41,21 +41,19 @@ class Decoder(nn.Module):
         attn_mask: optional (T, T) or (B*num_heads, T, T)
         key_padding_mask: optional (B, T) with True for PAD tokens
         """
-
         out = self.input_proj(query)
 
         if query_mask is not None:
             batch_size, query_dim = query_mask.shape
             key_dim = key.shape[1]
 
-            q_block = query_mask == 0
+            query_block = query_mask == 0
 
             #  (B*H, Tq, Tk) - repeat batch mask across heads
-            attn_mask_bt = q_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
+            attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
             attn_mask = attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
         else:
             attn_mask = None
-
 
         for mab in self.layers:
             out = mab(query=out, key=key, attn_mask=attn_mask)

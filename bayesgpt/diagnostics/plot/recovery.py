@@ -37,7 +37,6 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
     Utility to make subplots quadratic to avoid visual illusions
     in, e.g., recovery plot.
     """
-
     lower = min(x_data.min(), y_data.min())
     upper = max(x_data.max(), y_data.max())
     eps = (upper - lower) * 0.1
@@ -50,4 +49,3 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
         alpha=0.9,
         linestyle="dashed",
     )
-
