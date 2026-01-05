@@ -24,7 +24,6 @@ class ContextManager:
         Randomly build a design_config mapping regressors and optional intercept
         to subsets of intrinsic parameters.
         """
-        # TODO: consider "padding" num_regressors to a max
         # Set up mandatory and intercept only params based on free and fixed intrinsics
         mandatory = set(free_intrinsics or [])
         intercept_only = set(fixed_intrinsics or [])
@@ -102,7 +101,7 @@ class ContextManager:
         self,
         intrinsic_params: list[str],
         num_regressors: int,
-        max_num_regressors: int = 5,
+        # max_num_regressors: int = 5,
         max_num_categories: int = 4,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
@@ -153,6 +152,9 @@ class ContextManager:
         max_num_categories: int = 4,
         keep_intercept: bool = False,
     ) -> np.ndarray:
+        """
+
+        """
         block_width = max_num_categories - 1
         num_cols = num_regressors * block_width + (1 if keep_intercept else 0)
         mask = np.ones(num_cols, dtype=np.float32)
@@ -163,7 +165,7 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         num_obs: int,
-        max_num_regressors: int = 5,
+        # max_num_regressors: int = 5,
         context: dict[str, np.ndarray] | None = None,
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
@@ -231,6 +233,9 @@ class ContextManager:
         num_regressors: int,
         num_categories: int,
     ) -> np.ndarray:
+        """
+        Build an array of positional indices for the intrinsic parameters.
+        """
         # Get number of intrinsic params
         num_intrinsic_params = len(intrinsic_params)
         indices = np.tile(

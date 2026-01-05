@@ -48,6 +48,7 @@ class NestedModelFamily:
         free_prob: float = 0.5,
         keep_intercept: bool = True,
         flatten_param_outputs: bool = True,
+        debug: bool = False,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
@@ -90,7 +91,7 @@ class NestedModelFamily:
             context=context,
             discrete_prob=discrete_prob,
             keep_intercept=keep_intercept,
-            max_num_regressors=max_num_regressors,
+            # max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
         )
 
@@ -127,7 +128,7 @@ class NestedModelFamily:
             parameter_mask = parameter_mask.flatten()
             parameter_matrix = parameter_matrix.flatten()
 
-        return {
+        out = {
             "model_name": f"{self.name}",
             "design_config": design_config,
             "design_matrix": design_matrix,
@@ -139,6 +140,12 @@ class NestedModelFamily:
             "max_num_regressors": max_num_regressors,
             "keep_intercept": keep_intercept,
         }
+
+        if debug:
+            for k, v in out.items():
+                print(k, v.shape if isinstance(v, np.ndarray) else v)
+
+        return out
 
     def batch_sample(
         self,
@@ -155,7 +162,7 @@ class NestedModelFamily:
         max_num_categories: int = 4,
         discrete_prob: float = 0.5,
         keep_intercept: bool = True,
-        remove_intercept_on_collate: bool = True,
+        remove_intercept_on_collate: bool = False,
         flatten_param_outputs: bool = True,
         visualize: bool = False,
     ) -> list[dict] | dict:

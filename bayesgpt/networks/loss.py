@@ -17,7 +17,7 @@ def nll_loss(true_params, mu, logvar, param_masks) -> torch.Tensor:
     return torch.mean(nll_masked.sum(dim=-1) / denom)
 
 
-def mse_loss(true_params, mu, logvar, param_masks) -> torch.Tensor:
+def mse_loss(true_params, mu, param_masks) -> torch.Tensor:
     """
     Masked mean squared error (homoskedastic).
     Ignores log_var, uses only mu.

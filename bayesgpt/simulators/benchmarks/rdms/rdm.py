@@ -2,7 +2,6 @@ import numpy as np
 from numba import njit, prange
 from simulators import Model
 from utils.simulator_utils import as_1d
-from rdm_priors import rdm_baseline_prior
 
 @njit
 def sample_rdm_trial(
