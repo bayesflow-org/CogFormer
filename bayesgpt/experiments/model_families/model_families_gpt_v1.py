@@ -13,8 +13,9 @@ from simulators.benchmarks import DDM
 from simulators.benchmarks.ddms.ddm_priors import ddm_full_priors
 from adapters import Adapter
 from networks.transformers.gpt import BayesGPTv1
-from networks.loss import mse_loss
+from networks.loss import mse_loss, nll_loss
 from diagnostics.plot.recovery import recovery
+from diagnostics.plot.matrix_recovery import matrix_recovery
 
 
 class BayesGPTTrainer:
@@ -22,19 +23,19 @@ class BayesGPTTrainer:
         self,
         model_family,
         adapter,
-        net
+        gpt
     ):
         super().__init__()
         self.model_family = model_family
         self.adapter = adapter
-        self.net = net
+        self.gpt = gpt
 
-    def train(self, config, checkpoint_path="bayesgpt_model.pt"):
+    def train(self, config, val_batch_size=300, checkpoint_path="bayesgpt_model.pt"):
         # Define global step
         global_step = 0
 
         # Define optimizer, scheduler, and loss function from config
-        optimizer = Adam(self.net.parameters(), lr=config["learning_rate"])
+        optimizer = Adam(self.gpt.parameters(), lr=config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=config["epochs"])
         loss_fn = mse_loss
 
@@ -68,12 +69,12 @@ class BayesGPTTrainer:
                 pbar.update(1)
 
             if (epoch + 1) % 5 == 0:
-                self.validate(config, global_step)
+                self.validate(val_batch_size, global_step)
 
             scheduler.step()
             pbar.close()
 
-        torch.save(self.net.state_dict(), checkpoint_path)
+        torch.save(self.gpt.state_dict(), checkpoint_path)
 
     def step(self, config, optimizer, scheduler, loss_fn):
         """Training step"""
@@ -98,7 +99,7 @@ class BayesGPTTrainer:
         optimizer.zero_grad()
 
         # Train
-        mu, logvar = self.net(
+        mu, logvar = self.gpt(
             adapted['input_data'],
             adapted['param_indices'],
             adapted['regressor_indices'],
@@ -106,12 +107,12 @@ class BayesGPTTrainer:
         )
 
         # Compute loss
-        L = loss_fn(adapted["param_matrices"], mu, logvar, adapted["param_masks"])
+        L = loss_fn(adapted["param_matrices"], mu, adapted["param_masks"])
         L.backward()
 
         if train_config["gradient_clip_norm"] is not None:
             torch.nn.utils.clip_grad_norm_(
-                self.net.parameters(),
+                self.gpt.parameters(),
                 config["gradient_clip_norm"],
             )
 
@@ -123,10 +124,10 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def validate(self, config, global_step):
+    def validate(self, batch_size, global_step):
         # Generate training samples
         test_samples = self.model_family.batch_sample(
-            batch_size=config["batch_size"],
+            batch_size=batch_size,
             mask_randomizer_kwargs=dict(
                 free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"}
@@ -142,24 +143,32 @@ class BayesGPTTrainer:
         )
 
         # Evaluate with test set
-        self.net.eval()
-        mu, logvar = self.net(
+        self.gpt.eval()
+        mu, logvar = self.gpt(
             adapted['input_data'],
             adapted['param_indices'],
-            adapted['regressor_indices']
+            adapted['regressor_indices'],
+            adapted['param_masks']
         )
 
         true_set = adapted["param_matrices"].detach().cpu().numpy()
         pred_set = mu.detach().cpu().numpy()[:,:,0]
 
+        params = ["v", "a", "tau", "s_v", "s_tau"]
+        n_cols = len(params)
+        n_rows = true_set.shape[1] // n_cols
+        true_set = true_set.reshape(batch_size, n_rows, n_cols)
+        pred_set = pred_set.reshape(batch_size, n_rows, n_cols)
+
         # Log recovery plot
-        fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
+        # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
+        fig = matrix_recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
         wandb.log(
             {"val/recovery": wandb.Image(fig)},
             step=global_step,
         )
         plt.close(fig)
-        self.net.train()
+        self.gpt.train()
 
     @staticmethod
     def finish():
@@ -174,12 +183,16 @@ if __name__ == "__main__":
         device = torch.device("cpu")
 
     train_config = {
-        "epochs": 100,
+        "epochs": 200,
         "batch_size": 32,
-        "steps_per_epoch": 100,
+        "steps_per_epoch": 200,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device
+    }
+
+    val_config = {
+        "batch_size": 300
     }
 
     wandb_config = {
@@ -226,7 +239,7 @@ if __name__ == "__main__":
     trainer = BayesGPTTrainer(
         model_family=model_family,
         adapter=adapter,
-        net=bayesgpt
+        gpt=bayesgpt
     )
 
     # Define checkpoint path
