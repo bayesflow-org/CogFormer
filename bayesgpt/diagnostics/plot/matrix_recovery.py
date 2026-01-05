@@ -13,7 +13,7 @@ def matrix_recovery(
 ):
     num_params = len(params)
 
-    n_rows = true.shape[1] // num_params
+    n_rows = true.shape[1]
 
     if figsize is None:
         figsize = (3.0 * num_params, 2.6 * n_rows)
@@ -60,7 +60,7 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
     # Safeguard plotting issue with fixed and/or masked parameters
     span = upper - lower
     if span == 0:
-        span = 1.0  # or a small constant
+        span = 1.0
     eps = span * 0.1
 
     ax.set_xlim((lower - eps, upper + eps))
