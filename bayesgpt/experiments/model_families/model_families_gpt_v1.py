@@ -1,7 +1,7 @@
 import torch
 import wandb
 from tqdm.auto import tqdm
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
@@ -35,9 +35,9 @@ class BayesGPTTrainer:
         global_step = 0
 
         # Define optimizer, scheduler, and loss function from config
-        optimizer = Adam(self.gpt.parameters(), lr=config["learning_rate"])
+        optimizer = AdamW(self.gpt.parameters(), lr=config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=config["epochs"])
-        loss_fn = mse_loss
+        loss_fn = nll_loss
 
         # Training loop
         for epoch in range(config["epochs"]):
@@ -107,7 +107,7 @@ class BayesGPTTrainer:
         )
 
         # Compute loss
-        L = loss_fn(adapted["param_matrices"], mu, adapted["param_masks"])
+        L = loss_fn(adapted["param_matrices"], mu, logvar, adapted["param_masks"])
         L.backward()
 
         if train_config["gradient_clip_norm"] is not None:
@@ -183,9 +183,9 @@ if __name__ == "__main__":
         device = torch.device("cpu")
 
     train_config = {
-        "epochs": 100,
+        "epochs": 200,
         "batch_size": 32,
-        "steps_per_epoch": 100,
+        "steps_per_epoch": 200,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device
