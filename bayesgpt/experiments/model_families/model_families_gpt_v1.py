@@ -183,9 +183,9 @@ if __name__ == "__main__":
         device = torch.device("cpu")
 
     train_config = {
-        "epochs": 200,
+        "epochs":500,
         "batch_size": 32,
-        "steps_per_epoch": 200,
+        "steps_per_epoch": 500,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device
