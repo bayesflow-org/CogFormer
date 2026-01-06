@@ -244,11 +244,11 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (f"bayesgpt"
-                       f"_e{train_config["epochs"]}"
-                       f"_bs{train_config["batch_size"]}"
-                       f"_l{bayesgpt_config["decoder_num_layers"]}"
-                       f"_h{bayesgpt_config["encoder_num_heads"]}"
-                       f"_s{bayesgpt_config["num_seeds"]}.pt")
+                       f"_e{train_config['epochs']}"
+                       f"_bs{train_config['batch_size']}"
+                       f"_l{bayesgpt_config['decoder_num_layers']}"
+                       f"_h{bayesgpt_config['encoder_num_heads']}"
+                       f"_s{bayesgpt_config['num_seeds']}.pt")
     # Train
     trainer.train(
         config=train_config,
