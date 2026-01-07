@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 
 @njit
-def rdm_baseline_prior() -> np.ndarray:
+def rdm_baseline_priors() -> np.ndarray:
     v_intercept = np.random.gamma(3.0, 0.8)
     v_diff = np.random.normal(0.0, 2.0)
     v_slope = np.random.normal(0.0, 3.0)
@@ -15,7 +15,7 @@ def rdm_baseline_prior() -> np.ndarray:
     )
 
 @njit
-def rdm_prior():
+def rdm_priors():
     return {
         "v":        {"intercept": np.random.gamma(3.0, 0.8),
                      "slope": 0.0},
@@ -30,7 +30,7 @@ def rdm_prior():
     }
 
 @njit
-def rdm_full_prior():
+def rdm_full_priors():
     return {
         "v":        {"intercept": np.random.gamma(3.0, 0.8),
                      "slope": np.random.normal(0.0, 3.0)},

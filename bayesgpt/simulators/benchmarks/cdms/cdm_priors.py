@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 
 @njit
-def cdm_baseline_prior() -> np.ndarray:
+def cdm_baseline_priors() -> np.ndarray:
     v_intercept = np.random.normal(1, 2)
     v_theta = 2.0 * np.pi * (np.random.beta(3.0, 3.0) - 0.5)
     v_slope = np.random.normal(0, 2)
@@ -21,7 +21,7 @@ def cdm_baseline_prior() -> np.ndarray:
     )
 
 @njit
-def cdm_prior():
+def cdm_priors():
     return {
         "v":        {"intercept": np.random.normal(1.0, 2.0),
                      "slope": 0.0},
@@ -38,7 +38,7 @@ def cdm_prior():
     }
 
 @njit
-def cdm_full_prior():
+def cdm_full_priors():
     return {
         "v":        {"intercept": np.random.normal(1.0, 2.0),
                      "slope": np.random.normal(0.0, 3.0)},
