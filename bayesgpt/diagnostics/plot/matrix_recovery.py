@@ -6,11 +6,14 @@ import seaborn as sns
 def matrix_recovery(
     true: np.ndarray,
     pred: np.ndarray,
-    params: list[str],
+    free_params: list[str],
+    fixed_params: list[str],
     intercept_color: str = "#000787",
     slope_color: str = "#A23BEC",
     figsize: tuple | None = None,
 ):
+
+    params = free_params + fixed_params
     num_params = len(params)
 
     n_rows = true.shape[1]
@@ -30,8 +33,12 @@ def matrix_recovery(
             y = pred[:, r, c]
 
             sns.scatterplot(x=x, y=y, ax=ax, color=row_color)
-
             make_quadratic(ax, x, y)
+
+            if r == 0 or (r > 0 and params[c] in free_params):
+                corr = np.corrcoef(x, y)[0, 1]
+                metric_label = f"r = {corr:.3f}"
+                ax.text(0.1, 0.95, metric_label, ha="left", va="center", transform=ax.transAxes, size=12)
 
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
             sns.despine(ax=ax)
