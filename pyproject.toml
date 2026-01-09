@@ -3,7 +3,7 @@ name = "bayesgpt"
 version = "0.1.0"
 description = "Generalized framework for multi-model amortized Bayesian inference"
 authors = [
-    { name = "Jerry Huang", email = "huangm5@rpi.edu" }
+    { name = "Jerry Huang", email = "aca.jerryh@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.11"
