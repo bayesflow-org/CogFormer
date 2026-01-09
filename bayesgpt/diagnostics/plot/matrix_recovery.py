@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from utils.plot_utils import hex_code
+from utils.plot_utils import hex_code, make_quadratic
 
 
 def matrix_recovery(
