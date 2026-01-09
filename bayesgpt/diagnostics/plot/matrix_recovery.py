@@ -21,7 +21,7 @@ def matrix_recovery(
     n_rows = true.shape[1]
 
     if figsize is None:
-        figsize = (3.0 * num_params, 2.6 * n_rows)
+        figsize = (3.0 * num_params, 3.0 * n_rows)
 
     fig, axarr = plt.subplots(n_rows, num_params, figsize=figsize, squeeze=False)
     slope_color = ""
@@ -49,20 +49,9 @@ def matrix_recovery(
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
             sns.despine(ax=ax)
 
-            ax.set_ylabel(row_ylabel)
-
-            if c == 0:
-                ax.set_ylabel(row_ylabel)
-            else:
-                ax.set_ylabel("")
-
-            if r == n_rows - 1:
-                ax.set_xlabel("Ground Truth")
-            else:
-                ax.set_xlabel("")
-
-            if r == 0:
-                ax.set_title(params[c])
+            ax.set_ylabel(row_ylabel if c == 0 else "")
+            ax.set_xlabel("Ground Truth" if r == n_rows - 1 else "")
+            ax.set_title(params[c] if r == 0 else "")
 
     fig.tight_layout()
     return fig

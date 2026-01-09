@@ -16,6 +16,7 @@ from networks.transformers.gpt import BayesGPTv1
 from networks.loss import mse_loss, nll_loss
 from diagnostics.plot.recovery import recovery
 from diagnostics.plot.matrix_recovery import matrix_recovery
+from diagnostics.plot.correlation import correlation
 
 
 class BayesGPTTrainer:
@@ -30,25 +31,25 @@ class BayesGPTTrainer:
         self.adapter = adapter
         self.gpt = gpt
 
-    def train(self, config, val_batch_size=300, checkpoint_path="bayesgpt_model.pt"):
+    def train(self, train_config, val_config, checkpoint_path="bayesgpt_model.pt"):
         # Define global step
         global_step = 0
 
         # Define optimizer, scheduler, and loss function from config
-        optimizer = AdamW(self.gpt.parameters(), lr=config["learning_rate"])
-        scheduler = CosineAnnealingLR(optimizer, T_max=config["epochs"])
+        optimizer = AdamW(self.gpt.parameters(), lr=train_config["learning_rate"])
+        scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
         loss_fn = nll_loss
 
         # Training loop
-        for epoch in range(config["epochs"]):
+        for epoch in range(train_config["epochs"]):
             pbar = tqdm(
-                total=config["steps_per_epoch"],
+                total=train_config["steps_per_epoch"],
                 desc=f"Epoch {(epoch + 1)}/{train_config['epochs']}",
                 miniters=100,
             )
-            for step in range(config["steps_per_epoch"]):
+            for step in range(train_config["steps_per_epoch"]):
                 # Compute metrics
-                loss, current_lr = self.step(
+                loss, current_lr = self.train_step(
                     config=train_config,
                     optimizer=optimizer,
                     scheduler=scheduler,
@@ -69,23 +70,23 @@ class BayesGPTTrainer:
                 pbar.update(1)
 
             if (epoch + 1) % 5 == 0:
-                self.validate(val_batch_size, global_step)
+                self.validate(val_config, global_step)
 
             scheduler.step()
             pbar.close()
 
         torch.save(self.gpt.state_dict(), checkpoint_path)
 
-    def step(self, config, optimizer, scheduler, loss_fn):
+    def train_step(self, config, optimizer, scheduler, loss_fn):
         """Training step"""
         # Generate training samples
         train_samples = self.model_family.batch_sample(
+            **config["sim_config"],
             batch_size=config["batch_size"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"}
             ),
-            num_obs=500,
             flatten_param_outputs=True
         )
 
@@ -124,17 +125,19 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def validate(self, batch_size, global_step):
+    def validate(self, config, global_step):
         # Generate training samples
         test_samples = self.model_family.batch_sample(
-            batch_size=batch_size,
+            **config["sim_config"],
+            batch_size=config["batch_size"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics={"v", "a", "tau", "s_v"},
                 fixed_intrinsics={"s_tau"}
             ),
-            num_obs=500,
             flatten_param_outputs=True
         )
+
+        max_num_categories = test_samples["max_num_categories"]
 
         # Adapt
         adapted = self.adapter.adapt(
@@ -157,17 +160,24 @@ class BayesGPTTrainer:
         params = ["v", "a", "tau", "s_v", "s_tau"]
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
-        true_set = true_set.reshape(batch_size, n_rows, n_cols)
-        pred_set = pred_set.reshape(batch_size, n_rows, n_cols)
+        true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
+        pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
 
         # Log recovery plot
         # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
-        fig = matrix_recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
+        free_params = ["v", "a", "tau", "s_v"]
+        fixed_params = ["s_tau"]
+        recovery_fig = matrix_recovery(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
+        correlation_fig = correlation(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
         wandb.log(
-            {"val/recovery": wandb.Image(fig)},
+            {
+                "val/recovery": wandb.Image(recovery_fig),
+                "val/correlation": wandb.Image(correlation_fig)
+            },
             step=global_step,
         )
-        plt.close(fig)
+        plt.close(recovery_fig)
+        plt.close(correlation_fig)
         self.gpt.train()
 
     @staticmethod
@@ -182,17 +192,36 @@ if __name__ == "__main__":
     else:
         device = torch.device("cpu")
 
+
+    max_num_regressors = 3
+    max_num_categories = 3
+    keep_intercept = True
+    num_obs = 500
+
+    # Automate input dim
+    # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
+    encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
+
+    model_family_config = {
+        "max_num_regressors": max_num_regressors,
+        "max_num_categories": max_num_categories,
+        "keep_intercept": keep_intercept,
+        "num_obs": num_obs,
+    }
+
     train_config = {
-        "epochs":500,
+        "epochs": 50,
         "batch_size": 32,
-        "steps_per_epoch": 500,
+        "steps_per_epoch": 50,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
-        "device": device
+        "device": device,
+        "sim_config": model_family_config,
     }
 
     val_config = {
-        "batch_size": 300
+        "batch_size": 300,
+        "sim_config": model_family_config,
     }
 
     wandb_config = {
@@ -203,7 +232,9 @@ if __name__ == "__main__":
         "watch_freq": 200
     }
 
+
     bayesgpt_config = {
+        "encoder_input_dim": encoder_input_dim,
         "encoder_num_layers": 8,
         "decoder_num_layers": 8,
         "encoder_num_heads": 8,
@@ -251,7 +282,8 @@ if __name__ == "__main__":
                        f"_s{bayesgpt_config['num_seeds']}.pt")
     # Train
     trainer.train(
-        config=train_config,
+        train_config=train_config,
+        val_config=val_config,
         checkpoint_path=checkpoint_path
     )
     trainer.finish()
