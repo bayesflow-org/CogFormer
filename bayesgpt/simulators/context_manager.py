@@ -7,8 +7,8 @@ class ContextManager:
     Utility class for constructing design configurations, parameter masks,
     design matrices, and sampled parameter matrices for NestedModelFamily.
     """
-    def __init__(self, parameter_names: list[str] = None):
-        self.parameter_names = parameter_names or []
+    def __init__(self, intrinsic_params: list[str] = None):
+        self.intrinsic_params = intrinsic_params
 
     def build_random_design_config(
         self,
@@ -25,16 +25,14 @@ class ContextManager:
         to subsets of intrinsic parameters.
         """
         # Set up mandatory and intercept only params based on free and fixed intrinsics
-        mandatory = set(free_intrinsics or [])
-        intercept_only = set(fixed_intrinsics or [])
         config: dict[str, list[str]] = {}
 
         if keep_intercept:
             names = []
             for param in intrinsic_params:
-                if param in mandatory:          # Free intrinsics always get an intercept
+                if param in free_intrinsics:          # Free intrinsics always get an intercept
                     names.append(param)
-                elif param in intercept_only:   # Fixed intrinsics sometimes get an intercept
+                elif param in fixed_intrinsics:       # Fixed intrinsics sometimes get an intercept
                     if np.random.rand() < intercept_prob:
                         names.append(param)
                 else:
@@ -46,7 +44,7 @@ class ContextManager:
             key = f"u_{r+1}" if keep_intercept else f"u_{r}"
             names = []
             for param in intrinsic_params:
-                if (param not in intercept_only) and (np.random.rand() < free_prob):
+                if (param not in fixed_intrinsics) and (np.random.rand() < free_prob):
                     names.append(param)
             config[key] = names
 
@@ -56,7 +54,7 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
-        max_num_categories: int = 5,
+        max_num_categories: int = 3,
         keep_intercept: bool = False
     ) -> np.ndarray:
         """
@@ -97,6 +95,26 @@ class ContextManager:
 
         return mask
 
+    def build_intrinsic_priors(
+        self,
+        prior_fun: callable | dict,
+        free_intrinsics: list[str] | set[str] | None = None,
+        fixed_intrinsics: list[str] | set[str] | None = None,
+    ):
+        priors = {}
+
+        for k in prior_fun.keys():
+            prior = {
+                k: {
+                    "intercept": prior_fun[k] if k in free_intrinsics else 0.0,
+                    "slope": np.random.normal(0.0, 1.0) if k in fixed_intrinsics else 0.0
+                }
+            }
+            priors = priors | prior
+
+        return priors
+
+
     def build_random_parameter_mask(
         self,
         intrinsic_params: list[str],
@@ -105,11 +123,16 @@ class ContextManager:
         max_num_categories: int = 4,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
+        inactive_intrinsics: list[str] | set[str] | None = None,
         free_prob: float = 0.5,     # Probability of a param being free
         keep_intercept: bool = False
     ) -> tuple:
         """
         Randomly generate both a design_config and its corresponding parameter mask.
+
+        free_intrinsics: both intercept and slopes are sampled
+        fixed_intrinsics: only intercept is sampled, slopes are not
+        frozen_intrinsics: neither intercept nor slope are sampled
         """
         design_config = self.build_random_design_config(
             intrinsic_params=intrinsic_params,
@@ -128,7 +151,17 @@ class ContextManager:
             keep_intercept=keep_intercept,
         )
 
-        return parameter_mask, design_config
+        active_mask = parameter_mask.copy()
+
+        if inactive_intrinsics is not None:
+            for name in inactive_intrinsics:
+                if name in intrinsic_params:
+                    j = intrinsic_params.index(name)
+                    active_mask[:, j] = 0.0
+
+        active_mask *= parameter_mask
+
+        return parameter_mask, design_config, active_mask
 
     def build_random_discrete_mask(
         self,
@@ -278,8 +311,8 @@ class ContextManager:
     def sample_parameter_matrix(
         self,
         parameter_mask: np.ndarray,
-        prior_fun: dict[str, Callable | dict[str, Callable]],
         intrinsic_params: list[str],
+        prior_fun: dict[str, Callable | dict[str, Callable]],
     ) -> np.ndarray:
         """
         Sample parameter matrix based on the given parameter mask and the associated priors.
@@ -298,6 +331,8 @@ class ContextManager:
 
         for design_index in range(num_regressors):
             for param_index, intrinsic in enumerate(intrinsic_params):
+                if parameter_mask[design_index, param_index] != 1.0:
+                    continue
                 # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:
 

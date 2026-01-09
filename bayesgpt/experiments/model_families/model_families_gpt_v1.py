@@ -192,7 +192,6 @@ if __name__ == "__main__":
     else:
         device = torch.device("cpu")
 
-
     max_num_regressors = 3
     max_num_categories = 3
     keep_intercept = True
