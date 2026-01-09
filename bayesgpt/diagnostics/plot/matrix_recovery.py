@@ -2,14 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from utils.plot_utils import hex_code
+
 
 def matrix_recovery(
     true: np.ndarray,
     pred: np.ndarray,
     free_params: list[str],
     fixed_params: list[str],
+    max_num_categories: int = 3,
     intercept_color: str = "#000787",
-    slope_color: str = "#A23BEC",
     figsize: tuple | None = None,
 ):
 
@@ -22,8 +24,10 @@ def matrix_recovery(
         figsize = (3.0 * num_params, 2.6 * n_rows)
 
     fig, axarr = plt.subplots(n_rows, num_params, figsize=figsize, squeeze=False)
-
+    slope_color = ""
     for r in range(n_rows):
+        if r % max_num_categories == 1:
+            slope_color = hex_code()
         row_color = intercept_color if r == 0 else slope_color
         row_ylabel = "intercept (1)" if r == 0 else f"u_{r}"
 
@@ -42,6 +46,8 @@ def matrix_recovery(
 
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
             sns.despine(ax=ax)
+
+            ax.set_ylabel(row_ylabel)
 
             if c == 0:
                 ax.set_ylabel(row_ylabel)

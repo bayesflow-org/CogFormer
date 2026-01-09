@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,3 +21,6 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
         alpha=0.9,
         linestyle="dashed",
     )
+
+def hex_code():
+    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
