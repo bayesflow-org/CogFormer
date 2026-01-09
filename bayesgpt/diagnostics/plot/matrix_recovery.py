@@ -29,7 +29,9 @@ def matrix_recovery(
         if r % max_num_categories == 1:
             slope_color = hex_code()
         row_color = intercept_color if r == 0 else slope_color
-        row_ylabel = "intercept (1)" if r == 0 else f"u_{r}"
+        regressor_index = (r - 1) // (max_num_categories - 1) + 1
+        category_index = (r - 1) % (max_num_categories - 1) + 1
+        row_ylabel = "1" if r == 0 else fr"$u_{regressor_index}$ | $c_{category_index}$"
 
         for c in range(num_params):
             ax = axarr[r, c]
