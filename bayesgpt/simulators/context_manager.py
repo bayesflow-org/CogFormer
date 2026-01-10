@@ -97,7 +97,7 @@ class ContextManager:
 
     def build_intrinsic_priors(
         self,
-        prior_fun: callable | dict,
+        prior_fun: Callable | dict = None,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
     ):
@@ -106,8 +106,8 @@ class ContextManager:
         for k in prior_fun.keys():
             prior = {
                 k: {
-                    "intercept": prior_fun[k] if k in free_intrinsics else 0.0,
-                    "slope": np.random.normal(0.0, 1.0) if k in fixed_intrinsics else 0.0
+                    "intercept": prior_fun[k] if k in free_intrinsics else lambda: 0.0,
+                    "slope": lambda: (np.random.normal(0.0, 1.0) if k in free_intrinsics else 0.0)
                 }
             }
             priors = priors | prior

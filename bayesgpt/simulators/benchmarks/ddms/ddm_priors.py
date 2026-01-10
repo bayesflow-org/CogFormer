@@ -4,11 +4,11 @@ from scipy.stats import halfnorm
 
 def ddm_baseline_priors():
     return {
-        "v":        np.random.gamma(2., 1.),
-        "a":        np.random.normal(-.1, 0.3),
-        "tau":      np.random.normal(-1.5, 0.3),
-        "s_v":      halfnorm(loc=0.0, scale=1.0),
-        "s_tau":    np.random.beta(1.0, 3.0),
+        "v":        lambda: np.random.gamma(2., 1.),
+        "a":        lambda: np.random.normal(-.1, 0.3),
+        "tau":      lambda: np.random.normal(-1.5, 0.3),
+        "s_v":      lambda: halfnorm.rvs(loc=0.0, scale=1.0),
+        "s_tau":    lambda: np.random.beta(1.0, 3.0),
         # "decay":  np.random.gamma(1.0, 0.4),
     }
 
