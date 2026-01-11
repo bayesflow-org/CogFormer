@@ -340,8 +340,6 @@ class ContextManager:
 
         for design_index in range(num_regressors):
             for param_index, intrinsic in enumerate(intrinsic_params):
-                if parameter_mask[design_index, param_index] != 1.0:
-                    continue
                 # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:
 
