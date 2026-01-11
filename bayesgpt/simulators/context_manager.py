@@ -28,16 +28,18 @@ class ContextManager:
         config: dict[str, list[str]] = {}
 
         if keep_intercept:
-            names = []
-            for param in intrinsic_params:
-                if param in free_intrinsics:          # Free intrinsics always get an intercept
-                    names.append(param)
-                elif param in fixed_intrinsics:       # Fixed intrinsics sometimes get an intercept
-                    if np.random.rand() < intercept_prob:
-                        names.append(param)
-                else:
-                    if np.random.rand() < free_prob:
-                        names.append(param)
+            # All intrinsic parameters get intercepts.
+            # Whether they are free or fixed is determined later.
+            names = intrinsic_params
+            # for param in intrinsic_params:
+            #     names.append(param)
+            #     if param in free_intrinsics:          # Free intrinsics always get an intercept
+            #         names.append(param)
+            #     elif param in fixed_intrinsics:       # Fixed intrinsics sometimes get an intercept
+            #         names.append(param)
+            #     else:
+            #         if np.random.rand() < free_prob:
+            #             names.append(param)
             config["1"] = names
 
         for r in range(num_regressors):
@@ -100,13 +102,20 @@ class ContextManager:
         prior_fun: Callable | dict = None,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
+        fixed_values: dict[str, float] | None = None
     ):
         priors = {}
 
         for k in prior_fun.keys():
+            # If the user provides a fixed value for a fixed intrinsic parameter,
+            # use that value. Otherwise, default to zero.
+            if k in fixed_intrinsics and k in fixed_values:
+                fixed_value = fixed_values[k]
+            else:
+                fixed_value = 0.0
             prior = {
                 k: {
-                    "intercept": prior_fun[k] if k in free_intrinsics else lambda: 0.0,
+                    "intercept": prior_fun[k] if k in free_intrinsics else lambda: fixed_value,
                     "slope": lambda: (np.random.normal(0.0, 1.0) if k in free_intrinsics else 0.0)
                 }
             }
@@ -151,17 +160,17 @@ class ContextManager:
             keep_intercept=keep_intercept,
         )
 
-        active_mask = parameter_mask.copy()
+        # active_mask = parameter_mask.copy()
+        #
+        # if inactive_intrinsics is not None:
+        #     for name in inactive_intrinsics:
+        #         if name in intrinsic_params:
+        #             j = intrinsic_params.index(name)
+        #             active_mask[:, j] = 0.0
+        #
+        # active_mask *= parameter_mask
 
-        if inactive_intrinsics is not None:
-            for name in inactive_intrinsics:
-                if name in intrinsic_params:
-                    j = intrinsic_params.index(name)
-                    active_mask[:, j] = 0.0
-
-        active_mask *= parameter_mask
-
-        return parameter_mask, design_config, active_mask
+        return parameter_mask, design_config#, active_mask
 
     def build_random_discrete_mask(
         self,
