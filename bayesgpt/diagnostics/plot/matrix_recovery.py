@@ -13,12 +13,16 @@ def matrix_recovery(
     max_num_categories: int = 3,
     intercept_color: str = "#000787",
     figsize: tuple | None = None,
+    group_by_category: bool = False,
 ):
 
     params = free_params + fixed_params
     num_params = len(params)
 
-    n_rows = true.shape[1]
+    if group_by_category:
+        n_rows = (true.shape[1] - 1) // (max_num_categories - 1) + 1
+    else:
+        n_rows = true.shape[1]
 
     if figsize is None:
         figsize = (3.0 * num_params, 3.0 * n_rows)
@@ -26,7 +30,7 @@ def matrix_recovery(
     fig, axarr = plt.subplots(n_rows, num_params, figsize=figsize, squeeze=False)
     slope_color = ""
     for r in range(n_rows):
-        if r % max_num_categories == 1:
+        if r % (max_num_categories - 1) == 1:
             slope_color = hex_code()
         row_color = intercept_color if r == 0 else slope_color
         regressor_index = (r - 1) // (max_num_categories - 1) + 1
