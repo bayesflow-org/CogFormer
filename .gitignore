@@ -182,3 +182,4 @@ bayesgpt/wandb
 
 # Checkpoints
 *.ckpt
+model.keras
