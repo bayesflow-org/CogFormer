@@ -115,8 +115,9 @@ class ContextManager:
                 fixed_value = 0.0
             prior = {
                 k: {
-                    "intercept": prior_fun[k] if k in free_intrinsics else lambda: fixed_value,
-                    "slope": lambda: (np.random.normal(0.0, 1.0) if k in free_intrinsics else 0.0)
+                    # Assign variable to avoid late-binding issues
+                    "intercept": prior_fun[k] if k in free_intrinsics else lambda v=fixed_value: v,
+                    "slope": lambda key=k: np.random.normal(0.0, 1.0) if key in free_intrinsics else lambda: 0.0
                 }
             }
             priors = priors | prior
@@ -339,14 +340,14 @@ class ContextManager:
         has_intercept = parameter_mask[0].any()
 
         for design_index in range(num_regressors):
-            for param_index, intrinsic in enumerate(intrinsic_params):
+            for param_index, intrinsic_param in enumerate(intrinsic_params):
                 # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:
 
                     if (design_index == 0) and has_intercept:
-                        sampler = prior_fun[intrinsic]["intercept"]
+                        sampler = prior_fun[intrinsic_param]["intercept"]
                     else:
-                        sampler = prior_fun[intrinsic]["slope"]
+                        sampler = prior_fun[intrinsic_param]["slope"]
 
                     parameter_matrix[design_index, param_index] = sampler()
         return parameter_matrix
