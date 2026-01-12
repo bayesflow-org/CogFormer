@@ -11,12 +11,12 @@ from viz import visualize_matrix, visualize_matrices, visualize_design_configs
 class NestedModelFamily:
     def __init__(
         self,
-        name: str,
         model: Model,
         prior_fun: dict[str, dict[str, Callable]],
         intrinsic_params: list[str] | None = None,
         context_manager: ContextManager | None = None,
         mask_randomizer_kwargs: dict | None = None,
+        name: str | None = None,
     ):
         self.name = name
         self.model = model
@@ -34,7 +34,7 @@ class NestedModelFamily:
         # Detect whether the user-supplied priors are intrinsic priors
         is_intrinsic_priors = True
         for _, v in prior_fun.items():
-            if not isinstance(v, dict) or ("intercept" not in v) or ("slope" not in v):
+            if not isinstance(v, dict):
                 is_intrinsic_priors = False
 
         # If they are intrinsic priors, use as is.
