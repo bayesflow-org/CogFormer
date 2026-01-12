@@ -10,7 +10,7 @@ np.set_printoptions(suppress=True)
 
 from simulators import NestedModelFamily
 from simulators.benchmarks import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_full_priors
+from simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
 from adapters import Adapter
 from networks.transformers.gpt import BayesGPTv1
 from networks.loss import mse_loss, nll_loss
@@ -24,12 +24,14 @@ class BayesGPTTrainer:
         self,
         model_family,
         adapter,
-        gpt
+        gpt,
+        use_wandb=False,
     ):
         super().__init__()
         self.model_family = model_family
         self.adapter = adapter
         self.gpt = gpt
+        self.use_wandb = use_wandb
 
     def train(self, train_config, val_config, checkpoint_path="bayesgpt_model.pt"):
         # Define global step
@@ -56,14 +58,15 @@ class BayesGPTTrainer:
                     loss_fn=loss_fn
                 )
                 # Log metrics
-                wandb.log(
-                    {
-                        "train/loss": loss,
-                        "opt/lr": current_lr,
-                        "epoch": epoch + 1,
-                    },
-                    step=global_step,
-                )
+                if self.use_wandb:
+                    wandb.log(
+                        {
+                            "train/loss": loss,
+                            "opt/lr": current_lr,
+                            "epoch": epoch + 1,
+                        },
+                        step=global_step,
+                    )
                 # Update internal steps
                 global_step += 1
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
@@ -83,10 +86,6 @@ class BayesGPTTrainer:
         train_samples = self.model_family.batch_sample(
             **config["sim_config"],
             batch_size=config["batch_size"],
-            mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v"},
-                fixed_intrinsics={"s_tau"}
-            ),
             flatten_param_outputs=True
         )
 
@@ -130,10 +129,6 @@ class BayesGPTTrainer:
         test_samples = self.model_family.batch_sample(
             **config["sim_config"],
             batch_size=config["batch_size"],
-            mask_randomizer_kwargs=dict(
-                free_intrinsics={"v", "a", "tau", "s_v"},
-                fixed_intrinsics={"s_tau"}
-            ),
             flatten_param_outputs=True
         )
 
@@ -165,19 +160,24 @@ class BayesGPTTrainer:
 
         # Log recovery plot
         # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
-        free_params = ["v", "a", "tau", "s_v"]
-        fixed_params = ["s_tau"]
+        free_params = ["v", "a", "tau"]
+        fixed_params = ["s_v", "s_tau"]
         recovery_fig = matrix_recovery(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
         correlation_fig = correlation(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
-        wandb.log(
-            {
-                "val/recovery": wandb.Image(recovery_fig),
-                "val/correlation": wandb.Image(correlation_fig)
-            },
-            step=global_step,
-        )
-        plt.close(recovery_fig)
-        plt.close(correlation_fig)
+
+        if self.use_wandb:
+            wandb.log(
+                {
+                    "val/recovery": wandb.Image(recovery_fig),
+                    "val/correlation": wandb.Image(correlation_fig)
+                },
+                step=global_step,
+            )
+            plt.close(recovery_fig)
+            plt.close(correlation_fig)
+        else:
+            pass
+
         self.gpt.train()
 
     @staticmethod
@@ -209,9 +209,9 @@ if __name__ == "__main__":
     }
 
     train_config = {
-        "epochs": 50,
+        "epochs": 200,
         "batch_size": 32,
-        "steps_per_epoch": 50,
+        "steps_per_epoch": 200,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
@@ -260,7 +260,12 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_full_priors()
+        prior_fun=ddm_full_priors(),
+        mask_randomizer_kwargs=dict(
+            free_intrinsics=["v", "a", "tau"],
+            fixed_intrinsics=["s_v", "s_tau"],
+            fixed_values={"s_v": 0.0, "s_tau": 0.0}
+        )
     )
     adapter = Adapter()
     bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
@@ -273,12 +278,15 @@ if __name__ == "__main__":
     )
 
     # Define checkpoint path
-    checkpoint_path = (f"bayesgpt"
-                       f"_e{train_config['epochs']}"
-                       f"_bs{train_config['batch_size']}"
-                       f"_l{bayesgpt_config['decoder_num_layers']}"
-                       f"_h{bayesgpt_config['encoder_num_heads']}"
-                       f"_s{bayesgpt_config['num_seeds']}.pt")
+    checkpoint_path = (
+        f"bayesgpt"
+        f"_e{train_config['epochs']}"
+        f"_bs{train_config['batch_size']}"
+        f"_l{bayesgpt_config['decoder_num_layers']}"
+        f"_h{bayesgpt_config['encoder_num_heads']}"
+        f"_s{bayesgpt_config['num_seeds']}.pt"
+    )
+
     # Train
     trainer.train(
         train_config=train_config,
