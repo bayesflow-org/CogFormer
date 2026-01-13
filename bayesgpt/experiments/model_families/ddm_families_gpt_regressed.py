@@ -170,12 +170,6 @@ class BayesGPTTrainer:
             fixed_params=config['fixed_params']
         )
 
-        figures_dir = Path("./experiments/figures")
-        figures_dir.mkdir(parents=False, exist_ok=True)
-
-        recovery_fig.savefig(figures_dir / "ddm_family_gpt_intercept_only_recovery.pdf", bbox_inches="tight")
-        correlation_fig.savefig(figures_dir / "ddm_family_gpt_intercept_only_correlation.pdf", bbox_inches="tight")
-
         if self.use_wandb:
             wandb.log(
                 {
@@ -184,10 +178,17 @@ class BayesGPTTrainer:
                 },
                 step=global_step,
             )
-            plt.close(recovery_fig)
-            plt.close(correlation_fig)
         else:
             pass
+        
+        figures_dir = Path("./experiments/figures")
+        figures_dir.mkdir(parents=False, exist_ok=True)
+
+        recovery_fig.savefig(figures_dir / "ddm_family_gpt_regressed_recovery.pdf", bbox_inches="tight")
+        correlation_fig.savefig(figures_dir / "ddm_family_gpt_regressed_correlation.pdf", bbox_inches="tight")
+
+        plt.close(recovery_fig)
+        plt.close(correlation_fig)
 
         self.gpt.train()
 
@@ -205,16 +206,19 @@ if __name__ == "__main__":
 
     use_wandb = True
 
-    max_num_regressors = 0
-    max_num_categories = 0
+    min_num_regressors = 2
+    max_num_regressors = 2
+    max_num_categories = 2
     keep_intercept = True
     num_obs = 500
+    regressed_params = ["v", "a"]
 
     # Automate input dim
     # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
     encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     model_family_config = {
+        "min_num_regressors": min_num_regressors,
         "max_num_regressors": max_num_regressors,
         "max_num_categories": max_num_categories,
         "keep_intercept": keep_intercept,
@@ -229,9 +233,9 @@ if __name__ == "__main__":
     }
 
     train_config = {
-        "epochs": 10,
+        "epochs": 500,
         "batch_size": 32,
-        "steps_per_epoch": 10,
+        "steps_per_epoch": 500,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
@@ -284,6 +288,7 @@ if __name__ == "__main__":
         model=DDM(),
         name="DDM",
         prior_fun=ddm_baseline_priors(),
+        regressed_params=regressed_params,
         mask_randomizer_kwargs=mask_randomizer_kwargs
     )
     adapter = Adapter()
