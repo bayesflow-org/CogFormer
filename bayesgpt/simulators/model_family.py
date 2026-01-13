@@ -14,6 +14,7 @@ class NestedModelFamily:
         model: Model,
         prior_fun: dict[str, dict[str, Callable]],
         intrinsic_params: list[str] | None = None,
+        regressed_params: list[str] | None = None,
         context_manager: ContextManager | None = None,
         mask_randomizer_kwargs: dict | None = None,
         name: str | None = None,
@@ -28,6 +29,7 @@ class NestedModelFamily:
         if intrinsic_params is None:
             intrinsic_params = list(prior_fun.keys())
         self.intrinsic_params = intrinsic_params
+        self.regressed_params = regressed_params
 
         self.mask_randomizer_kwargs = mask_randomizer_kwargs
 
@@ -60,7 +62,7 @@ class NestedModelFamily:
         self,
         design_config: dict[str, list[str]] = None,
         num_obs: int = 10,
-        num_regressors: int = 0,
+        num_regressors: int = 2,
         max_num_regressors: int = 5,
         max_num_categories: int = 4,
         link_fun: Callable = shifted_softplus,
@@ -72,6 +74,14 @@ class NestedModelFamily:
         debug: bool = False,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
+        if design_config is None and self.regressed_params is not None:
+            design_config = self.context_manager.build_design_config(
+                intrinsic_params=self.intrinsic_params,
+                regressed_params=self.regressed_params,
+                num_regressors=num_regressors,
+                keep_intercept=keep_intercept,
+            )
+
         if design_config is None:
             kwargs = self.mask_randomizer_kwargs or {}
             parameter_mask, design_config = self.context_manager.build_random_parameter_mask(

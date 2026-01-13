@@ -10,6 +10,27 @@ class ContextManager:
     def __init__(self, intrinsic_params: list[str] = None):
         self.intrinsic_params = intrinsic_params
 
+    def build_design_config(
+        self,
+        intrinsic_params: list[str],
+        regressed_params: list[str] = None,
+        num_regressors: int = 2,
+        keep_intercept: bool = False
+    ):
+
+        config = {}
+        if keep_intercept:
+            names = intrinsic_params
+            config["1"] = names
+
+        for r in range(num_regressors):
+            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
+            config[key] = regressed_params
+
+        return config
+
+
+
     def build_random_design_config(
         self,
         intrinsic_params: list[str],
@@ -128,7 +149,7 @@ class ContextManager:
     def build_random_parameter_mask(
         self,
         intrinsic_params: list[str],
-        num_regressors: int,
+        num_regressors: int = 2,
         # max_num_regressors: int = 5,
         max_num_categories: int = 4,
         free_intrinsics: list[str] | set[str] | None = None,
