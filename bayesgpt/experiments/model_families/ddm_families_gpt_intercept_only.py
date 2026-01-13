@@ -1,5 +1,6 @@
 import torch
 import wandb
+from pathlib import Path
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -132,8 +133,6 @@ class BayesGPTTrainer:
             flatten_param_outputs=True
         )
 
-        max_num_categories = test_samples["max_num_categories"]
-
         # Adapt
         adapted = self.adapter.adapt(
             test_samples,
@@ -160,10 +159,19 @@ class BayesGPTTrainer:
 
         # Log recovery plot
         # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
-        free_params = ["v", "a", "tau"]
-        fixed_params = ["s_v", "s_tau"]
-        recovery_fig = matrix_recovery(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
-        correlation_fig = correlation(true_set, pred_set, free_params=free_params, fixed_params=fixed_params)
+        recovery_fig = matrix_recovery(
+            true_set, pred_set,
+            free_params=config['free_params'],
+            fixed_params=config['fixed_params']
+        )
+        correlation_fig = correlation(
+            true_set, pred_set,
+            free_params=config['free_params'],
+            fixed_params=config['fixed_params']
+        )
+
+        recovery_fig.savefig("../figures/mf_recovery_gpt_intercept_only.pdf", bbox_inches="tight")
+        correlation_fig.savefig("../figures/mf_correlation_gpt_intercept_only.pdf", bbox_inches="tight")
 
         if self.use_wandb:
             wandb.log(
@@ -208,13 +216,18 @@ if __name__ == "__main__":
         "max_num_categories": max_num_categories,
         "keep_intercept": keep_intercept,
         "num_obs": num_obs,
-        "mask_randomizer_kwargs": {}
+    }
+
+    mask_randomizer_kwargs = {
+        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "fixed_intrinsics": [],
+        "fixed_values": {}
     }
 
     train_config = {
-        "epochs": 200,
+        "epochs": 10,
         "batch_size": 32,
-        "steps_per_epoch": 200,
+        "steps_per_epoch": 10,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
@@ -224,6 +237,9 @@ if __name__ == "__main__":
     val_config = {
         "batch_size": 300,
         "sim_config": model_family_config,
+        "free_params": mask_randomizer_kwargs["fixed_intrinsics"],
+        "fixed_params": mask_randomizer_kwargs["fixed_intrinsics"],
+        "fixed_values": mask_randomizer_kwargs["fixed_values"],
     }
 
     wandb_config = {
@@ -233,7 +249,6 @@ if __name__ == "__main__":
         "watch_log": "gradients",
         "watch_freq": 200
     }
-
 
     bayesgpt_config = {
         "encoder_input_dim": encoder_input_dim,
@@ -265,11 +280,7 @@ if __name__ == "__main__":
         model=DDM(),
         name="DDM",
         prior_fun=ddm_baseline_priors(),
-        mask_randomizer_kwargs=dict(
-            free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
-            fixed_intrinsics=[],
-            fixed_values={}
-        )
+        mask_randomizer_kwargs=mask_randomizer_kwargs
     )
     adapter = Adapter()
     bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
