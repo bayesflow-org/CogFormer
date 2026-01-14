@@ -209,3 +209,9 @@ class Adapter:
         }
 
         return Adapter.to_device(out, device)
+
+    def build_inference_condition(
+        self,
+        context_manager
+    ):
+        raise NotImplementedError
