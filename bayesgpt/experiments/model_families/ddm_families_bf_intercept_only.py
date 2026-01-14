@@ -78,8 +78,8 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=10,
-        steps_per_epoch=10,
+        epochs=500,
+        steps_per_epoch=200,
         batch_size=32
     )
 
@@ -94,9 +94,9 @@ def main():
     figures = workflow.plot_default_diagnostics(
         test_data=300,
         num_samples=300,
-        param_names=param_names,
-        loss_kwargs={"figsize": (16, 3), "label_fontsize": 12},
-        recovery_kwargs={"figsize": (16, 6), "label_fontsize": 12},
+        variable_names=param_names,
+        loss_kwargs={"figsize": (16, 3), "label_fontsize": 14},
+        recovery_kwargs={"figsize": (16, 3), "label_fontsize": 14},
     )
 
     figures_dir = Path("./experiments/figures")

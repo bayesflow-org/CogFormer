@@ -19,7 +19,6 @@ from diagnostics.plot.matrix_recovery import matrix_recovery
 from diagnostics.plot.correlation import correlation
 
 
-
 class BayesGPTTrainer:
     def __init__(
         self,
@@ -229,9 +228,9 @@ if __name__ == "__main__":
     }
 
     train_config = {
-        "epochs": 10,
+        "epochs": 500,
         "batch_size": 32,
-        "steps_per_epoch": 10,
+        "steps_per_epoch": 200,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
