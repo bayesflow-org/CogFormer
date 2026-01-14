@@ -53,7 +53,6 @@ class NestedModelFamily:
                 fixed_values=mask_randomizer_kwargs["fixed_values"],
             )
 
-
     @property
     def parameter_names(self) -> list[str]:
         return self.context_manager.parameter_names
@@ -72,28 +71,29 @@ class NestedModelFamily:
         keep_intercept: bool = True,
         flatten_param_outputs: bool = True,
         debug: bool = False,
+        for_inference: bool = False
     ):
         # Create design config and parameter mask, either dynamically or based on user input
-        if design_config is None and self.regressed_params is not None:
-            design_config = self.context_manager.build_design_config(
-                intrinsic_params=self.intrinsic_params,
-                regressed_params=self.regressed_params,
-                num_regressors=num_regressors,
-                keep_intercept=keep_intercept,
-            )
-
         if design_config is None:
-            kwargs = self.mask_randomizer_kwargs or {}
-            parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
-                intrinsic_params=self.intrinsic_params,
-                num_regressors=num_regressors,
-                # max_num_regressors=max_num_regressors,
-                max_num_categories=max_num_categories,
-                keep_intercept=keep_intercept,
-                free_prob=free_prob,
-                free_intrinsics=kwargs.get("free_intrinsics"),
-                fixed_intrinsics=kwargs.get("fixed_intrinsics")
-            )
+            if for_inference and self.regressed_params is not None:
+                design_config = self.context_manager.build_design_config(
+                    intrinsic_params=self.intrinsic_params,
+                    regressed_params=self.regressed_params,
+                    num_regressors=num_regressors,
+                    keep_intercept=keep_intercept,
+                )
+            else:
+                kwargs = self.mask_randomizer_kwargs or {}
+                parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
+                    intrinsic_params=self.intrinsic_params,
+                    num_regressors=num_regressors,
+                    # max_num_regressors=max_num_regressors,
+                    max_num_categories=max_num_categories,
+                    keep_intercept=keep_intercept,
+                    free_prob=free_prob,
+                    free_intrinsics=kwargs.get("free_intrinsics"),
+                    fixed_intrinsics=kwargs.get("fixed_intrinsics")
+                )
         else:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
