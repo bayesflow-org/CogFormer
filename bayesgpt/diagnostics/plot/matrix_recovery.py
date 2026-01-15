@@ -10,7 +10,7 @@ def matrix_recovery(
     pred: np.ndarray,
     free_params: list[str],
     fixed_params: list[str],
-    max_num_categories: int = 3,
+    max_num_categories: int = 2,
     intercept_color: str = "#000787",
     figsize: tuple | None = None,
     group_by_category: bool = False,
