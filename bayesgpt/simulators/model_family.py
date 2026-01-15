@@ -66,24 +66,36 @@ class NestedModelFamily:
         max_num_categories: int = 4,
         link_fun: Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
+        mask_randomizer_kwargs: dict | None = None,
         discrete_prob: float = 0.5,
         free_prob: float = 0.5,
         keep_intercept: bool = True,
         flatten_param_outputs: bool = True,
         debug: bool = False,
-        for_inference: bool = False
+        fixed_config: bool = False
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
-            if for_inference and self.regressed_params is not None:
+            if fixed_config and self.regressed_params is not None:
                 design_config = self.context_manager.build_design_config(
                     intrinsic_params=self.intrinsic_params,
                     regressed_params=self.regressed_params,
                     num_regressors=num_regressors,
                     keep_intercept=keep_intercept,
                 )
+                parameter_mask = self.context_manager.build_parameter_mask(
+                    design_config=design_config,
+                    intrinsic_params=self.intrinsic_params,
+                    max_num_categories=max_num_categories,
+                    keep_intercept=keep_intercept,
+                    # max_num_regressors=max_num_regressors,
+                )
             else:
-                kwargs = self.mask_randomizer_kwargs or {}
+                if mask_randomizer_kwargs is None:
+                    kwargs = self.mask_randomizer_kwargs
+                else:
+                    kwargs = mask_randomizer_kwargs
+                kwargs = kwargs or {}
                 parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
                     intrinsic_params=self.intrinsic_params,
                     num_regressors=num_regressors,
@@ -130,7 +142,8 @@ class NestedModelFamily:
         parameter_matrix = self.context_manager.sample_parameter_matrix(
             parameter_mask=parameter_mask,
             prior_fun=self.prior_fun,
-            intrinsic_params=self.intrinsic_params
+            intrinsic_params=self.intrinsic_params,
+            keep_intercept=keep_intercept,
         )
 
         # Compose per-trial intrinsic values
@@ -193,7 +206,9 @@ class NestedModelFamily:
         discrete_prob: float = 0.5,
         keep_intercept: bool = True,
         remove_intercept_on_collate: bool = False,
+        mask_randomizer_kwargs: dict | None = None,
         flatten_param_outputs: bool = True,
+        fixed_config: bool = False,
         visualize: bool = False,
     ) -> list[dict] | dict:
         # Sample num_obs and num_regressors per batch element if not provided
@@ -231,12 +246,14 @@ class NestedModelFamily:
                 design_config=design_config,
                 num_obs=num_obs,
                 context=ctx_i,
+                mask_randomizer_kwargs=mask_randomizer_kwargs if mask_randomizer_kwargs is not None else self.mask_randomizer_kwargs,
                 num_regressors=num_regressors,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,
                 # max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
-                flatten_param_outputs=flatten_param_outputs
+                flatten_param_outputs=flatten_param_outputs,
+                fixed_config=fixed_config
             )
 
             sim_instance["num_obs"] = num_obs

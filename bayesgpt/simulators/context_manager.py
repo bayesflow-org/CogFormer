@@ -344,6 +344,7 @@ class ContextManager:
         parameter_mask: np.ndarray,
         intrinsic_params: list[str],
         prior_fun: dict[str, Callable | dict[str, Callable]],
+        keep_intercept: bool = False,
     ) -> np.ndarray:
         """
         Sample parameter matrix based on the given parameter mask and the associated priors.
@@ -358,13 +359,17 @@ class ContextManager:
             return parameter_matrix
 
         # Heuristic: treat the very first row as intercept if any nonzero exists there.
-        has_intercept = parameter_mask[0].any()
+        has_intercept = keep_intercept and parameter_mask[0].any()
 
         for design_index in range(num_regressors):
+            is_intercept_row = has_intercept and (design_index == 0)
+
             for param_index, intrinsic_param in enumerate(intrinsic_params):
                 # Sample prior if parameter or regressor is not masked
-                if parameter_mask[design_index, param_index] == 1.0:
+                if parameter_mask[design_index, param_index] != 1.0:
+                    continue
 
+                if parameter_mask[design_index, param_index] == 1.0:
                     if (design_index == 0) and has_intercept:
                         sampler = prior_fun[intrinsic_param]["intercept"]
                     else:
