@@ -37,7 +37,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         sample_kwargs = {
             'min_num_regressors': 2,
             "max_num_regressors": 2,
-            "max_num_categories": 2
+            "max_num_categories": 2,
+            "fixed_config": True
         }
 
         samples = self.model_family.batch_sample(
@@ -138,7 +139,7 @@ def main():
 
 
 if __name__ == '__main__':
-    debug = False
+    debug = True
 
     if debug:
         test()

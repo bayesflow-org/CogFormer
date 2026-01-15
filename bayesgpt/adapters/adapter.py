@@ -212,6 +212,61 @@ class Adapter:
 
     def build_inference_condition(
         self,
-        context_manager
+        context_manager,
+        design_config: dict,
+        intrinsic_params: list[str],
+        max_num_regressors: int,
+        max_num_categories: int,
+        keep_intercept: bool,
+        device: str | torch.device = torch.device("cuda"),
+        additional_tokens: np.ndarray | None = None,
     ):
-        raise NotImplementedError
+        param_mask = context_manager.build_parameter_mask(
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_regressors=max_num_regressors,
+            max_num_categories=max_num_categories,
+            keep_intercept=keep_intercept,
+        )
+        param_mask = Adapter.to_torch_tensor(param_mask.flatten()[None, :]).to(torch.float32)
+
+        # Build indices (fixed by max sizes)
+        parameter_indices = Adapter.build_parameter_indices(
+            intrinsic_params,
+            num_regressors=max_num_regressors,
+            num_categories=max_num_categories,
+        )
+        regressor_indices = Adapter.build_regressor_indices(
+            intrinsic_params,
+            num_regressors=max_num_regressors,
+            num_categories=max_num_categories,
+        )
+
+        parameter_indices = Adapter.to_torch_tensor(parameter_indices[None, ...]).to(torch.float32)
+        regressor_indices = Adapter.to_torch_tensor(regressor_indices[None, ...]).to(torch.float32)
+
+        # Tokens
+        num_tokens = parameter_indices.shape[1]
+        if additional_tokens is None:
+            additional_tokens = np.zeros((1, num_tokens, 1), dtype=np.float32)
+        else:
+            additional_tokens = np.asarray(additional_tokens, dtype=np.float32)
+            if additional_tokens.ndim == 2:
+                additional_tokens = additional_tokens[None, ..., None]
+            elif additional_tokens.ndim == 3:
+                additional_tokens = additional_tokens[None, ...]
+
+        token_embeddings = Adapter.build_token_embeddings(
+            regressor_indices=regressor_indices[0].cpu().numpy(),
+            parameter_indices=parameter_indices[0].cpu().numpy(),
+            additional_tokens=additional_tokens[0],
+        )
+        token_embeddings = Adapter.to_torch_tensor(token_embeddings[None, ...]).to(torch.float32)
+
+        out = {
+            "param_indices": parameter_indices,
+            "regressor_indices": regressor_indices,
+            "param_masks": param_mask,
+            "token_embeddings": token_embeddings,
+        }
+        return Adapter.to_device(out, device)
