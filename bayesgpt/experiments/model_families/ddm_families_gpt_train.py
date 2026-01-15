@@ -1,6 +1,8 @@
 import torch
 import wandb
 from pathlib import Path
+
+from ipywidgets import fixed
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -84,7 +86,8 @@ class BayesGPTTrainer:
         """Training step"""
         # Generate training samples
         train_samples = self.model_family.batch_sample(
-            **config["sim_config"],
+            **config["model_family_config"],
+            **config["train_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True
         )
@@ -110,7 +113,7 @@ class BayesGPTTrainer:
         L = loss_fn(adapted["param_matrices"], mu, logvar, adapted["param_masks"])
         L.backward()
 
-        if train_config["gradient_clip_norm"] is not None:
+        if config["gradient_clip_norm"] is not None:
             torch.nn.utils.clip_grad_norm_(
                 self.gpt.parameters(),
                 config["gradient_clip_norm"],
@@ -127,7 +130,8 @@ class BayesGPTTrainer:
     def validate(self, config, global_step):
         # Generate training samples
         test_samples = self.model_family.batch_sample(
-            **config["sim_config"],
+            **config["model_family_config"],
+            **config["val_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True
         )
@@ -202,16 +206,12 @@ if __name__ == "__main__":
     else:
         device = torch.device("cpu")
 
-    use_wandb = False
+    use_wandb = True
 
-    max_num_regressors = 2
+    max_num_regressors = 3
     max_num_categories = 2
     keep_intercept = True
     num_obs = 500
-
-    # Automate input dim
-    # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
-    encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     model_family_config = {
         "max_num_regressors": max_num_regressors,
@@ -221,11 +221,33 @@ if __name__ == "__main__":
     }
 
     # Mask randomizer kwargs interface will need to be improved at some point.
-    mask_randomizer_kwargs = {
+    train_params_kwargs = {
         "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {}
     }
+
+    val_params_kwargs = {
+        "free_intrinsics": ["v", "a", "tau"],
+        "fixed_intrinsics": ["s_v", "s_tau"],
+        "fixed_values": {"s_v": 0.0, "s_tau": 0.0},
+    }
+
+    train_sample_config = {
+        "min_num_regressors": 1,
+        "fixed_config": False
+    }
+
+    val_sample_config = {
+        "min_num_regressors": 2,
+        "fixed_config": True
+    }
+
+    # Automate input dim
+    # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
+    encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
+
+
 
     train_config = {
         "epochs": 500,
@@ -234,15 +256,17 @@ if __name__ == "__main__":
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
-        "sim_config": model_family_config,
+        "model_family_config": model_family_config,
+        "train_sample_config": train_sample_config,
     }
 
     val_config = {
         "batch_size": 300,
-        "sim_config": model_family_config,
-        "free_params": mask_randomizer_kwargs["free_intrinsics"],
-        "fixed_params": mask_randomizer_kwargs["fixed_intrinsics"],
-        "fixed_values": mask_randomizer_kwargs["fixed_values"],
+        "model_family_config": model_family_config,
+        "val_sample_config": val_sample_config,
+        "free_params": val_params_kwargs["free_intrinsics"],
+        "fixed_params": val_params_kwargs["fixed_intrinsics"],
+        "fixed_values": val_params_kwargs["fixed_values"],
     }
 
     wandb_config = {
@@ -283,7 +307,7 @@ if __name__ == "__main__":
         model=DDM(),
         name="DDM",
         prior_fun=ddm_baseline_priors(),
-        mask_randomizer_kwargs=mask_randomizer_kwargs
+        mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
     bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
