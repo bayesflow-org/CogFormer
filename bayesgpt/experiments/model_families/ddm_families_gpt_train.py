@@ -2,7 +2,6 @@ import torch
 import wandb
 from pathlib import Path
 
-from ipywidgets import fixed
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -174,7 +173,7 @@ class BayesGPTTrainer:
         )
 
         figures_dir = Path("./experiments/figures")
-        figures_dir.mkdir(parents=False, exist_ok=True)
+        figures_dir.mkdir(parents=True, exist_ok=True)
 
         recovery_fig.savefig(figures_dir / "ddm_family_gpt_intercept_only_recovery.pdf", bbox_inches="tight")
         correlation_fig.savefig(figures_dir / "ddm_family_gpt_intercept_only_correlation.pdf", bbox_inches="tight")
@@ -250,9 +249,9 @@ if __name__ == "__main__":
 
 
     train_config = {
-        "epochs": 500,
+        "epochs": 50,
         "batch_size": 32,
-        "steps_per_epoch": 200,
+        "steps_per_epoch": 20,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
