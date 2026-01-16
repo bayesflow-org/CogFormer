@@ -224,7 +224,6 @@ class Adapter:
         param_mask = context_manager.build_parameter_mask(
             design_config=design_config,
             intrinsic_params=intrinsic_params,
-            max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
             keep_intercept=keep_intercept,
         )

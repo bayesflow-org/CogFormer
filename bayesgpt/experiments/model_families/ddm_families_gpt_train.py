@@ -23,16 +23,27 @@ from diagnostics.plot.correlation import correlation
 class BayesGPTTrainer:
     def __init__(
         self,
-        model_family,
-        adapter,
         gpt,
+        model=None,
+        prior_fun=None,
+        model_family=None,
+        adapter=None,
         use_wandb=False,
     ):
         super().__init__()
-        self.model_family = model_family
-        self.adapter = adapter
         self.gpt = gpt
+        self.model = model
+        self.prior_fun = prior_fun
+        self.adapter = adapter
         self.use_wandb = use_wandb
+        if model_family is not None:
+            self.model_family = model_family
+        else:
+            self.model_family = NestedModelFamily(
+                name='DDM',
+                model=self.model,
+                prior_fun=self.prior_fun
+            )
 
     def train(self, train_config, val_config, checkpoint_path="bayesgpt_model.pt"):
         # Define global step
@@ -128,11 +139,19 @@ class BayesGPTTrainer:
 
     def validate(self, config, global_step):
         # Generate training samples
+        design_config = {
+            '1': ["v", "a", "tau"],
+            "u_1": ["v", "a"],
+            "u_2": ["v", "a"]
+        }
+
+
         test_samples = self.model_family.batch_sample(
             **config["model_family_config"],
             **config["val_sample_config"],
             batch_size=config["batch_size"],
-            flatten_param_outputs=True
+            flatten_param_outputs=True,
+            design_config=design_config
         )
 
         # Adapt
@@ -207,7 +226,7 @@ if __name__ == "__main__":
 
     use_wandb = True
 
-    max_num_regressors = 3
+    max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
     num_obs = 500
@@ -233,25 +252,25 @@ if __name__ == "__main__":
     }
 
     train_sample_config = {
+        "mask_randomizer_kwargs": train_params_kwargs,
         "min_num_regressors": 1,
         "fixed_config": False
     }
 
     val_sample_config = {
+        "mask_randomizer_kwargs": val_params_kwargs,
         "min_num_regressors": 2,
-        "fixed_config": True
+        "fixed_config": False
     }
 
     # Automate input dim
     # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
     encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
-
-
     train_config = {
-        "epochs": 50,
+        "epochs": 10,
         "batch_size": 32,
-        "steps_per_epoch": 20,
+        "steps_per_epoch": 10,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
