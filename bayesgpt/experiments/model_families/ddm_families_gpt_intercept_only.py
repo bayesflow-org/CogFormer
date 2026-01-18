@@ -72,7 +72,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 100 == 0:
                 self.validate(val_config, global_step)
 
             scheduler.step()
@@ -151,6 +151,7 @@ class BayesGPTTrainer:
         pred_set = mu.detach().cpu().numpy()[:,:,0]
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
+        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
@@ -161,7 +162,8 @@ class BayesGPTTrainer:
         recovery_fig = matrix_recovery(
             true_set, pred_set,
             free_params=config['free_params'],
-            fixed_params=config['fixed_params']
+            fixed_params=config['fixed_params'],
+            param_names=param_names
         )
         correlation_fig = correlation(
             true_set, pred_set,
@@ -183,11 +185,10 @@ class BayesGPTTrainer:
                 },
                 step=global_step,
             )
-            plt.close(recovery_fig)
-            plt.close(correlation_fig)
         else:
             pass
-
+        plt.close(recovery_fig)
+        plt.close(correlation_fig)
         self.gpt.train()
 
     @staticmethod
