@@ -11,10 +11,11 @@ def matrix_recovery(
     free_params: list[str],
     fixed_params: list[str],
     max_num_categories: int = 2,
-    intercept_color: str = "#000787",
-    slope_color: str = "#FF6969",
+    intercept_color: str = "#4e2a84",
+    slope_color: str = "#6969ff",
     figsize: tuple | None = None,
     group_by_category: bool = False,
+    param_names: list[str] | None = None,
 ):
 
     params = free_params + fixed_params
@@ -53,7 +54,7 @@ def matrix_recovery(
 
             ax.set_ylabel(row_ylabel if c == 0 else "")
             ax.set_xlabel("Ground Truth" if r == n_rows - 1 else "")
-            ax.set_title(params[c] if r == 0 else "")
+            ax.set_title(param_names[c] if r == 0 else "")
 
     fig.tight_layout()
     return fig
