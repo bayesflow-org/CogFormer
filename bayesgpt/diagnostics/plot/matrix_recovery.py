@@ -10,6 +10,7 @@ def matrix_recovery(
     pred: np.ndarray,
     free_params: list[str],
     fixed_params: list[str],
+    params_mask: np.ndarray = None,
     max_num_categories: int = 2,
     intercept_color: str = "#4e2a84",
     slope_color: str = "#6969ff",
@@ -40,21 +41,30 @@ def matrix_recovery(
             ax = axarr[r, c]
             x = true[:, r, c]
             y = pred[:, r, c]
+            mask = params_mask[r, c]
 
-            sns.scatterplot(x=x, y=y, ax=ax, color=row_color)
-            make_quadratic(ax, x, y)
+            if mask == 1.0:
+                sns.scatterplot(x=x, y=y, ax=ax, color=row_color)
+                make_quadratic(ax, x, y)
 
-            if r == 0 or (r > 0 and params[c] in free_params):
-                corr = np.corrcoef(x, y)[0, 1]
-                metric_label = f"r = {corr:.3f}"
-                ax.text(0.1, 0.95, metric_label, ha="left", va="center", transform=ax.transAxes, size=12)
+                if r == 0 or (r > 0 and params[c] in free_params):
+                    corr = np.corrcoef(x, y)[0, 1]
+                    metric_label = f"r = {corr:.3f}"
+                    ax.text(0.1, 0.95, metric_label, ha="left", va="center", transform=ax.transAxes, size=12)
 
-            ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
-            sns.despine(ax=ax)
+                ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.3)
+                sns.despine(ax=ax)
 
-            ax.set_ylabel(row_ylabel if c == 0 else "")
-            ax.set_xlabel("Ground Truth" if r == n_rows - 1 else "")
-            ax.set_title(param_names[c] if r == 0 else "")
+                ax.set_ylabel(row_ylabel if c == 0 else "")
+                ax.set_xlabel("Ground Truth" if r == n_rows - 1 else "")
+                ax.set_title(param_names[c] if r == 0 else "")
+            else:
+                # make it look like a solid block
+                ax.set_facecolor(0.0, 0.0, 0.0, 0.05)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for sp in ax.spines.values():
+                    sp.set_visible(False)
 
     fig.tight_layout()
     return fig
