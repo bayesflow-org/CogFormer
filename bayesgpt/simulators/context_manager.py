@@ -15,21 +15,35 @@ class ContextManager:
         intrinsic_params: list[str],
         regressed_params: list[str] = None,
         num_regressors: int = 2,
-        keep_intercept: bool = False
+        keep_intercept: bool = False,
+        add_interaction: bool = False,
     ):
 
         config = {}
+
+        # Intercept first
         if keep_intercept:
             names = intrinsic_params
             config["1"] = names
 
+        # Then main effect
+        main_keys = []
         for r in range(num_regressors):
             key = f"u_{r+1}" if keep_intercept else f"u_{r}"
             config[key] = regressed_params
+            main_keys.append(key)
+
+        # Optionally, interaction effect
+        if add_interaction:
+            for i in range(len(main_keys)):
+                for j in range(i + 1, len(main_keys)):
+                    a, b = main_keys[i], main_keys[j]
+                    shared_set = set(config[a]) & set(config[b])
+                    if shared_set:
+                        shared = [p for p in intrinsic_params if p in shared_set]
+                        config[f"{a}:{b}"] = shared
 
         return config
-
-
 
     def build_random_design_config(
         self,
@@ -39,7 +53,8 @@ class ContextManager:
         fixed_intrinsics: list[str] | set[str] | None = None,
         keep_intercept: bool = False,
         free_prob: float = 0.5,
-        intercept_prob: float = 0.5
+        intercept_prob: float = 0.5,
+        add_interaction: bool = False,
     ) -> dict[str, list[str]]:
         """
         Randomly build a design_config mapping regressors and optional intercept
@@ -63,6 +78,8 @@ class ContextManager:
             #             names.append(param)
             config["1"] = names
 
+        # Main effect
+        main_keys = []
         for r in range(num_regressors):
             key = f"u_{r+1}" if keep_intercept else f"u_{r}"
             names = []
@@ -70,6 +87,16 @@ class ContextManager:
                 if (param not in fixed_intrinsics) and (np.random.rand() < free_prob):
                     names.append(param)
             config[key] = names
+            main_keys.append(key)
+
+        if add_interaction:
+            for i in range(len(main_keys)):
+                for j in range(i + 1, len(main_keys)):
+                    a, b = main_keys[i], main_keys[j]
+                    shared_set = set(config[a]) & set(config[b])
+                    if shared_set:
+                        shared = [p for p in intrinsic_params if p in shared_set]
+                        config[f"{a}:{b}"] = shared
 
         return config
 
@@ -249,6 +276,11 @@ class ContextManager:
         regressor_keys = [k for k in regressor_keys if k != "1"]
         num_regressors = len(regressor_keys)
 
+        # Split regressor keys further into effect keys: main vs. interaction
+        main_effect_keys = [k for k in regressor_keys if ":" not in k]
+        interaction_keys = [k for k in regressor_keys if ":" in k]
+
+
         # Construct per-parameter column blocks
         block_width = max_num_categories - 1
         num_cols = num_regressors * block_width + (1 if has_intercept else 0)
@@ -258,17 +290,22 @@ class ContextManager:
 
         # Generate discrete mask for the non-intercept regressors if none provided
         discrete_mask = self.build_random_discrete_mask(
-            num_regressors=num_regressors, discrete_prob=discrete_prob
+            num_regressors=len(main_effect_keys),
+            discrete_prob=discrete_prob
         )
 
         # Fill in the matrix
         col_idx = 0
         if has_intercept:
-            design_matrix[:, 0] = 1
+            design_matrix[:, 0] = 1.0
             col_idx = 1
 
-        for j, key in enumerate(regressor_keys):
-            start = col_idx + j * block_width
+        # Map regressor keys to the start of its associated block (first column)
+        start_col = {k: col_idx + j * block_width for j, k in enumerate(regressor_keys)}
+
+        # Main effect
+        for j, key in enumerate(main_effect_keys):
+            start = start_col[key]
 
             if key in context:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
@@ -288,6 +325,16 @@ class ContextManager:
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
                 design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
+
+        # Interaction effect
+        for key in interaction_keys:
+            start = start_col[key]
+
+            if key in context:
+                col = np.asarray(context[key], dtype=np.float32).reshape(-1)
+                if col.shape[0] != num_obs:
+                    raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
+                design_matrix[:, start] = col
 
         return design_matrix
 
