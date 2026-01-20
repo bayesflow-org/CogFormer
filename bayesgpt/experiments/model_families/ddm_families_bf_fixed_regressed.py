@@ -21,6 +21,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
+            regressed_params=["v", "a", "tau"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],
                 fixed_intrinsics=["s_v", "s_tau"],
@@ -34,9 +35,9 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
              batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 0,
-            "max_num_regressors": 0,
-            "max_num_categories": 0,
+            'min_num_regressors': 2,
+            "max_num_regressors": 2,
+            "max_num_categories": 2,
             "fixed_config": True
         }
 
@@ -90,7 +91,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_fixed"
+    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_fixed_regressed"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -102,40 +103,40 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=10,
-        steps_per_epoch=10,
+        epochs=500,
+        steps_per_epoch=200,
         batch_size=32
     )
 
-    param_names = [r"$v$", r"$a$", r"$\tau$"]
+    param_names = [
+        r"$\beta_{v,0}$", r"$\beta_{a,0}$", r"$\tau$", #r"$s_v$", r"$s_\tau$",
+        r"$\beta_{v,1}$", r"$\beta_{a,1}$",
+        r"$\beta_{v,2}$", r"$\beta_{a,2}$",
+    ]
 
     evals = workflow.compute_default_diagnostics(test_data=300, variable_names=param_names)
 
     evals_dir = Path("./experiments/evaluations")
     evals_dir.mkdir(parents=True, exist_ok=True)
-    evals.to_csv(evals_dir / "ddm_families_bf_fixed_evaluations.csv", sep=";")
+    evals.to_csv(evals_dir / "ddm_families_bf_fixed_regressed_evaluations.csv", sep=";")
 
     figures = workflow.plot_default_diagnostics(
-        test_data=20,
-        num_samples=20,
+        test_data=300,
+        num_samples=300,
         variable_names=param_names,
-        loss_kwargs={"figsize": (3 * len(param_names), 3), "label_fontsize": 14},
-        recovery_kwargs={"figsize": (3 * len(param_names), 3), "label_fontsize": 14},
+        loss_kwargs={"figsize": (16, 3), "label_fontsize": 14},
+        recovery_kwargs={"figsize": (16, 6), "label_fontsize": 14},
     )
 
     figures_dir = Path("./experiments/figures")
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     for plot_name, fig in figures.items():
-        fig_path = figures_dir / f"ddm_families_bf_fixed_{plot_name}.pdf"
+        fig_path = figures_dir / f"ddm_families_bf_fixed_regressed_{plot_name}.pdf"
         fig.savefig(fig_path) #, dpi=300, bbox_inches="tight")
         plt.close(fig)
         logging.info(f"Saved diagnostic plot to {fig_path}")
 
-    val_sims = workflow.simulate(batch_shape=20)
-    post_draws = workflow.sample(num_samples=20, conditions=val_sims)
-    for k, v in post_draws.items():
-        print(k, v.shape)
 
 if __name__ == '__main__':
     debug = False
