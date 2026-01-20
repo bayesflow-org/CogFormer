@@ -115,13 +115,28 @@ class NestedModelFamily:
                 # max_num_regressors=max_num_regressors,
             )
 
-        # Discrete mask
+        # Partition regressor keys
         regressor_keys = [k for k in design_config.keys() if k != "1"]
         num_regressors_from_config = len(regressor_keys)
 
-        discrete_mask = self.context_manager.build_random_discrete_mask(
-            num_regressors=num_regressors_from_config, discrete_prob=discrete_prob
+        main_keys = [k for k in regressor_keys if ":" not in k]
+        num_main_keys = len(main_keys)
+
+        # Discrete mask
+        main_discrete_mask = self.context_manager.build_random_discrete_mask(
+            num_regressors=num_main_keys, discrete_prob=discrete_prob
         )
+
+        discrete_mask = -np.ones((num_regressors_from_config,), dtype=np.float32)
+
+        # Build a total-length discrete mask aligned with regressor_keys_total
+        # (main -> 0/1, interactions -> -1)
+        ptr = 0
+        for i, k in enumerate(num_regressors_from_config):
+            if ":" in k:
+                continue
+            discrete_mask[i] = float(main_discrete_mask[ptr])
+            ptr += 1
 
         # Check if there is a context for the model
         if context is None and hasattr(self.model, 'build_default_context'):
