@@ -63,19 +63,9 @@ class ContextManager:
         # Set up mandatory and intercept only params based on free and fixed intrinsics
         config: dict[str, list[str]] = {}
 
+        # Intercept first
         if keep_intercept:
-            # All intrinsic parameters get intercepts.
-            # Whether they are free or fixed is determined later.
             names = intrinsic_params
-            # for param in intrinsic_params:
-            #     names.append(param)
-            #     if param in free_intrinsics:          # Free intrinsics always get an intercept
-            #         names.append(param)
-            #     elif param in fixed_intrinsics:       # Fixed intrinsics sometimes get an intercept
-            #         names.append(param)
-            #     else:
-            #         if np.random.rand() < free_prob:
-            #             names.append(param)
             config["1"] = names
 
         # Main effect
@@ -89,6 +79,7 @@ class ContextManager:
             config[key] = names
             main_keys.append(key)
 
+        # Interaction effect
         if add_interaction:
             for i in range(len(main_keys)):
                 for j in range(i + 1, len(main_keys)):
@@ -172,7 +163,6 @@ class ContextManager:
 
         return priors
 
-
     def build_random_parameter_mask(
         self,
         intrinsic_params: list[str],
@@ -181,7 +171,6 @@ class ContextManager:
         max_num_categories: int = 4,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
-        inactive_intrinsics: list[str] | set[str] | None = None,
         free_prob: float = 0.5,     # Probability of a param being free
         keep_intercept: bool = False
     ) -> tuple:
@@ -209,17 +198,46 @@ class ContextManager:
             keep_intercept=keep_intercept,
         )
 
-        # active_mask = parameter_mask.copy()
-        #
-        # if inactive_intrinsics is not None:
-        #     for name in inactive_intrinsics:
-        #         if name in intrinsic_params:
-        #             j = intrinsic_params.index(name)
-        #             active_mask[:, j] = 0.0
-        #
-        # active_mask *= parameter_mask
+        return parameter_mask, design_config
 
-        return parameter_mask, design_config#, active_mask
+    def build_discrete_mask(
+            self,
+            design_config: dict[str, list[str]],
+            discrete_prob: float = 0.5,
+            keep_intercept: bool = False,
+            add_interaction: bool = False,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Sample a discrete mask for main regressors only and expand it to a total-length
+        mask aligned with design_config key order (excluding intercept).
+        """
+        regressor_keys = list(design_config.keys())
+        if keep_intercept and ("1" in regressor_keys):
+            regressor_keys = [k for k in regressor_keys if k != "1"]
+        else:
+            regressor_keys = [k for k in regressor_keys if k != "1"]
+
+        main_keys = [k for k in regressor_keys if ":" not in k]
+        num_main = len(main_keys)
+
+        main_discrete_mask = self.build_random_discrete_mask(
+            num_regressors=num_main,
+            discrete_prob=discrete_prob,
+        ).astype(np.float32, copy=False)
+
+        if add_interaction:
+            discrete_mask = np.full((len(regressor_keys),), -1.0, dtype=np.float32)
+
+            ptr = 0
+            for i, k in enumerate(regressor_keys):
+                if ":" in k:
+                    continue
+                discrete_mask[i] = float(main_discrete_mask[ptr])
+                ptr += 1
+        else:
+            discrete_mask = main_discrete_mask
+
+        return discrete_mask
 
     def build_random_discrete_mask(
         self,
@@ -243,9 +261,6 @@ class ContextManager:
         max_num_categories: int = 4,
         keep_intercept: bool = False,
     ) -> np.ndarray:
-        """
-
-        """
         block_width = max_num_categories - 1
         num_cols = num_regressors * block_width + (1 if keep_intercept else 0)
         mask = np.ones(num_cols, dtype=np.float32)

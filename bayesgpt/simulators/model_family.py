@@ -117,7 +117,7 @@ class NestedModelFamily:
 
         # Partition regressor keys
         regressor_keys = [k for k in design_config.keys() if k != "1"]
-        num_regressors_from_config = len(regressor_keys)
+        num_regressors_total = len(regressor_keys)
 
         main_keys = [k for k in regressor_keys if ":" not in k]
         num_main_keys = len(main_keys)
@@ -127,12 +127,12 @@ class NestedModelFamily:
             num_regressors=num_main_keys, discrete_prob=discrete_prob
         )
 
-        discrete_mask = -np.ones((num_regressors_from_config,), dtype=np.float32)
+        discrete_mask = -np.ones((num_regressors_total,), dtype=np.float32)
 
         # Build a total-length discrete mask aligned with regressor_keys_total
         # (main -> 0/1, interactions -> -1)
         ptr = 0
-        for i, k in enumerate(num_regressors_from_config):
+        for i, k in enumerate(regressor_keys):
             if ":" in k:
                 continue
             discrete_mask[i] = float(main_discrete_mask[ptr])
@@ -177,7 +177,7 @@ class NestedModelFamily:
 
         # Regressor mask
         regressor_mask = self.context_manager.build_regressor_mask(
-            num_regressors=num_regressors_from_config,
+            num_regressors=num_regressors_total,
             max_num_categories=max_num_categories,
             keep_intercept=keep_intercept
         )
