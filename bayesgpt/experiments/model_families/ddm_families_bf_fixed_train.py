@@ -102,8 +102,8 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=10,
-        steps_per_epoch=10,
+        epochs=500,
+        steps_per_epoch=200,
         batch_size=32
     )
 
@@ -114,28 +114,8 @@ def main():
     evals_dir = Path("./experiments/evaluations")
     evals_dir.mkdir(parents=True, exist_ok=True)
     evals.to_csv(evals_dir / "ddm_families_bf_fixed_evaluations.csv", sep=";")
+    logging.info("Metric evaluation is now finished.")
 
-    figures = workflow.plot_default_diagnostics(
-        test_data=20,
-        num_samples=20,
-        variable_names=param_names,
-        loss_kwargs={"figsize": (3 * len(param_names), 3), "label_fontsize": 14},
-        recovery_kwargs={"figsize": (3 * len(param_names), 3), "label_fontsize": 14},
-    )
-
-    figures_dir = Path("./experiments/figures")
-    figures_dir.mkdir(parents=True, exist_ok=True)
-
-    for plot_name, fig in figures.items():
-        fig_path = figures_dir / f"ddm_families_bf_fixed_{plot_name}.pdf"
-        fig.savefig(fig_path) #, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-        logging.info(f"Saved diagnostic plot to {fig_path}")
-
-    val_sims = workflow.simulate(batch_shape=20)
-    post_draws = workflow.sample(num_samples=20, conditions=val_sims)
-    for k, v in post_draws.items():
-        print(k, v.shape)
 
 if __name__ == '__main__':
     debug = False
