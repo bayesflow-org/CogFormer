@@ -15,9 +15,9 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
             mask_randomizer_kwargs=dict(
-                free_intrinsics=["v", "a", "tau"],
-                fixed_intrinsics=["s_v", "s_tau"],
-                fixed_values={"s_v": 0, "s_tau": 0},
+                free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
+                fixed_intrinsics=[],
+                fixed_values={}
             )
     )
 
@@ -27,10 +27,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
              batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 0,
             "max_num_regressors": 0,
-            "max_num_categories": 0,
-            "fixed_config": True
+            "max_num_categories": 0
         }
 
         samples = self.model_family.batch_sample(
@@ -43,11 +41,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        params = samples["param_matrices"]
-
-        # Special treatment for BF:
-        # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
+        params = samples["param_matrices"].squeeze(axis=1)
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -68,7 +62,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_fixed"
+    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_intercept_only"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(

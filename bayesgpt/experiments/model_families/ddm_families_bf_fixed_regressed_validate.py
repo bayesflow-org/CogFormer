@@ -21,22 +21,22 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
+            regressed_params=["v", "a", "tau"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],
                 fixed_intrinsics=["s_v", "s_tau"],
                 fixed_values={"s_v": 0, "s_tau": 0},
             )
-    )
+        )
 
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
-
         if isinstance(batch_size, tuple):
-             batch_size = batch_size[0]
+            batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 0,
-            "max_num_regressors": 0,
-            "max_num_categories": 0,
+            'min_num_regressors': 2,
+            "max_num_regressors": 2,
+            "max_num_categories": 2,
             "fixed_config": True
         }
 
@@ -58,16 +58,21 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(num_samples=300):
+def main(num_samples=300, case="fixed_regressed"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_fixed/model.keras"
+    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
-    param_names = [r"$v$", r"$a$", r"$\tau$"]
+    param_names = [
+        r"$v$", r"$a$", r"$\tau$", #r"$s_v$", r"$s_\tau$",
+        r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$",
+        r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
+    ]
+
     data_dir = Path("./experiments/data")
     figures_dir = Path("./experiments/figures")
     evals_dir = Path("./experiments/evaluations")
@@ -85,7 +90,7 @@ def main(num_samples=300):
     params = post_draws["params"][:10]
 
     np.savez(
-        data_dir / "ddm_families_bf_fixed_data.npz",
+        data_dir / f"ddm_families_bf_{case}_data.npz",
         rts=rts, choices=choices, params=params
     )
     logging.info(f"Saved data to {data_dir}")
@@ -116,30 +121,35 @@ def main(num_samples=300):
         }
     )
 
-    metrics.to_csv(evals_dir / "ddm_families_bf_fixed_evaluations.csv", sep=";")
+    metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
     recovery = bf.diagnostics.recovery(
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(3 * len(param_names), 3),
-        label_fontsize=14
+        figsize=(12, 6),
+        label_fontsize=14,
+        num_row=3,
+        num_col=3
     )
-    recovery_path = figures_dir / "ddm_families_bf_fixed_recovery.pdf"
+    recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
     recovery.savefig(recovery_path)
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
     posterior = bf.diagnostics.plots.pairs_posterior(
-        estimates = post_draws,
-        targets = val_sims,
-        dataset_id = 0,
-        variable_names = param_names
+        estimates=post_draws,
+        targets=val_sims,
+        dataset_id=0,
+        variable_names=param_names
     )
-    posterior_path = figures_dir / "ddm_families_bf_fixed_posterior.pdf"
+    posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior.pdf"
     posterior.savefig(posterior_path)
     logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 if __name__ == "__main__":
-    main()
+    debug = False
+
+    if not debug:
+        main()

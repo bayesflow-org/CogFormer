@@ -22,16 +22,15 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
             mask_randomizer_kwargs=dict(
-                free_intrinsics=["v", "a", "tau"],
-                fixed_intrinsics=["s_v", "s_tau"],
-                fixed_values={"s_v": 0, "s_tau": 0},
+                free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
+                fixed_intrinsics=[],
+                fixed_values={}
             )
-    )
+        )
 
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
-
         if isinstance(batch_size, tuple):
-             batch_size = batch_size[0]
+            batch_size = batch_size[0]
 
         sample_kwargs = {
             'min_num_regressors': 0,
@@ -63,11 +62,11 @@ def main(num_samples=300):
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_fixed/model.keras"
+    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_intercept_only/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
-    param_names = [r"$v$", r"$a$", r"$\tau$"]
+    param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
     data_dir = Path("./experiments/data")
     figures_dir = Path("./experiments/figures")
     evals_dir = Path("./experiments/evaluations")
@@ -132,14 +131,17 @@ def main(num_samples=300):
     logging.info(f"Saved recovery plot to {recovery_path}")
 
     posterior = bf.diagnostics.plots.pairs_posterior(
-        estimates = post_draws,
-        targets = val_sims,
-        dataset_id = 0,
-        variable_names = param_names
+        estimates=post_draws,
+        targets=val_sims,
+        dataset_id=0,
+        variable_names=param_names
     )
     posterior_path = figures_dir / "ddm_families_bf_fixed_posterior.pdf"
     posterior.savefig(posterior_path)
     logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 if __name__ == "__main__":
-    main()
+    debug = False
+
+    if not debug:
+        main()
