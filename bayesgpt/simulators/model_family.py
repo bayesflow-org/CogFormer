@@ -72,7 +72,8 @@ class NestedModelFamily:
         keep_intercept: bool = True,
         flatten_param_outputs: bool = True,
         debug: bool = False,
-        fixed_config: bool = False
+        fixed_config: bool = False,
+        add_interaction: bool = False,
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
@@ -82,6 +83,7 @@ class NestedModelFamily:
                     regressed_params=self.regressed_params,
                     num_regressors=num_regressors,
                     keep_intercept=keep_intercept,
+                    add_interaction=add_interaction,
                 )
                 parameter_mask = self.context_manager.build_parameter_mask(
                     design_config=design_config,
@@ -104,7 +106,8 @@ class NestedModelFamily:
                     keep_intercept=keep_intercept,
                     free_prob=free_prob,
                     free_intrinsics=kwargs.get("free_intrinsics"),
-                    fixed_intrinsics=kwargs.get("fixed_intrinsics")
+                    fixed_intrinsics=kwargs.get("fixed_intrinsics"),
+                    add_interaction=add_interaction,
                 )
         else:
             parameter_mask = self.context_manager.build_parameter_mask(
@@ -158,8 +161,6 @@ class NestedModelFamily:
             for j, name in enumerate(self.intrinsic_params)
         }
 
-        #explicate what prepare params does / think about whether this is not more suitable
-        # as a task for the context manager? O_o
         params = self.model.prepare_params(params=params, num_obs=num_obs, context=context)
         sim_trials = self.model.simulate(params, context=context)
 
@@ -212,7 +213,7 @@ class NestedModelFamily:
         mask_randomizer_kwargs: dict | None = None,
         flatten_param_outputs: bool = True,
         fixed_config: bool = False,
-        visualize: bool = False,
+        add_interaction: bool = False,
     ) -> list[dict] | dict:
         # Sample num_obs and num_regressors per batch element if not provided
         if num_obs is None:
@@ -259,7 +260,8 @@ class NestedModelFamily:
                 # max_num_regressors=max_num_regressors,
                 max_num_categories=max_num_categories,
                 flatten_param_outputs=flatten_param_outputs,
-                fixed_config=fixed_config
+                fixed_config=fixed_config,
+                add_interaction=add_interaction,
             )
 
             sim_instance["num_obs"] = num_obs
@@ -273,9 +275,6 @@ class NestedModelFamily:
             flatten_param_outputs=flatten_param_outputs,
             remove_intercept=remove_intercept_on_collate
         )
-
-        if visualize:
-            self.visualize(batch, intrinsic_params=self.intrinsic_params)
         return batch
 
     def collate(
@@ -363,22 +362,3 @@ class NestedModelFamily:
             "max_num_regressors": max_num_regressors,
             "max_num_categories": max_num_categories,
         }
-
-    def visualize(
-        self,
-        batch: dict[str, np.ndarray],
-        intrinsic_params: list[str]
-    ):
-        # Design configs (whole)
-        fig_configs = visualize_design_configs(batch["design_configs"], intrinsic_params)
-
-        # Design matrices (per batch)
-        fig_design = visualize_matrices(batch["design_matrices"], title="Design Matrices")
-
-        # Param masks/matrices (per batch)
-        fig_masks = visualize_matrices(batch["param_masks"], title="Parameter Masks")
-        fig_mats = visualize_matrices(batch["param_matrices"], title="Parameter Matrices")
-
-        # Masks (whole)
-        fig_reg = visualize_matrix(batch["regressor_masks"], title="Regressor Masks")
-        fig_disc = visualize_matrix(batch["discrete_masks"], title="Discrete Masks")

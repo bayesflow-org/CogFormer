@@ -172,7 +172,8 @@ class ContextManager:
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
         free_prob: float = 0.5,     # Probability of a param being free
-        keep_intercept: bool = False
+        keep_intercept: bool = False,
+        add_interaction: bool = False,
     ) -> tuple:
         """
         Randomly generate both a design_config and its corresponding parameter mask.
@@ -186,8 +187,9 @@ class ContextManager:
             num_regressors=num_regressors,
             free_prob=free_prob,
             keep_intercept=keep_intercept,
-            free_intrinsics=free_intrinsics,    # Intercept + slope
-            fixed_intrinsics=fixed_intrinsics   # Intercept only
+            free_intrinsics=free_intrinsics,
+            fixed_intrinsics=fixed_intrinsics,
+            add_interaction=add_interaction
         )
 
         parameter_mask = self.build_parameter_mask(
