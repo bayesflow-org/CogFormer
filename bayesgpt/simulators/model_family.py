@@ -191,7 +191,15 @@ class NestedModelFamily:
 
         if debug:
             for k, v in out.items():
-                print(k, v.shape if isinstance(v, np.ndarray) else v)
+                if isinstance(v, np.ndarray):
+                    print(k, v.shape)
+                elif isinstance(v, list):
+                    for i in v:
+                        print(i)
+                elif isinstance(v, dict):
+                    print(v.keys())
+                else:
+                    print(k, v)
 
         return out
 
