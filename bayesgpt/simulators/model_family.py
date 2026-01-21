@@ -119,24 +119,12 @@ class NestedModelFamily:
         regressor_keys = [k for k in design_config.keys() if k != "1"]
         num_regressors_total = len(regressor_keys)
 
-        main_keys = [k for k in regressor_keys if ":" not in k]
-        num_main_keys = len(main_keys)
-
         # Discrete mask
-        main_discrete_mask = self.context_manager.build_random_discrete_mask(
-            num_regressors=num_main_keys, discrete_prob=discrete_prob
+        main_discrete_mask, discrete_mask = self.context_manager.build_discrete_mask(
+            design_config=design_config,
+            discrete_prob=discrete_prob,
+            keep_intercept=keep_intercept,
         )
-
-        discrete_mask = -np.ones((num_regressors_total,), dtype=np.float32)
-
-        # Build a total-length discrete mask aligned with regressor_keys_total
-        # (main -> 0/1, interactions -> -1)
-        ptr = 0
-        for i, k in enumerate(regressor_keys):
-            if ":" in k:
-                continue
-            discrete_mask[i] = float(main_discrete_mask[ptr])
-            ptr += 1
 
         # Check if there is a context for the model
         if context is None and hasattr(self.model, 'build_default_context'):
@@ -235,6 +223,9 @@ class NestedModelFamily:
         else:
             num_regressors_array = np.full(batch_size, num_regressors)
 
+        if mask_randomizer_kwargs is None:
+            mask_randomizer_kwargs = self.mask_randomizer_kwargs
+
         # Initialize batch and keep track of the maximum num_obs
         list_batch = []
 
@@ -261,7 +252,7 @@ class NestedModelFamily:
                 design_config=design_config,
                 num_obs=num_obs,
                 context=ctx_i,
-                mask_randomizer_kwargs=mask_randomizer_kwargs if mask_randomizer_kwargs is not None else self.mask_randomizer_kwargs,
+                mask_randomizer_kwargs=mask_randomizer_kwargs,
                 num_regressors=num_regressors,
                 discrete_prob=discrete_prob,
                 keep_intercept=keep_intercept,

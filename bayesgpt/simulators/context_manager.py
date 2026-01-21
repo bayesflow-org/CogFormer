@@ -61,7 +61,7 @@ class ContextManager:
         to subsets of intrinsic parameters.
         """
         # Set up mandatory and intercept only params based on free and fixed intrinsics
-        config: dict[str, list[str]] = {}
+        config = {}
 
         # Intercept first
         if keep_intercept:
@@ -206,7 +206,7 @@ class ContextManager:
             discrete_prob: float = 0.5,
             keep_intercept: bool = False,
             add_interaction: bool = False,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ):
         """
         Sample a discrete mask for main regressors only and expand it to a total-length
         mask aligned with design_config key order (excluding intercept).
@@ -225,19 +225,16 @@ class ContextManager:
             discrete_prob=discrete_prob,
         ).astype(np.float32, copy=False)
 
-        if add_interaction:
-            discrete_mask = np.full((len(regressor_keys),), -1.0, dtype=np.float32)
+        discrete_mask = np.full((len(regressor_keys),), -1.0, dtype=np.float32)
 
-            ptr = 0
-            for i, k in enumerate(regressor_keys):
-                if ":" in k:
-                    continue
-                discrete_mask[i] = float(main_discrete_mask[ptr])
-                ptr += 1
-        else:
-            discrete_mask = main_discrete_mask
+        ptr = 0
+        for i, k in enumerate(regressor_keys):
+            if ":" in k:
+                continue
+            discrete_mask[i] = float(main_discrete_mask[ptr])
+            ptr += 1
 
-        return discrete_mask
+        return main_discrete_mask, discrete_mask
 
     def build_random_discrete_mask(
         self,
@@ -276,7 +273,8 @@ class ContextManager:
         discrete_prob: float = 0.5,
         keep_intercept: bool = False,
         min_num_categories: int = 2,
-        max_num_categories: int = 4
+        max_num_categories: int = 4,
+        main_discrete_mask: np.ndarray = None,
     ) -> np.ndarray:
         """
         Build design matrix based on the respective configuration of free intrinsic parameters.
@@ -295,7 +293,6 @@ class ContextManager:
         main_effect_keys = [k for k in regressor_keys if ":" not in k]
         interaction_keys = [k for k in regressor_keys if ":" in k]
 
-
         # Construct per-parameter column blocks
         block_width = max_num_categories - 1
         num_cols = num_regressors * block_width + (1 if has_intercept else 0)
@@ -304,6 +301,12 @@ class ContextManager:
         design_matrix = np.zeros((num_obs, num_cols))
 
         # Generate discrete mask for the non-intercept regressors if none provided
+        if main_discrete_mask is None:
+            main_discrete_mask = self.build_random_discrete_mask(
+                num_regressors=len(main_effect_keys),
+                discrete_prob=discrete_prob,
+            )
+
         discrete_mask = self.build_random_discrete_mask(
             num_regressors=len(main_effect_keys),
             discrete_prob=discrete_prob
@@ -319,7 +322,8 @@ class ContextManager:
         start_col = {k: col_idx + j * block_width for j, k in enumerate(regressor_keys)}
 
         # Main effect
-        for j, key in enumerate(main_effect_keys):
+        j = 0
+        for key in main_effect_keys:
             start = start_col[key]
 
             if key in context:
@@ -340,6 +344,7 @@ class ContextManager:
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
                 design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
+            j += 1
 
         # Interaction effect
         for key in interaction_keys:
