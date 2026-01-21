@@ -57,7 +57,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main():
+def main(num_samples=300):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
@@ -71,8 +71,8 @@ def main():
     data_dir = Path("./experiments/data")
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    val_sims = ddm_family_simulator.sample(300)
-    post_draws = approximator.sample(conditions=val_sims, num_samples=300)
+    val_sims = ddm_family_simulator.sample(num_samples)
+    post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
 
     rts = val_sims["rts"][:10]
     choices = val_sims["choices"][:10]

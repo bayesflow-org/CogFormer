@@ -103,13 +103,13 @@ def main():
 
     history = workflow.fit_online(
         epochs=500,
-        steps_per_epoch=200,
+        steps_per_epoch=100,
         batch_size=32
     )
 
     param_names = [r"$v$", r"$a$", r"$\tau$"]
 
-    evals = workflow.compute_default_diagnostics(test_data=300, variable_names=param_names)
+    evals = workflow.compute_default_diagnostics(test_data=200, variable_names=param_names)
 
     evals_dir = Path("./experiments/evaluations")
     evals_dir.mkdir(parents=True, exist_ok=True)

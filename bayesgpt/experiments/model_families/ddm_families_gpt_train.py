@@ -85,7 +85,7 @@ class BayesGPTTrainer:
                 pbar.update(1)
 
             if (epoch + 1) % 5 == 0:
-                self.validate(val_config, global_step)
+                self.val_step(val_config, global_step)
 
             scheduler.step()
             pbar.close()
@@ -137,14 +137,15 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def validate(self, config, global_step):
+    def val_step(self, config, global_step):
+        """Validation steps, used for validation only"""
+
         # Generate training samples
         design_config = {
             '1': ["v", "a", "tau"],
-            "u_1": ["v", "a"],
-            "u_2": ["v", "a"]
+            "u_1": [],
+            "u_2": []
         }
-
 
         test_samples = self.model_family.batch_sample(
             **config["model_family_config"],
@@ -172,7 +173,7 @@ class BayesGPTTrainer:
         true_set = adapted["param_matrices"].detach().cpu().numpy()
         pred_set = mu.detach().cpu().numpy()[:,:,0]
 
-        params = ["v", "a", "tau", "s_v", "s_tau"]
+        params = ["v", "a", "tau"]
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
@@ -253,7 +254,7 @@ if __name__ == "__main__":
 
     train_sample_config = {
         "mask_randomizer_kwargs": train_params_kwargs,
-        "min_num_regressors": 1,
+        "min_num_regressors": 0,
         "fixed_config": False
     }
 
@@ -268,9 +269,9 @@ if __name__ == "__main__":
     encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     train_config = {
-        "epochs": 20,
+        "epochs": 10,
         "batch_size": 32,
-        "steps_per_epoch": 20,
+        "steps_per_epoch": 10,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
