@@ -1,7 +1,8 @@
 import numpy as np
 from numba import njit, prange
 from keras.utils import to_categorical
-from utils.simulator_utils import shifted_softplus
+
+from bayesgpt.utils.simulator_utils import shifted_softplus
 
 @njit
 def sample_rdm_prior() -> np.ndarray:

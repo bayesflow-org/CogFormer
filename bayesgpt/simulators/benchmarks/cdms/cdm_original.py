@@ -1,6 +1,7 @@
 import numpy as np
 from numba import njit, prange
-from utils.simulator_utils import shifted_softplus
+
+from bayesgpt.utils.simulator_utils import shifted_softplus
 
 @njit
 def sample_cdm_prior() -> np.ndarray:

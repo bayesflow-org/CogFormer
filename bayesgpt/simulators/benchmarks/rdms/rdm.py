@@ -1,7 +1,8 @@
 import numpy as np
 from numba import njit, prange
-from simulators import Model
-from utils.simulator_utils import as_1d
+
+from bayesgpt.simulators import Model
+from bayesgpt.utils.simulator_utils import as_1d
 
 @njit
 def sample_rdm_trial(

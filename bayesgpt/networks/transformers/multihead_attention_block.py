@@ -19,7 +19,8 @@ class MultiheadAttentionBlock(nn.Module):
         key_dim: int = None,
         num_heads: int = 4,
         layer_norm: bool = False,
-        dropout: float = 0.0
+        dropout: float = 0.0,
+        output_dim: int = None,
     ):
         super().__init__()
 
@@ -39,7 +40,9 @@ class MultiheadAttentionBlock(nn.Module):
         self.layer_norm_0 = nn.LayerNorm(query_dim) if layer_norm else None
         self.layer_norm_1 = nn.LayerNorm(query_dim) if layer_norm else None
 
-        self.fc_o = nn.Linear(query_dim, query_dim)
+        if output_dim is None:
+            output_dim = query_dim
+        self.fc_o = nn.Linear(query_dim, output_dim)
 
     def forward(self,
         query: torch.Tensor,
