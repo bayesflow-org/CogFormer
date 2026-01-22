@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections.abc import Callable
 
 from utils.plot_utils import hex_code, make_quadratic
 
@@ -13,6 +14,9 @@ def matrix_recovery(
     params_mask: np.ndarray = None,
     max_num_categories: int = 2,
     intercept_color: str = "#4e2a84",
+    main_effect_color: str = "#ff7f0e",
+    interaction_color: str = "#ff7f0e",
+    uncertainty_agg: Callable = None,
     slope_color: str = "#6969ff",
     figsize: tuple | None = None,
     group_by_category: bool = False,
@@ -44,6 +48,7 @@ def matrix_recovery(
             mask = params_mask[r, c]
 
             if mask == 1.0:
+
                 sns.scatterplot(x=x, y=y, ax=ax, color=row_color)
                 make_quadratic(ax, x, y)
 
@@ -60,7 +65,7 @@ def matrix_recovery(
                 ax.set_title(param_names[c] if r == 0 else "")
             else:
                 # make it look like a solid block
-                ax.set_facecolor(0.0, 0.0, 0.0, 0.05)
+                ax.set_facecolor((0.0, 0.0, 0.0, 0.05))
                 ax.set_xticks([])
                 ax.set_yticks([])
                 for sp in ax.spines.values():
@@ -89,3 +94,48 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
         alpha=0.9,
         linestyle="dashed",
     )
+
+
+
+def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwargs) -> np.ndarray:
+    """
+    Compute credible interval from samples using quantiles.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array of samples from a posterior distribution or bootstrap samples.
+    prob : float, default 0.95
+        Coverage probability of the credible interval (between 0 and 1).
+        For example, 0.95 gives a 95% credible interval.
+    axis : Sequence[int]
+        Axis or axes along which the credible interval is computed.
+        Default is None (flatten array).
+
+    Returns
+    -------
+    a numpy array of shape (2, ...) with the first dimension indicating the
+    lower and upper bounds of the credible interval.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Simulate posterior samples
+    >>> samples = np.random.normal(size=(10, 1000, 3))
+
+    >>> # Different coverage probabilities
+    >>> credible_interval(samples, prob=0.5, axis=1)  # 50% CI
+    >>> credible_interval(samples, prob=0.99, axis=1)  # 99% CI
+    """
+
+    # Input validation
+    if not 0 <= prob <= 1:
+        raise ValueError(f"prob must be between 0 and 1, got {prob}")
+
+    # Calculate tail probabilities
+    alpha = 1 - prob
+    lower_q = alpha / 2
+    upper_q = 1 - alpha / 2
+
+    # Compute quantiles
+    return np.quantile(x, q=(lower_q, upper_q), axis=axis, **kwargs)
