@@ -128,7 +128,7 @@ def main(num_samples=300, case="fixed_regressed"):
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(12, 6),
+        figsize=(9, 9),
         label_fontsize=14,
         num_row=3,
         num_col=3

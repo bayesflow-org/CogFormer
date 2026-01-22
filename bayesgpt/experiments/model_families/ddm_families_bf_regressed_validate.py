@@ -1,8 +1,10 @@
 import os
 os.environ["KERAS_BACKEND"] = "torch"
 
+import keras
 import logging
 import numpy as np
+import pandas as pd
 import bayesflow as bf
 import matplotlib.pyplot as plt
 
@@ -57,89 +59,96 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-
-def test():
-    ddm_family_simulator = DDMModelFamilyBF()
-    ddm_samples = ddm_family_simulator.sample(4)
-
-    for k, v in ddm_samples.items():
-        if isinstance(v, np.ndarray):
-            print(k, v.shape)
-        elif isinstance(v, dict):
-            print(k, v.keys())
-        else:
-            print(k, v)
-
-    print(ddm_samples["params"])
-
-def main():
+def main(num_samples=300, case="regressed"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
-    # Define adapter
-    adapter = (
-        bf.Adapter()
-        .convert_dtype("float64", "float32")
-        .concatenate(["rts", "choices"], into="summary_variables")
-        .rename("params", "inference_variables")
-    )
-
-    # define networks
-    summary_net = bf.networks.SetTransformer()
-    inference_net = bf.networks.FlowMatching()
-
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_regressed"
+    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    approximator = keras.saving.load_model(checkpoint_path)
 
-    # Set up workflow
-    workflow = bf.BasicWorkflow(
-        simulator=ddm_family_simulator,
-        adapter=adapter,
-        summary_network=summary_net,
-        inference_network=inference_net,
-        checkpoint_filepath=checkpoint_path
-    )
-
-    history = workflow.fit_online(
-        epochs=500,
-        steps_per_epoch=200,
-        batch_size=32
-    )
-
+    # Make directories
     param_names = [
-        r"$\beta_{v,0}$", r"$\beta_{a,0}$", r"$\tau$", r"$s_v$", r"$s_\tau$",
-        r"$\beta_{v,1}$", r"$\beta_{a,1}$",
-        r"$\beta_{v,2}$", r"$\beta_{a,2}$",
+        r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
+        r"$u_{1, v}$", r"$u_{1, a}$",
+        r"$u_{2, v}$", r"$u_{2, a}$",
     ]
 
-    evals = workflow.compute_default_diagnostics(test_data=300, variable_names=param_names)
-
+    data_dir = Path("./experiments/data")
+    figures_dir = Path("./experiments/figures")
     evals_dir = Path("./experiments/evaluations")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir.mkdir(parents=True, exist_ok=True)
     evals_dir.mkdir(parents=True, exist_ok=True)
-    evals.to_csv(evals_dir / "ddm_families_bf_regressed_evaluations.csv", sep=";")
 
-    figures = workflow.plot_default_diagnostics(
-        test_data=300,
-        num_samples=300,
-        variable_names=param_names,
-        loss_kwargs={"figsize": (16, 3), "label_fontsize": 14},
-        recovery_kwargs={"figsize": (16, 6), "label_fontsize": 14},
+    # Generate validation samples
+    val_sims = ddm_family_simulator.sample(num_samples)
+    post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
+
+    # Save some of them
+    rts = val_sims["rts"][:10]
+    choices = val_sims["choices"][:10]
+    params = post_draws["params"][:10]
+
+    np.savez(
+        data_dir / f"ddm_families_bf_{case}_data.npz",
+        rts=rts, choices=choices, params=params
+    )
+    logging.info(f"Saved data to {data_dir}")
+
+    # Compute and save metric evaluations
+    rmse = bf.diagnostics.metrics.root_mean_squared_error(
+        estimates=post_draws, targets=val_sims, variable_names=param_names
     )
 
-    figures_dir = Path("./experiments/figures")
-    figures_dir.mkdir(parents=True, exist_ok=True)
+    log_gamma = bf.diagnostics.metrics.calibration_log_gamma(
+        estimates=post_draws, targets=val_sims, variable_names=param_names
+    )
 
-    for plot_name, fig in figures.items():
-        fig_path = figures_dir / f"ddm_families_bf_regressed_{plot_name}.pdf"
-        fig.savefig(fig_path) #, dpi=300, bbox_inches="tight")
-        plt.close(fig)
-        logging.info(f"Saved diagnostic plot to {fig_path}")
+    calibration_errors = bf.diagnostics.metrics.calibration_error(
+        estimates=post_draws, targets=val_sims, variable_names=param_names
+    )
+
+    contraction = bf.diagnostics.metrics.posterior_contraction(
+        estimates=post_draws, targets=val_sims, variable_names=param_names
+    )
+
+    metrics = pd.DataFrame(
+        {
+            rmse["metric_name"]: rmse["values"],
+            log_gamma["metric_name"]: log_gamma["values"],
+            calibration_errors["metric_name"]: calibration_errors["values"],
+            contraction["metric_name"]: contraction["values"],
+        }
+    )
+
+    metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
+    logging.info("Metric evaluation is now finished.")
+
+    recovery = bf.diagnostics.recovery(
+        estimates=post_draws,
+        targets=val_sims,
+        variable_names=param_names,
+        figsize=(9, 9),
+        label_fontsize=14,
+        num_row=3,
+        num_col=3
+    )
+    recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
+    recovery.savefig(recovery_path)
+    plt.close(recovery)
+    logging.info(f"Saved recovery plot to {recovery_path}")
+
+    posterior = bf.diagnostics.plots.pairs_posterior(
+        estimates=post_draws,
+        targets=val_sims,
+        dataset_id=0,
+        variable_names=param_names
+    )
+    posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior.pdf"
+    posterior.savefig(posterior_path)
+    logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 
 if __name__ == '__main__':
-    debug = True
-
-    if debug:
-        test()
-    else:
-        main()
+    main()

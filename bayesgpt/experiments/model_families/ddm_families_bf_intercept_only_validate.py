@@ -57,16 +57,19 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(num_samples=300):
+def main(num_samples=300, case="intercept_only"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_intercept_only/model.keras"
+    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
-    param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+    param_names = [
+        r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_tau$"
+    ]
+
     data_dir = Path("./experiments/data")
     figures_dir = Path("./experiments/figures")
     evals_dir = Path("./experiments/evaluations")
@@ -84,7 +87,7 @@ def main(num_samples=300):
     params = post_draws["params"][:10]
 
     np.savez(
-        data_dir / "ddm_families_bf_fixed_data.npz",
+        data_dir / f"ddm_families_bf_{case}_data.npz",
         rts=rts, choices=choices, params=params
     )
     logging.info(f"Saved data to {data_dir}")
@@ -115,7 +118,7 @@ def main(num_samples=300):
         }
     )
 
-    metrics.to_csv(evals_dir / "ddm_families_bf_fixed_evaluations.csv", sep=";")
+    metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
     recovery = bf.diagnostics.recovery(
@@ -123,9 +126,9 @@ def main(num_samples=300):
         targets=val_sims,
         variable_names=param_names,
         figsize=(3 * len(param_names), 3),
-        label_fontsize=14
+        label_fontsize=14,
     )
-    recovery_path = figures_dir / "ddm_families_bf_fixed_recovery.pdf"
+    recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
     recovery.savefig(recovery_path)
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
@@ -136,10 +139,9 @@ def main(num_samples=300):
         dataset_id=0,
         variable_names=param_names
     )
-    posterior_path = figures_dir / "ddm_families_bf_fixed_posterior.pdf"
+    posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior.pdf"
     posterior.savefig(posterior_path)
     logging.info(f"Saved posterior pairplot to {posterior_path}")
-
 if __name__ == "__main__":
     debug = False
 
