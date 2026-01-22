@@ -87,7 +87,8 @@ class Adapter:
     ) -> np.ndarray:
         # Get number of intrinsic params
         num_intrinsic_params = len(intrinsic_params)
-        num_tiles = num_regressors * (num_categories - 1) + 1
+        num_total_regressors = num_regressors * (num_regressors + 1) // 2
+        num_tiles = num_total_regressors * (num_categories - 1) + 1
         indices = np.tile(np.linspace(0.0, 1.0, num_intrinsic_params), num_tiles)[..., None]
         return indices
 
@@ -98,7 +99,8 @@ class Adapter:
         num_categories: int,
     ):
         num_intrinsic_params = len(intrinsic_params)
-        num_indices = num_regressors * (num_categories - 1) + 1
+        num_total_regressors = num_regressors * (num_regressors + 1) // 2
+        num_indices = num_total_regressors * (num_categories - 1) + 1
         indices = np.repeat(np.linspace(0.0, 1.0, num_indices), num_intrinsic_params)[..., None]
         return indices
 
