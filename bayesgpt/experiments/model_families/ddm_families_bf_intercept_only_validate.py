@@ -67,7 +67,7 @@ def main(num_samples=300, case="intercept_only"):
 
     # Make directories
     param_names = [
-        r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_tau$"
+        r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"
     ]
 
     data_dir = Path("./experiments/data")
