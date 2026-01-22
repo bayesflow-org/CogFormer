@@ -144,7 +144,8 @@ class BayesGPTTrainer:
         design_config = {
             '1': ["v", "a", "tau"],
             "u_1": [],
-            "u_2": []
+            "u_2": [],
+            "u_1:u_2": []
         }
 
         test_samples = self.model_family.batch_sample(
@@ -172,8 +173,10 @@ class BayesGPTTrainer:
 
         true_set = adapted["param_matrices"].detach().cpu().numpy()
         pred_set = mu.detach().cpu().numpy()[:,:,0]
+        print(true_set.shape, pred_set.shape)
 
-        params = ["v", "a", "tau"]
+        params = ["v", "a", "tau", "s_v", "s_tau"]
+        param_names = [r"$v$", r"$a$", r"$tau$", r"$s_v$", r"$s_tau$"]
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
@@ -184,7 +187,8 @@ class BayesGPTTrainer:
         recovery_fig = matrix_recovery(
             true_set, pred_set,
             free_params=config['free_params'],
-            fixed_params=config['fixed_params']
+            fixed_params=config['fixed_params'],
+            param_names=param_names,
         )
         correlation_fig = correlation(
             true_set, pred_set,
@@ -237,6 +241,7 @@ if __name__ == "__main__":
         "max_num_categories": max_num_categories,
         "keep_intercept": keep_intercept,
         "num_obs": num_obs,
+        "add_interaction": True
     }
 
     # Mask randomizer kwargs interface will need to be improved at some point.
@@ -255,7 +260,7 @@ if __name__ == "__main__":
     train_sample_config = {
         "mask_randomizer_kwargs": train_params_kwargs,
         "min_num_regressors": 0,
-        "fixed_config": False
+        "fixed_config": False,
     }
 
     val_sample_config = {
@@ -266,7 +271,9 @@ if __name__ == "__main__":
 
     # Automate input dim
     # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
-    encoder_input_dim = max_num_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
+    max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
+    print(max_total_regressors)
+    encoder_input_dim = max_total_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     train_config = {
         "epochs": 10,

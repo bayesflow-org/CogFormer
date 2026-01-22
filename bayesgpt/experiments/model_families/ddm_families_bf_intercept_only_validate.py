@@ -22,16 +22,15 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
             mask_randomizer_kwargs=dict(
-                free_intrinsics=["v", "a", "tau"],
-                fixed_intrinsics=["s_v", "s_tau"],
-                fixed_values={"s_v": 0, "s_tau": 0},
+                free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
+                fixed_intrinsics=[],
+                fixed_values={}
             )
-    )
+        )
 
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
-
         if isinstance(batch_size, tuple):
-             batch_size = batch_size[0]
+            batch_size = batch_size[0]
 
         sample_kwargs = {
             'min_num_regressors': 0,
@@ -58,7 +57,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(num_samples=300, case="fixed"):
+def main(num_samples=300, case="intercept_only"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
@@ -68,7 +67,7 @@ def main(num_samples=300, case="fixed"):
 
     # Make directories
     param_names = [
-        r"$v$", r"$a$", r"$\tau$"
+        r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"
     ]
 
     data_dir = Path("./experiments/data")
@@ -126,10 +125,8 @@ def main(num_samples=300, case="fixed"):
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(9, 3),
+        figsize=(3 * len(param_names), 3),
         label_fontsize=14,
-        num_row=1,
-        num_col=3
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
     recovery.savefig(recovery_path)
@@ -145,6 +142,8 @@ def main(num_samples=300, case="fixed"):
     posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior.pdf"
     posterior.savefig(posterior_path)
     logging.info(f"Saved posterior pairplot to {posterior_path}")
-
 if __name__ == "__main__":
-    main()
+    debug = False
+
+    if not debug:
+        main()

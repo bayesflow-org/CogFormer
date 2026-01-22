@@ -21,22 +21,22 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_baseline_priors(),
+            regressed_params=["v", "a", "tau"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],
                 fixed_intrinsics=["s_v", "s_tau"],
                 fixed_values={"s_v": 0, "s_tau": 0},
             )
-    )
+        )
 
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
-
         if isinstance(batch_size, tuple):
-             batch_size = batch_size[0]
+            batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 0,
-            "max_num_regressors": 0,
-            "max_num_categories": 0,
+            'min_num_regressors': 2,
+            "max_num_regressors": 2,
+            "max_num_categories": 2,
             "fixed_config": True
         }
 
@@ -58,7 +58,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(num_samples=300, case="fixed"):
+def main(num_samples=300, case="fixed_regressed"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
@@ -68,7 +68,9 @@ def main(num_samples=300, case="fixed"):
 
     # Make directories
     param_names = [
-        r"$v$", r"$a$", r"$\tau$"
+        r"$v$", r"$a$", r"$\tau$", #r"$s_v$", r"$s_\tau$",
+        r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$",
+        r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
     ]
 
     data_dir = Path("./experiments/data")
@@ -126,9 +128,9 @@ def main(num_samples=300, case="fixed"):
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(9, 3),
+        figsize=(9, 9),
         label_fontsize=14,
-        num_row=1,
+        num_row=3,
         num_col=3
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
@@ -147,4 +149,7 @@ def main(num_samples=300, case="fixed"):
     logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 if __name__ == "__main__":
-    main()
+    debug = False
+
+    if not debug:
+        main()

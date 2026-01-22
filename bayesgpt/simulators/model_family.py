@@ -191,7 +191,15 @@ class NestedModelFamily:
 
         if debug:
             for k, v in out.items():
-                print(k, v.shape if isinstance(v, np.ndarray) else v)
+                if isinstance(v, np.ndarray):
+                    print(k, v.shape)
+                elif isinstance(v, list):
+                    for i in v:
+                        print(i)
+                elif isinstance(v, dict):
+                    print(v.keys())
+                else:
+                    print(k, v)
 
         return out
 
@@ -294,7 +302,8 @@ class NestedModelFamily:
 
         # Calculate max column width
         block_width = max_num_categories - 1
-        max_num_cols = max_num_regressors * block_width + (1 if list_batch[0]["keep_intercept"] else 0)
+        max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
+        max_num_cols = max_total_regressors * block_width + (1 if list_batch[0]["keep_intercept"] else 0)
 
         if flatten_param_outputs:
             param_outputs_shape = (batch_size, max_num_cols * num_params)
@@ -306,7 +315,7 @@ class NestedModelFamily:
         param_masks = np.zeros(param_outputs_shape)
         param_matrices = np.zeros(param_outputs_shape)
         regressor_masks = np.zeros((batch_size, max_num_cols))
-        discrete_masks = -np.ones((batch_size, max_num_regressors))
+        discrete_masks = -np.ones((batch_size, max_total_regressors))
         num_obs_array = np.zeros((batch_size, 1))
         num_regressors_array = np.zeros((batch_size, 1))
 
@@ -325,7 +334,7 @@ class NestedModelFamily:
             # Pad design_matrix, param_mask, param_matrix, and regressor_mask to max_num_regressors
             num_obs = b["num_obs"]
             num_regressors = b["num_regressors"]
-            num_cols = num_regressors * block_width + (1 if b["keep_intercept"] else 0)
+            num_cols = b["design_matrix"].shape[1]
 
             design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
 
@@ -337,7 +346,7 @@ class NestedModelFamily:
                 param_matrices[i, :num_cols, :num_params] = b["param_matrix"]
 
             regressor_masks[i, :num_cols] = b["regressor_mask"]
-            discrete_masks[i, :num_regressors] = b["discrete_mask"]
+            discrete_masks[i, :b["discrete_mask"].shape[0]] = b["discrete_mask"]
             num_obs_array[i] = b["num_obs"]
             num_regressors_array[i] = b["num_regressors"]
 

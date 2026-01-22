@@ -324,8 +324,7 @@ class ContextManager:
         start_col = {k: col_idx + j * block_width for j, k in enumerate(regressor_keys)}
 
         # Main effect
-        j = 0
-        for key in main_effect_keys:
+        for j, key in enumerate(main_effect_keys):
             start = start_col[key]
 
             if key in context:
@@ -333,7 +332,9 @@ class ContextManager:
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
                 design_matrix[:, start] = col
-            elif discrete_mask[j] == 1:
+                continue
+
+            if main_discrete_mask[j] == 1:
                 # Sample dummies
                 dummies = self.sample_dummies(
                     num_obs=num_obs,
@@ -346,18 +347,31 @@ class ContextManager:
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
                 design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
-            j += 1
 
         # Interaction effect
         for key in interaction_keys:
             start = start_col[key]
 
+            # Allow explicit override via context if desired
             if key in context:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
                 design_matrix[:, start] = col
+                continue
 
+            try:
+                a, b = key.split(":")
+            except ValueError:
+                continue
+
+            # first-column indices of parent blocks
+            a0 = start_col.get(a)
+            b0 = start_col.get(b)
+            if (a0 is None) or (b0 is None):
+                continue
+
+            design_matrix[:, start] = design_matrix[:, a0] * design_matrix[:, b0]
         return design_matrix
 
     def build_parameter_indices(
