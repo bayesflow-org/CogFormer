@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from tqdm import trange
+from tqdm.auto import tqdm
 
 from ..encoder import Encoder
 from ..decoder_fm import Decoder
@@ -66,30 +66,38 @@ class BayesGPT(nn.Module):
 
         return pred_velocity, target_velocity
     
-    def sample(self, input_data, param_indices, regressor_indices, params_mask, steps=1000):
+    @torch.no_grad()
+    def sample(self, input_data, param_indices, regressor_indices, params_mask, steps=1000, num_samples=100):
 
-        theta_t = torch.randn_like(param_indices)
-        t = torch.zeros(theta_t.shape[0], device=theta_t.device)
-        t = broadcast_right(t, theta_t.shape)
+        theta_t = torch.randn((num_samples, *param_indices.shape), device=input_data.device)
+
+        samples = torch.zeros_like(theta_t, device=theta_t.device)
 
         encoder_tokens = self.encoder(input_data)
         pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)
-    
-        for _ in trange(steps, desc=f"[FlowMatching] Drawing {len(input_data)} Samples", leave=False, unit="step"):
-            dt = 1 / steps
 
-            v = self.decoder.velocity(
-                theta_t=theta_t, 
-                query=pos_embeddings, 
-                key=encoder_tokens, 
-                t=t, 
-                query_mask=params_mask
-            )
+        for sample_id in tqdm(range(num_samples), desc="Sampling", unit="sample"):
+            
+            t = torch.zeros_like(theta_t[sample_id], device=theta_t.device)
 
-            theta_t = theta_t + v * dt
-            t = t + dt
+            for _ in range(steps):
+                dt = 1 / steps
 
-        return theta_t
+                v = self.decoder.velocity(
+                    theta_t=theta_t[sample_id], 
+                    query=pos_embeddings, 
+                    key=encoder_tokens, 
+                    t=t,
+                    query_mask=params_mask
+                )
+
+                theta_t[sample_id] = theta_t[sample_id] + v * dt
+                t = t + dt
+
+            samples[sample_id] = theta_t[sample_id]
+
+        samples = torch.swapaxes(samples, 0, 1).cpu().numpy()
+        return samples
 
     def compute_loss(self, pred_velocity, target_velocity, param_masks) -> torch.Tensor:
         """"""
