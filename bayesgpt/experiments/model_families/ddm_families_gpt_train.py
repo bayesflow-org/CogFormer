@@ -10,14 +10,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 np.set_printoptions(suppress=True)
 
-from simulators import NestedModelFamily
-from simulators.benchmarks import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
-from adapters import Adapter
-from networks.transformers.gpt import BayesGPTv1
-from networks.loss import mse_loss, nll_loss
-from diagnostics.plot.matrix_recovery import matrix_recovery
-from diagnostics.plot.correlation import correlation
+from bayesgpt.simulators import NestedModelFamily
+from bayesgpt.simulators.benchmarks import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
+from bayesgpt.adapters import Adapter
+from bayesgpt.networks.transformers.gpt import BayesGPTv1
+from bayesgpt.networks.loss import mse_loss, nll_loss
+from bayesgpt.diagnostics.plot.matrix_recovery import matrix_recovery
+from bayesgpt.diagnostics.plot.correlation import correlation
 
 
 class BayesGPTTrainer:

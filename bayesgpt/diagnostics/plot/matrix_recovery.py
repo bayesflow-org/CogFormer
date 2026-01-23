@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections.abc import Callable
 
-from utils.plot_utils import hex_code, make_quadratic
+from bayesgpt.utils.plot_utils import hex_code, make_quadratic
 
 
 def matrix_recovery(
@@ -94,8 +94,6 @@ def make_quadratic(ax: plt.Axes, x_data: np.ndarray, y_data: np.ndarray):
         alpha=0.9,
         linestyle="dashed",
     )
-
-
 
 def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwargs) -> np.ndarray:
     """
