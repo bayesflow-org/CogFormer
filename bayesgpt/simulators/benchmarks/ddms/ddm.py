@@ -1,9 +1,10 @@
 import numpy as np
 from numba import njit, prange
-from simulators import Model
 from scipy.stats import halfnorm
 
 from .ddm_priors import ddm_baseline_priors
+
+from bayesgpt.simulators import Model
 
 
 @njit

@@ -1,6 +1,6 @@
 import numpy as np
-from collections.abc import Callable
-from simulators import NestedModelFamily
+
+from .model_family import NestedModelFamily
 
 
 class ModelClass:

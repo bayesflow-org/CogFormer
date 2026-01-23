@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
-from networks.transformers.encoder import Encoder
-from networks.transformers.decoder import Decoder
+
+
+from ..encoder import Encoder
+from ..decoder_vi import Decoder
 
 
 class BayesGPTv1(nn.Module):

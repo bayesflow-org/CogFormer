@@ -4,8 +4,8 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 
-from utils.simulator_utils import shifted_softplus
-from viz import visualize_matrix, visualize_matrices, visualize_design_configs
+from ..utils.simulator_utils import shifted_softplus
+from ..viz import visualize_matrix, visualize_matrices, visualize_design_configs
 
 
 class NestedModelFamily:
