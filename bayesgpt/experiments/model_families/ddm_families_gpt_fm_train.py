@@ -14,10 +14,9 @@ from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
 from bayesgpt.adapters import Adapter
-from bayesgpt.networks.transformers.gpt import BayesGPTv1
+from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.networks.loss import mse_loss, nll_loss
-from bayesgpt.diagnostics.plot.matrix_recovery import matrix_recovery
-from bayesgpt.diagnostics.plot.correlation import correlation
+from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 
 
 class BayesGPTTrainer:
@@ -31,10 +30,10 @@ class BayesGPTTrainer:
         use_wandb=False,
     ):
         super().__init__()
-        self.gpt = gpt
-        self.model = model
-        self.prior_fun = prior_fun
-        self.adapter = adapter
+        self.gpt=gpt
+        self.model=model
+        self.prior_fun=prior_fun
+        self.adapter=adapter
         self.use_wandb = use_wandb
         if model_family is not None:
             self.model_family = model_family
@@ -45,7 +44,7 @@ class BayesGPTTrainer:
                 prior_fun=self.prior_fun
             )
 
-    def train(self, train_config, val_config, checkpoint_path="bayesgpt_model.pt"):
+    def train(self, train_config, val_config, checkpoint_path="bayesgpt_vi.pt"):
         # Define global step
         global_step = 0
 
@@ -66,8 +65,7 @@ class BayesGPTTrainer:
                 loss, current_lr = self.train_step(
                     config=train_config,
                     optimizer=optimizer,
-                    scheduler=scheduler,
-                    loss_fn=loss_fn
+                    scheduler=scheduler
                 )
                 # Log metrics
                 if self.use_wandb:
@@ -92,7 +90,7 @@ class BayesGPTTrainer:
 
         torch.save(self.gpt.state_dict(), checkpoint_path)
 
-    def train_step(self, config, optimizer, scheduler, loss_fn):
+    def train_step(self, config, optimizer, scheduler):
         """Training step"""
         # Generate training samples
         train_samples = self.model_family.batch_sample(
@@ -112,7 +110,8 @@ class BayesGPTTrainer:
         optimizer.zero_grad()
 
         # Train
-        mu, logvar = self.gpt(
+        pred_velocity, target_velocity = self.gpt(
+            adapted["param_matrices"][..., None],
             adapted['input_data'],
             adapted['param_indices'],
             adapted['regressor_indices'],
@@ -120,7 +119,7 @@ class BayesGPTTrainer:
         )
 
         # Compute loss
-        L = loss_fn(adapted["param_matrices"], mu, logvar, adapted["param_masks"])
+        L = self.gpt.compute_loss(pred_velocity, target_velocity, adapted['param_masks'])
         L.backward()
 
         if config["gradient_clip_norm"] is not None:
@@ -137,95 +136,14 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def val_step(self, config, global_step):
-        """Validation steps, used for validation only"""
-
-        # Generate training samples
-        design_config = {
-            '1': ["v", "a", "tau"],
-            "u_1": ["v", "a", "tau"],
-            "u_2": ["v", "a", "tau"],
-            "u_1:u_2": ["v", "a", "tau"],
-        }
-
-        test_samples = self.model_family.batch_sample(
-            **config["model_family_config"],
-            **config["val_sample_config"],
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-            design_config=design_config
-        )
-
-        # Adapt
-        adapted = self.adapter.adapt(
-            test_samples,
-            intrinsic_params=self.model_family.intrinsic_params
-        )
-
-        # Evaluate with test set
-        self.gpt.eval()
-        mu, logvar = self.gpt(
-            adapted['input_data'],
-            adapted['param_indices'],
-            adapted['regressor_indices'],
-            adapted['param_masks']
-        )
-
-        true_set = adapted["param_matrices"].detach().cpu().numpy()
-        pred_set = mu.detach().cpu().numpy()[:,:,0]
-        params_mask = adapted["param_masks"].detach().cpu().numpy()
-        print(true_set.shape, pred_set.shape)
-
-        params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
-        n_cols = len(params)
-        n_rows = true_set.shape[1] // n_cols
-        true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
-        pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
-
-        # Log recovery plot
-        # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
-        recovery_fig = matrix_recovery(
-            true_set, pred_set,
-            free_params=config['free_params'],
-            fixed_params=config['fixed_params'],
-            params_mask=params_mask,
-            param_names=param_names,
-        )
-        correlation_fig = correlation(
-            true_set, pred_set,
-            free_params=config['free_params'],
-            fixed_params=config['fixed_params']
-        )
-
-        figures_dir = Path("./experiments/figures")
-        figures_dir.mkdir(parents=True, exist_ok=True)
-
-        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fixed_variability_recovery.pdf", bbox_inches="tight")
-        correlation_fig.savefig(figures_dir / "ddm_family_gpt_fixed_variability_correlation.pdf", bbox_inches="tight")
-
-        if self.use_wandb:
-            wandb.log(
-                {
-                    "val/recovery": wandb.Image(recovery_fig),
-                    "val/correlation": wandb.Image(correlation_fig)
-                },
-                step=global_step,
-            )
-            plt.close(recovery_fig)
-            plt.close(correlation_fig)
-        else:
-            pass
-
-        self.gpt.train()
+    def val_step(self, val_config, global_step):
+        pass
 
     @staticmethod
     def finish():
         wandb.finish()
 
-
 if __name__ == "__main__":
-
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
@@ -246,7 +164,6 @@ if __name__ == "__main__":
         "add_interaction": True
     }
 
-    # Mask randomizer kwargs interface will need to be improved at some point.
     train_params_kwargs = {
         "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
@@ -274,13 +191,12 @@ if __name__ == "__main__":
     # Automate input dim
     # input_dim = regressors * (categories - 1) + intercept + sim_data_dim (RTs, choices --> 2)
     max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
-    print(max_total_regressors)
     encoder_input_dim = max_total_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     train_config = {
-        "epochs": 500,
+        "epochs": 10,
         "batch_size": 32,
-        "steps_per_epoch": 100,
+        "steps_per_epoch": 10,
         "learning_rate": 2e-4,
         "gradient_clip_norm": 5.0,
         "device": device,
@@ -289,7 +205,7 @@ if __name__ == "__main__":
     }
 
     val_config = {
-        "batch_size": 300,
+        "batch_size": 30,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
         "free_params": val_params_kwargs["free_intrinsics"],
@@ -338,7 +254,7 @@ if __name__ == "__main__":
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
-    bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
+    bayesgpt = BayesGPT(**bayesgpt_config).to(device).train()
 
     # Pass to trainer
     trainer = BayesGPTTrainer(
