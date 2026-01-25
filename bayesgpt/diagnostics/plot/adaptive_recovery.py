@@ -14,6 +14,7 @@ def adaptive_recovery(
     design_config: dict,
     intrinsic_params: list[str],
     max_num_categories: int,
+    parameter_mask: np.ndarray = None,
     variable_names: list[str] = None,
     intercept_color: str = "#4e2a84",
     main_effect_color: str = "#6969ff",
@@ -24,14 +25,17 @@ def adaptive_recovery(
     if variable_names is None:
         variable_names = design_config["1"]
 
-    context_manager = ContextManager()
-    parameter_mask = context_manager.build_parameter_mask(
-        design_config=design_config,
-        max_num_categories=num_categories,
-        intrinsic_params=intrinsic_params,
-        keep_intercept=True
-    )
-    print(parameter_mask)
+    if parameter_mask is None:
+        context_manager = ContextManager()
+        parameter_mask = context_manager.build_parameter_mask(
+            design_config=design_config,
+            max_num_categories=max_num_categories,
+            intrinsic_params=intrinsic_params,
+            keep_intercept=True
+        )
+    elif parameter_mask.ndim == 3:
+        parameter_mask = parameter_mask[0]
+
     num_rows, num_cols = parameter_mask.shape
 
     if figsize is None:
@@ -127,22 +131,25 @@ def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwa
     return np.quantile(x, q=(lower_q, upper_q), axis=axis, **kwargs)
 
 if __name__ == "__main__":
-    design_config = {
-        "1": ["v", "a", "z", "tau"],
-        "u_1": ["v", "a", "tau"],
-        "u_2": ["v", "a", "z"],
-        "u_1:u_2": ["v", "a"]
-    }
+    debug = False
 
-    intrinsic_params = design_config["1"]
-    num_params = len(intrinsic_params)
-    num_regressors = len(list(design_config.keys())) - 1
-    num_categories = 3
-    batch_size = 10
-    true = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
-    pred = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
-    print(true.shape, pred.shape)
+    if debug:
+        design_config = {
+            "1": ["v", "a", "z", "tau"],
+            "u_1": ["v", "a", "tau"],
+            "u_2": ["v", "a", "z"],
+            "u_1:u_2": ["v", "a"]
+        }
 
-    fig = adaptive_recovery(true, pred, design_config, intrinsic_params, max_num_categories=num_categories)
-    fig.savefig("adaptive_recovery.pdf")
-    print("success")
+        intrinsic_params = design_config["1"]
+        num_params = len(intrinsic_params)
+        num_regressors = len(list(design_config.keys())) - 1
+        num_categories = 3
+        batch_size = 10
+        true = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
+        pred = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
+        print(true.shape, pred.shape)
+
+        fig = adaptive_recovery(true, pred, design_config, intrinsic_params, max_num_categories=num_categories)
+        fig.savefig("adaptive_recovery.pdf")
+        print("success")
