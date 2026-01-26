@@ -30,3 +30,27 @@ def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray):
 
 def hex_code():
     return "#{:06x}".format(random.randint(0, 0xFFFFFF))
+
+def staedtler_fineliner():
+    colors = {
+        # BF
+        "bf_intercept": "#1B9E77",
+        "bf_main_effect": "#1AC995",
+        "bf_interaction": "#10E0A2",
+
+        # BayesGPT-VI
+        "vi_intercept": "#15435F",
+        "vi_main_effect": "#007396",
+        "vi_interaction": "#3EB1C8",
+
+        # BayesGPT-FM
+        "fm_intercept": "#6969FF",
+        "fm_main_effect": "#7570B3",
+        "fm_interaction": "#9E9AC8",
+
+        # BayesGPT-CM
+        "cm_intercept": "#AD1457",
+        "cm_main_effect": "#EC008C",
+        "cm_interaction": "#FF69FF",
+    }
+    return colors
