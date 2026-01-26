@@ -1,7 +1,9 @@
 import torch
 import wandb
-from pathlib import Path
+import logging
+import argparse
 
+from pathlib import Path
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -84,7 +86,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 10 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -197,7 +199,6 @@ class BayesGPTTrainer:
             variable_names=param_names,
         )
 
-
         # correlation_fig = correlation(
         #     true_set, pred_set,
         #     free_params=config['free_params'],
@@ -227,15 +228,31 @@ class BayesGPTTrainer:
     def finish():
         wandb.finish()
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
+    parser.add_argument("--val_batch_size", type=int, default=32, help="validation batch size")
+    parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
+    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
+    parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
+    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
+    parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
+    parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
+    parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
+    parser.add_argument("--layer_dropout", type=float, default=0.1, help="layer dropout rate")
+    return parser.parse_args()
 
 if __name__ == "__main__":
+    args = parse_args()
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
 
-    use_wandb = True
+    use_wandb = args.use_wandb
 
     max_num_regressors = 2
     max_num_categories = 2
@@ -250,7 +267,6 @@ if __name__ == "__main__":
         "add_interaction": True
     }
 
-    # Mask randomizer kwargs interface will need to be improved at some point.
     train_params_kwargs = {
         "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
@@ -281,10 +297,10 @@ if __name__ == "__main__":
     encoder_input_dim = max_total_regressors * (max_num_categories - 1) + (3 if keep_intercept else 2)
 
     train_config = {
-        "epochs": 10,
-        "batch_size": 32,
-        "steps_per_epoch": 10,
-        "learning_rate": 2e-4,
+        "epochs": args.epochs,
+        "batch_size": args.train_batch_size,
+        "steps_per_epoch": args.steps_per_epoch,
+        "learning_rate": args.lr,
         "gradient_clip_norm": 5.0,
         "device": device,
         "model_family_config": model_family_config,
@@ -292,7 +308,7 @@ if __name__ == "__main__":
     }
 
     val_config = {
-        "batch_size": 30,
+        "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
         "free_params": val_params_kwargs["free_intrinsics"],
@@ -301,7 +317,7 @@ if __name__ == "__main__":
     }
 
     wandb_config = {
-        "project_name": "bayesgpt-v1",
+        "project_name": "bayesgpt-vi",
         "run_name": None,
         "tags": ["BayesGPTv1", "ModelFamily"],
         "watch_log": "gradients",
@@ -310,16 +326,23 @@ if __name__ == "__main__":
 
     bayesgpt_config = {
         "encoder_input_dim": encoder_input_dim,
-        "encoder_num_layers": 8,
-        "decoder_num_layers": 8,
+        "encoder_num_layers": args.encoder_num_layers,
+        "decoder_num_layers": args.decoder_num_layers,
         "encoder_num_heads": 8,
         "decoder_num_heads": 8,
-        "num_seeds": 40,
-        "seed_dim": 128,
+        "num_seeds": args.num_seeds,
+        "seed_dim": args.seed_dim,
         "proj_dim": 64,
-        "dropout": 0.1,
-        "layer_dropout": 0.1,
+        "dropout": args.dropout,
+        "layer_dropout": args.layer_dropout,
     }
+
+    logging.info(
+        f"Training with "
+        f"{train_config['epochs']} epochs, "
+        f"{train_config['steps_per_epoch']} steps per epoch, and "
+        f"{train_config['batch_size']} batches of dataset per step."
+    )
 
     if use_wandb:
     # Initialize wandb
@@ -353,12 +376,13 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
-        f"bayesgpt"
-        f"_e{train_config['epochs']}"
-        f"_b{train_config['batch_size']}"
-        f"_l{bayesgpt_config['decoder_num_layers']}"
-        f"_h{bayesgpt_config['encoder_num_heads']}"
-        f"_s{bayesgpt_config['num_seeds']}.pt"
+        f"bayesgpt_vi"
+        f"_eps{train_config['epochs']}"
+        f"_stp{train_config['steps_per_epoch']}"
+        f"_bse{train_config['batch_size']}"
+        f"_nls{bayesgpt_config['decoder_num_layers']}"
+        f"_nhs{bayesgpt_config['decoder_num_heads']}"
+        f"_nss{bayesgpt_config['num_seeds']}.pt"
     )
 
     # Train
