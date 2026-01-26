@@ -179,7 +179,12 @@ cython_debug/
 wandb-metadata.json
 wandb-summary.json
 bayesgpt/wandb
+/wandb
 
 # Checkpoints
 *.ckpt
 model.keras
+
+# config.yaml
+config.yaml
+
