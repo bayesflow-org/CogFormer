@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from collections.abc import Callable
 
 from bayesgpt.simulators.context_manager import ContextManager
-from bayesgpt.utils.plot_utils import make_quadratic
+from bayesgpt.utils.plot_utils import make_quadratic, staedtler_fineliner
 
 
 def adaptive_recovery(
@@ -20,6 +20,8 @@ def adaptive_recovery(
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
     uncertainty_agg: Callable = None,
+    title_fontsize: int = 14,
+    label_fontsize: int = 14,
     figsize: tuple = None
 ):
     if variable_names is None:
@@ -45,8 +47,6 @@ def adaptive_recovery(
 
     regressor_keys = list(design_config.keys())
     for r in range(num_rows):
-        # Initialize regressor key and color
-
         if r > 0:
             category_id = (r - 1) % (max_num_categories - 1) + 1
             regressor_id = (r - 1) // (max_num_categories - 1) + 1
@@ -72,9 +72,9 @@ def adaptive_recovery(
 
                 ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
                 sns.despine(ax=ax)
-                ax.set_ylabel(ylabel if c == 0 else "")
-                ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "")
-                ax.set_title(variable_names[c] if r == 0 else "")
+                ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
+                ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
+                ax.set_title(variable_names[c] if r == 0 else "", fontsize=title_fontsize)
 
             else:
                 ax.set_facecolor(color)
@@ -131,7 +131,8 @@ def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwa
     return np.quantile(x, q=(lower_q, upper_q), axis=axis, **kwargs)
 
 if __name__ == "__main__":
-    debug = False
+    debug = True
+    color = staedtler_fineliner()
 
     if debug:
         design_config = {
@@ -142,6 +143,7 @@ if __name__ == "__main__":
         }
 
         intrinsic_params = design_config["1"]
+        variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
         num_params = len(intrinsic_params)
         num_regressors = len(list(design_config.keys())) - 1
         num_categories = 3
@@ -150,6 +152,18 @@ if __name__ == "__main__":
         pred = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
         print(true.shape, pred.shape)
 
-        fig = adaptive_recovery(true, pred, design_config, intrinsic_params, max_num_categories=num_categories)
-        fig.savefig("adaptive_recovery.pdf")
+        fig = adaptive_recovery(
+            true,
+            pred,
+            design_config,
+            intrinsic_params,
+            variable_names=variable_names,
+            max_num_categories=num_categories,
+            intercept_color=color["cm_intercept"],
+            main_effect_color=color["cm_main_effect"],
+            interaction_color=color["cm_interaction"],
+            title_fontsize=18,
+            label_fontsize=14,
+        )
+        fig.savefig("test_recovery.pdf")
         print("success")
