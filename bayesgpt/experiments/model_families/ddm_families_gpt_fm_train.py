@@ -136,8 +136,78 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def val_step(self, val_config, global_step):
-        pass
+    def val_step(self, config, global_step):
+        # Generate training samples
+        design_config = {
+            '1': ["v", "a", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "a", "tau"],
+            "u_2": ["v", "a", "tau"],
+            "u_1:u_2": ["v", "a"],
+        }
+
+        test_samples = self.model_family.batch_sample(
+            **config["model_family_config"],
+            **config["val_sample_config"],
+            batch_size=config["batch_size"],
+            flatten_param_outputs=True,
+            design_config=design_config
+        )
+
+        # Adapt
+        adapted = self.adapter.adapt(
+            test_samples,
+            intrinsic_params=self.model_family.intrinsic_params
+        )
+
+        self.gpt.eval()
+        pred_velocity, target_velocity = self.gpt(
+            adapted["param_matrices"][..., None],
+            adapted['input_data'],
+            adapted['param_indices'],
+            adapted['regressor_indices'],
+            adapted['param_masks']
+        )
+        print(pred_velocity.shape, target_velocity.shape)
+
+        true_set = target_velocity.detach().cpu().numpy()[:,:,0]
+        pred_set = pred_velocity.detach().cpu().numpy()[:,:,0]
+
+        params = ["v", "a", "tau", "s_v", "s_tau"]
+        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+        params_mask = adapted["param_masks"].detach().cpu().numpy()
+        n_cols = len(params)
+        n_rows = true_set.shape[1] // n_cols
+        true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
+        pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
+        params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
+
+        recovery_fig = adaptive_recovery(
+            true_set, pred_set,
+            design_config=design_config,
+            intrinsic_params=params,
+            max_num_categories=config["model_family_config"]["max_num_categories"],
+            parameter_mask=params_mask,
+            variable_names=param_names,
+        )
+
+        figures_dir = Path("./experiments/figures")
+        figures_dir.mkdir(parents=True, exist_ok=True)
+
+        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery.pdf", bbox_inches="tight")
+
+        if self.use_wandb:
+            wandb.log(
+                {
+                    "val/recovery": wandb.Image(recovery_fig),
+                    # "val/correlation": wandb.Image(correlation_fig)
+                },
+                step=global_step,
+            )
+            plt.close(recovery_fig)
+            # plt.close(correlation_fig)
+
+        self.gpt.train()
+
 
     @staticmethod
     def finish():
