@@ -181,26 +181,22 @@ class BayesGPTTrainer:
         var = np.exp(0.5 * logvar)
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+        param_names = [r"$v$", r"$\log a$", r"$\log \tau$", r"$s_v$", r"$s_\tau$"]
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
-        # Provide options for both point estimation and full posterior estimation
-        if config["point_estimates"]:
-            pred_set = mu.reshape(config["batch_size"], n_rows, n_cols)
-        else:
-            mu = mu.reshape(config["batch_size"], n_rows, n_cols)
-            var = var.reshape(config["batch_size"], n_rows, n_cols)
-            num_samples = 100
-            pred_set = np.random.normal(
-                loc=mu[:, None, :, :],
-                scale=var[:, None, :, :],
-                size=(config["batch_size"], num_samples, n_rows, n_cols)
-            )
-            if self.debug:
-                print(pred_set.shape)
+        mu = mu.reshape(config["batch_size"], n_rows, n_cols)
+        var = var.reshape(config["batch_size"], n_rows, n_cols)
+        num_samples = 500
+        pred_set = np.random.normal(
+            loc=mu[:, None, :, :],
+            scale=var[:, None, :, :],
+            size=(config["batch_size"], num_samples, n_rows, n_cols)
+        )
+        if self.debug:
+            print(pred_set.shape)
 
         params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
 
@@ -250,16 +246,17 @@ class BayesGPTTrainer:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
-    parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
+    parser.add_argument("--debug", action="store_true", help="Debug mode")
+    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
+    parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
-    parser.add_argument("--encoder_num_layers", type=int, default=8, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
-    parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
-    parser.add_argument("--seed_dim", type=int, default=128, help="dimension of seeds")
+    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
+    parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
+    parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
     parser.add_argument("--layer_dropout", type=float, default=0.1, help="layer dropout rate")
     return parser.parse_args()
@@ -328,7 +325,6 @@ if __name__ == "__main__":
     }
 
     val_config = {
-        "point_estimates": False,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,

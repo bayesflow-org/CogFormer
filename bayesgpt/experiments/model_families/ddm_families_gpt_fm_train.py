@@ -48,7 +48,7 @@ class BayesGPTTrainer:
             )
         self.debug = False
 
-    def train(self, train_config, val_config, checkpoint_path="bayesgpt_vi.pt"):
+    def train(self, train_config, val_config, checkpoint_path="bayesgpt_fm.pt"):
         # Define global step
         global_step = 0
 
@@ -86,7 +86,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 5 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -144,7 +144,7 @@ class BayesGPTTrainer:
         # Generate training samples
         design_config = {
             '1': ["v", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau"],
+            "u_1": ["v", "a", "tau", "s_v"],
             "u_2": ["v", "a", "tau"],
             "u_1:u_2": ["v", "a"],
         }
@@ -174,32 +174,30 @@ class BayesGPTTrainer:
         if self.debug:
             print(pred_velocity.shape, target_velocity.shape)
 
-        true_set = target_velocity.detach().cpu().numpy()[:,:,0]
-        pred_set = pred_velocity.detach().cpu().numpy()[:,:,0]
+        true_set = adapted["param_matrices"].detach().cpu().numpy()
+        print(true_set.shape)
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+        param_names = [r"$v$", r"$\log a$", r"$\log \tau$", r"$s_v$", r"$s_\tau$"]
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
-        if config["point_estimates"]:
-            pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
-        else:
-            num_sample_steps = config["num_sample_steps"]
-            num_samples = 100
-            pred_set = self.gpt.sample(
-                adapted['input_data'],
-                adapted['param_indices'],
-                adapted['regressor_indices'],
-                adapted['param_masks'],
-                steps=num_sample_steps,
-                num_samples=num_samples
-            )
-            pred_set = pred_set.reshape(config["batch_size"], num_samples, n_rows, n_cols)
-            if self.debug:
-                print(pred_set.shape)
+        num_sample_steps = config["num_sample_steps"]
+        num_samples = 500
+        pred_set = self.gpt.sample(
+            adapted['input_data'],
+            adapted['param_indices'],
+            adapted['regressor_indices'],
+            adapted['param_masks'],
+            steps=num_sample_steps,
+            num_samples=num_samples
+        )
+        print(pred_set.shape)
+        pred_set = pred_set.reshape(config["batch_size"], num_samples, n_rows, n_cols)
+        if self.debug:
+            print(pred_set.shape)
 
         params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
 
@@ -242,11 +240,12 @@ class BayesGPTTrainer:
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
     parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
     parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
@@ -320,7 +319,6 @@ if __name__ == "__main__":
     }
 
     val_config = {
-        "point_estimates": False,
         "num_sample_steps": 100,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
