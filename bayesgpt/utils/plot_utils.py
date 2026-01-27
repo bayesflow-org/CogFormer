@@ -28,29 +28,95 @@ def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray):
         linestyle="dashed",
     )
 
+def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwargs) -> np.ndarray:
+    """
+    Compute credible interval from samples using quantiles.
+
+    Parameters
+    ----------
+    x : array_like
+        Input array of samples from a posterior distribution or bootstrap samples.
+    prob : float, default 0.95
+        Coverage probability of the credible interval (between 0 and 1).
+        For example, 0.95 gives a 95% credible interval.
+    axis : Sequence[int]
+        Axis or axes along which the credible interval is computed.
+        Default is None (flatten array).
+
+    Returns
+    -------
+    a numpy array of shape (2, ...) with the first dimension indicating the
+    lower and upper bounds of the credible interval.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> # Simulate posterior samples
+    >>> samples = np.random.normal(size=(10, 1000, 3))
+
+    >>> # Different coverage probabilities
+    >>> credible_interval(samples, prob=0.5, axis=1)  # 50% CI
+    >>> credible_interval(samples, prob=0.99, axis=1)  # 99% CI
+    """
+
+    # Input validation
+    if not 0 <= prob <= 1:
+        raise ValueError(f"prob must be between 0 and 1, got {prob}")
+
+    # Calculate tail probabilities
+    alpha = 1 - prob
+    lower_q = alpha / 2
+    upper_q = 1 - alpha / 2
+
+    # Compute quantiles
+    return np.quantile(x, q=(lower_q, upper_q), axis=axis, **kwargs)
+
 def hex_code():
     return "#{:06x}".format(random.randint(0, 0xFFFFFF))
 
-def staedtler_fineliner():
+def bf_colors():
     colors = {
         # BF
-        "bf_intercept": "#1B9E77",
-        "bf_main_effect": "#1AC995",
-        "bf_interaction": "#10E0A2",
+        "intercept": "#1B9E77",
+        "main_effect": "#1AC995",
+        "interaction": "#10E0A2",
+    }
+    return colors
 
-        # BayesGPT-VI
-        "vi_intercept": "#15435F",
-        "vi_main_effect": "#007396",
-        "vi_interaction": "#3EB1C8",
-
-        # BayesGPT-FM
-        "fm_intercept": "#6969FF",
-        "fm_main_effect": "#7570B3",
-        "fm_interaction": "#9E9AC8",
-
+def bayesgpt_cm_colors():
+    colors = {
         # BayesGPT-CM
-        "cm_intercept": "#AD1457",
-        "cm_main_effect": "#EC008C",
-        "cm_interaction": "#FF69FF",
+        "intercept": "#15435F",
+        "main_effect": "#007396",
+        "interaction": "#3EB1C8",
+    }
+    return colors
+
+def bayesgpt_vi_colors():
+    colors = {
+        # BayesGPT-VI
+        "intercept": "#6969FF",
+        "main_effect": "#7570B3",
+        "interaction": "#9E9AC8",
+    }
+
+    return colors
+
+def bayesgpt_fm_colors():
+    colors = {
+        # BayesGPT-FM
+        "intercept": "#AD1457",
+        "main_effect": "#EC008C",
+        "interaction": "#FF69FF",
+    }
+
+    return colors
+
+def staedtler_fineliner():
+    colors = {
+        "bf": bf_colors(),
+        "vi": bayesgpt_vi_colors(),
+        "fm": bayesgpt_fm_colors(),
+        "cm": bayesgpt_cm_colors()
     }
     return colors

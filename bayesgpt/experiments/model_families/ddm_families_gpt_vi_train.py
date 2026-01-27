@@ -19,6 +19,7 @@ from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPTv1
 from bayesgpt.networks.loss import mse_loss, nll_loss
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.utils.plot_utils import bayesgpt_vi_colors
 from bayesgpt.diagnostics.plot.correlation import correlation
 
 
@@ -145,7 +146,7 @@ class BayesGPTTrainer:
         # Generate training samples
         design_config = {
             '1': ["v", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau"],
+            "u_1": ["v", "a", "tau", "s_v"],
             "u_2": ["v", "a", "tau"],
             "u_1:u_2": ["v", "a"],
         }
@@ -174,10 +175,9 @@ class BayesGPTTrainer:
         )
 
         true_set = adapted["param_matrices"].detach().cpu().numpy()
-        pred_set = mu.detach().cpu().numpy()[:,:,0]
+        mu = mu.detach().cpu().numpy()[:,:,0]
         logvar = logvar.detach().cpu().numpy()[:,:,0]
-        variance = np.exp(logvar)
-        print(true_set.shape, pred_set.shape, variance.shape)
+        var = np.exp(0.5 * logvar)
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
         param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
@@ -185,10 +185,25 @@ class BayesGPTTrainer:
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
-        pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
+
+        # Provide options for both point estimation and full posterior estimation
+        if config["point_estimates"]:
+            pred_set = mu.reshape(config["batch_size"], n_rows, n_cols)
+        else:
+            mu = mu.reshape(config["batch_size"], n_rows, n_cols)
+            var = var.reshape(config["batch_size"], n_rows, n_cols)
+            num_draws = 300
+            pred_set = np.random.normal(
+                loc=mu[:, None, :, :],
+                scale=var[:, None, :, :],
+                size=(config["batch_size"], num_draws, n_rows, n_cols)
+            )
+            print(pred_set.ndim)
+
         params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
 
         # Log recovery plot
+        colors = bayesgpt_vi_colors()
         # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
         recovery_fig = adaptive_recovery(
             true_set, pred_set,
@@ -197,6 +212,9 @@ class BayesGPTTrainer:
             max_num_categories=config["model_family_config"]["max_num_categories"],
             parameter_mask=params_mask,
             variable_names=param_names,
+            intercept_color=colors["intercept"],
+            main_effect_color=colors["main_effect"],
+            interaction_color=colors["interaction"],
         )
 
         # correlation_fig = correlation(
@@ -255,7 +273,7 @@ if __name__ == "__main__":
     use_wandb = args.use_wandb
 
     max_num_regressors = 2
-    max_num_categories = 2
+    max_num_categories = 3
     keep_intercept = True
     num_obs = 500
 
@@ -308,6 +326,7 @@ if __name__ == "__main__":
     }
 
     val_config = {
+        "point_estimates": False,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
