@@ -47,6 +47,7 @@ class BayesGPTTrainer:
                 model=self.model,
                 prior_fun=self.prior_fun
             )
+        self.debug = False
 
     def train(self, train_config, val_config, checkpoint_path="bayesgpt_vi.pt"):
         # Define global step
@@ -192,13 +193,14 @@ class BayesGPTTrainer:
         else:
             mu = mu.reshape(config["batch_size"], n_rows, n_cols)
             var = var.reshape(config["batch_size"], n_rows, n_cols)
-            num_draws = 200
+            num_samples = 100
             pred_set = np.random.normal(
                 loc=mu[:, None, :, :],
                 scale=var[:, None, :, :],
-                size=(config["batch_size"], num_draws, n_rows, n_cols)
+                size=(config["batch_size"], num_samples, n_rows, n_cols)
             )
-            print(pred_set.ndim)
+            if self.debug:
+                print(pred_set.shape)
 
         params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
 
@@ -250,7 +252,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
-    parser.add_argument("--val_batch_size", type=int, default=300, help="validation batch size")
+    parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")

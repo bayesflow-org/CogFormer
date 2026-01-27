@@ -19,6 +19,7 @@ from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.networks.loss import mse_loss, nll_loss
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
 class BayesGPTTrainer:
@@ -45,6 +46,7 @@ class BayesGPTTrainer:
                 model=self.model,
                 prior_fun=self.prior_fun
             )
+        self.debug = False
 
     def train(self, train_config, val_config, checkpoint_path="bayesgpt_vi.pt"):
         # Define global step
@@ -169,7 +171,8 @@ class BayesGPTTrainer:
             adapted['regressor_indices'],
             adapted['param_masks']
         )
-        print(pred_velocity.shape, target_velocity.shape)
+        if self.debug:
+            print(pred_velocity.shape, target_velocity.shape)
 
         true_set = target_velocity.detach().cpu().numpy()[:,:,0]
         pred_set = pred_velocity.detach().cpu().numpy()[:,:,0]
@@ -180,9 +183,28 @@ class BayesGPTTrainer:
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
-        pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
+
+        if config["point_estimates"]:
+            pred_set = pred_set.reshape(config["batch_size"], n_rows, n_cols)
+        else:
+            num_sample_steps = config["num_sample_steps"]
+            num_samples = 100
+            pred_set = self.gpt.sample(
+                adapted['input_data'],
+                adapted['param_indices'],
+                adapted['regressor_indices'],
+                adapted['param_masks'],
+                steps=num_sample_steps,
+                num_samples=num_samples
+            )
+            pred_set = pred_set.reshape(config["batch_size"], num_samples, n_rows, n_cols)
+            if self.debug:
+                print(pred_set.shape)
+
         params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
 
+
+        colors = bayesgpt_fm_colors()
         recovery_fig = adaptive_recovery(
             true_set, pred_set,
             design_config=design_config,
@@ -190,6 +212,9 @@ class BayesGPTTrainer:
             max_num_categories=config["model_family_config"]["max_num_categories"],
             parameter_mask=params_mask,
             variable_names=param_names,
+            intercept_color=colors["intercept"],
+            main_effect_color=colors["main_effect"],
+            interaction_color=colors["interaction"],
         )
 
         figures_dir = Path("./experiments/figures")
@@ -219,7 +244,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
-    parser.add_argument("--val_batch_size", type=int, default=300, help="validation batch size")
+    parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
@@ -295,6 +320,8 @@ if __name__ == "__main__":
     }
 
     val_config = {
+        "point_estimates": False,
+        "num_sample_steps": 100,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
