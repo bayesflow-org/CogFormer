@@ -175,7 +175,7 @@ cython_debug/
 
 # wandb
 *.wandb
-*.pt
+*/data
 wandb-metadata.json
 wandb-summary.json
 bayesgpt/wandb

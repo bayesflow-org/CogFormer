@@ -39,6 +39,7 @@ def adaptive_recovery(
         parameter_mask = parameter_mask[0]
 
     num_rows, num_cols = parameter_mask.shape
+    print(num_rows, num_cols)
 
     if figsize is None:
         figsize = (3 * num_cols, 2.8 * num_rows)
@@ -50,6 +51,7 @@ def adaptive_recovery(
         if r > 0:
             category_id = (r - 1) % (max_num_categories - 1) + 1
             regressor_id = (r - 1) // (max_num_categories - 1) + 1
+
             regressor_key = regressor_keys[regressor_id]
             ylabel = fr"${regressor_key} | c_{category_id}$"
             color = interaction_color if ":" in regressor_key else main_effect_color
