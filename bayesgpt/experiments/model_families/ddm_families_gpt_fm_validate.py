@@ -10,9 +10,9 @@ from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
 from bayesgpt.adapters import Adapter
-from bayesgpt.networks.transformers.gpt import BayesGPTv1
+from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
-from bayesgpt.utils.plot_utils import bayesgpt_vi_colors
+from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
 def get_benchmark_design_configs():
@@ -154,7 +154,7 @@ def main():
         keep_intercept=args.keep_intercept,
     )
 
-    bayesgpt = BayesGPTv1(
+    bayesgpt = BayesGPT(
         encoder_input_dim=encoder_input_dim,
         encoder_num_layers=args.encoder_num_layers,
         decoder_num_layers=args.decoder_num_layers,
@@ -172,7 +172,7 @@ def main():
     bayesgpt.load_state_dict(state)
     bayesgpt.eval()
 
-    colors = bayesgpt_vi_colors()
+    colors = bayesgpt_fm_colors()
     benchmark = get_benchmark_design_configs()
 
     default_fixed_values = {"s_v": 0.0, "s_tau": 0.0}
@@ -215,33 +215,31 @@ def main():
                 adapted[k] = v.to(device)
 
         # Forward or sample
-        mu, logvar = bayesgpt(
+        pred_velocity, target_velocity = bayesgpt(
+            adapted["param_matrices"][..., None],
             adapted["input_data"],
             adapted["param_indices"],
             adapted["regressor_indices"],
             adapted["param_masks"],
         )
 
-        true_set = adapted["param_matrices"].detach().cpu().numpy()
+        true_set = target_velocity.detach().cpu().numpy()[:, :, 0]
         n_cols = len(intrinsic_params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(args.batch_size, n_rows, n_cols)
 
         if args.point_estimates:
-            pred_set = mu.detach().cpu().numpy()[:, :, 0]
+            pred_set = pred_velocity.detach().cpu().numpy()[:, :, 0]
             pred_set = pred_set.reshape(args.batch_size, n_rows, n_cols)
         else:
-            mu = mu.detach().cpu().numpy()[:, :, 0]
-            mu = mu.reshape(args.batch_size, n_rows, n_cols)
-            logvar = logvar.detach().cpu().numpy()[:, :, 0]
-            sigma = np.exp(0.5 * logvar)
-            sigma = sigma.reshape(args.batch_size, n_rows, n_cols)
-            pred_set = np.random.normal(
-                loc=mu[:, None, :, :],
-                scale=sigma[:, None, :, :],
-                size=(args.batch_size, args.num_samples, n_rows, n_cols),
+            pred_set = bayesgpt.sample(
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+                steps=args.num_sample_steps,
+                num_samples=args.num_samples,
             )
-
             pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, n_cols)
 
         params_mask = adapted["param_masks"].detach().cpu().numpy()
@@ -261,9 +259,9 @@ def main():
         )
 
         if args.point_estimates:
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_vi_pt_recovery.pdf"
+            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_pt_recovery.pdf"
         else:
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_vi_post_recovery.pdf"
+            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_recovery.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
@@ -276,17 +274,17 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main()
 
-    # To use (change checkpoints accordingly)
+    # To use
     # 1) Point estimates
-    # python -m ddm_families_gpt_vi_validate.py \
-    # --checkpoint bayesgpt_vi_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
+    # python -m ddm_families_gpt_fm_validate.py \
+    # --checkpoint bayesgpt_fm_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
     # --outdir ./experiments/figures/benchmark_recovery \
     # --batch_size 200 \
     # --point_estimates
     #
     # 2) Full posterior
-    # python -m ddm_families_gpt_vi_validate.py \
-    # --checkpoint bayesgpt_vi_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
+    # python -m ddm_families_gpt_fm_validate.py \
+    # --checkpoint bayesgpt_fm_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
     # --batch_size 200 \
     # --num_sample_steps 100 \
     # --num_samples 100
