@@ -250,13 +250,13 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
-    parser.add_argument("--val_batch_size", type=int, default=32, help="validation batch size")
+    parser.add_argument("--val_batch_size", type=int, default=300, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
+    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
-    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
-    parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
+    parser.add_argument("--encoder_num_layers", type=int, default=8, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
+    parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
     parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
     parser.add_argument("--layer_dropout", type=float, default=0.1, help="layer dropout rate")
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     use_wandb = args.use_wandb
 
     max_num_regressors = 2
-    max_num_categories = 3
+    max_num_categories = 2
     keep_intercept = True
     num_obs = 500
 
