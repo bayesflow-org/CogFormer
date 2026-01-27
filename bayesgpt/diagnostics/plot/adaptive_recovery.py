@@ -62,21 +62,24 @@ def adaptive_recovery(
             x = true[..., r, c]
             mask = parameter_mask[r, c]
             if mask == 1.0:
-                if pred.ndim == 4:     # Full posterior
+                if pred.ndim == 4: # Full posterior
                     y = pred[..., r, c]
                     y_mean = y.mean(axis=1)
+                    make_quadratic(ax, x, y_mean, color=color)
+
                     ci = uncertainty_agg(y, prob=0.9, axis=1)
                     y_lo, y_hi = ci[0], ci[1]
                     y_err = np.vstack([y_mean - y_lo, y_hi - y_mean])
 
-                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.7, linewidth=1, color=color)
-                    sns.scatterplot(x=x, y=y_mean, ax=ax, color=color, alpha=0.7)
-                    make_quadratic(ax, x, y_mean)
+                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.5, linewidth=1, color=color)
+                    sns.scatterplot(x=x, y=y_mean, ax=ax, color=color, alpha=0.5)
+
                     corr = np.corrcoef(x, y_mean)[0, 1]
-                else:               # Point estimate
+                else:              # Point estimate
                     y = pred[..., r, c]
-                    sns.scatterplot(x=x, y=y, ax=ax, color=color)
-                    make_quadratic(ax, x, y)
+                    make_quadratic(ax, x, y, color=color)
+
+                    sns.scatterplot(x=x, y=y, ax=ax, color=color, alpha=0.5)
                     corr = np.corrcoef(x, y)[0, 1]
 
                 metric_label = f"r = {corr:.3f}"

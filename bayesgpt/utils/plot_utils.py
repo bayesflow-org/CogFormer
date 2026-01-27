@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray):
+def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray, color: str = "black"):
     """
     Utility to make subplots quadratic to avoid visual illusions
     in, e.g., recovery plot.
@@ -23,8 +23,8 @@ def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray):
     ax.plot(
         [ax.get_xlim()[0], ax.get_xlim()[1]],
         [ax.get_ylim()[0], ax.get_ylim()[1]],
-        color="black",
-        alpha=0.9,
+        color=color,
+        alpha=0.7,
         linestyle="dashed",
     )
 
