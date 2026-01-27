@@ -219,7 +219,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
-    parser.add_argument("--val_batch_size", type=int, default=32, help="validation batch size")
+    parser.add_argument("--val_batch_size", type=int, default=300, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
