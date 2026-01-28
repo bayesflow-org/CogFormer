@@ -3,6 +3,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
 from bayesgpt.simulators.context_manager import ContextManager
 
 
@@ -36,9 +37,12 @@ def create_labels(
 ):
     labels = []
     for k, v in design_config.items():
-        if k = "1":
-            labels =
-
-
+        if k == "1":
+            pass
 
     return labels
+
+
+if __name__ == "__main__":
+    debug = True
+    colors = bayesgpt_cm_colors()

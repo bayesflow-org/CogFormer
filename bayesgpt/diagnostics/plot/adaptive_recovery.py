@@ -73,7 +73,7 @@ def adaptive_recovery(
                     y_lo, y_hi = ci[0], ci[1]
                     y_err = np.vstack([y_mean - y_lo, y_hi - y_mean])
 
-                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.5, linewidth=1, color=color)
+                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.5, linewidth=1.5, color=color)
                     sns.scatterplot(x=x, y=y_mean, ax=ax, color=color, alpha=0.5)
 
                     corr = np.corrcoef(x, y_mean)[0, 1]
@@ -90,8 +90,8 @@ def adaptive_recovery(
                 ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
                 sns.despine(ax=ax)
                 ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
-                ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
                 ax.set_title(variable_names[c] if r == 0 else "", fontsize=title_fontsize)
+                ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
             else:
                 ax.set_facecolor(color)
@@ -100,6 +100,17 @@ def adaptive_recovery(
                 ax.set_yticks([])
                 for sp in ax.spines.values():
                     sp.set_visible(False)
+                ax.text(
+                    0.5, 0.5, "Excluded",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="center",
+                    fontsize=14,
+                    weight="bold",
+                    alpha=0.7,
+                    color=color
+                )
+                ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
     fig.tight_layout()
     return fig

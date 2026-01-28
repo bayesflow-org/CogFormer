@@ -17,7 +17,6 @@ from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
-from bayesgpt.networks.loss import mse_loss, nll_loss
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
@@ -55,7 +54,6 @@ class BayesGPTTrainer:
         # Define optimizer, scheduler, and loss function from config
         optimizer = AdamW(self.gpt.parameters(), lr=train_config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
-        loss_fn = nll_loss
 
         # Training loop
         for epoch in range(train_config["epochs"]):
@@ -86,7 +84,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 10 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -242,7 +240,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
-    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
+    parser.add_argument("--steps_per_epoch", type=int, default=500, help="number of steps per epoch")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
