@@ -5,10 +5,10 @@ from scipy.stats import halfnorm
 def ddm_baseline_priors():
     return {
         "v":        lambda: np.random.gamma(2., 1.),
-        "a":        lambda: np.random.normal(-.1, 0.3),
-        "tau":      lambda: np.random.normal(-1.5, 0.3),
+        "a":        lambda: np.random.lognormal(0.0, 0.25), #np.random.normal(-.1, 0.3),
+        "tau":      lambda: np.random.beta(2.0, 2.0) * 0.5,#np.random.normal(-1.5, 0.3),
         "s_v":      lambda: halfnorm.rvs(loc=0.0, scale=1.0),
-        "s_tau":    lambda: np.random.beta(1.0, 3.0),
+        "s_tau":    lambda: np.random.beta(2.0, 5.0), #np.random.beta(1.0, 3.0),
         # "decay":  np.random.gamma(1.0, 0.4),
     }
 

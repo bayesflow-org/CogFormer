@@ -20,10 +20,9 @@ def simulate_ddm_trial(
     dt: float = 0.001,
     max_steps: int = 10000,
 ):
-    a = np.exp(a)
-    tau = np.exp(tau)
+    # a = np.exp(a)
+    # tau = np.exp(tau)
     v_i = np.random.normal(v, s_v)
-
     tau_i = tau + np.random.uniform(-s_tau * tau, s_tau * tau)
 
     # initialize
