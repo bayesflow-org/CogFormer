@@ -156,7 +156,7 @@ class ContextManager:
                 k: {
                     # Assign variable to avoid late-binding issues
                     "intercept": prior_fun[k] if k in free_intrinsics else lambda v=fixed_value: v,
-                    "slope": lambda key=k: np.random.normal(0.0, 0.3) if key in free_intrinsics else lambda: 0.0
+                    "slope": lambda key=k: np.random.normal(0.0, 1.0) if key in free_intrinsics else lambda: 0.0
                 }
             }
             priors = priors | prior
@@ -331,6 +331,7 @@ class ContextManager:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
+                col = (col - col.mean()) / col.std()
                 design_matrix[:, start] = col
                 continue
 
@@ -346,7 +347,9 @@ class ContextManager:
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
-                design_matrix[:, start] = np.random.uniform(0.0, 1.0, size=num_obs)
+                x = np.random.uniform(0.0, 1.0, size=num_obs)
+                x = (x - x.mean()) / x.std()
+                design_matrix[:, start] = x
 
         # Interaction effect
         for key in interaction_keys:
