@@ -156,7 +156,7 @@ class ContextManager:
                 k: {
                     # Assign variable to avoid late-binding issues
                     "intercept": prior_fun[k] if k in free_intrinsics else lambda v=fixed_value: v,
-                    "slope": lambda key=k: np.random.normal(0.0, 0.1) if key in free_intrinsics else lambda: 0.0
+                    "slope": lambda key=k: np.random.normal(0.0, 0.3) if key in free_intrinsics else lambda: 0.0
                 }
             }
             priors = priors | prior
