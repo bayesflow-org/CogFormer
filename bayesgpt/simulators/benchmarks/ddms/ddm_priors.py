@@ -14,11 +14,12 @@ def ddm_baseline_priors():
 
 def ddm_test_priors():
     return {
-        "v":        np.random.gamma(2.5, 0.5, size=1000),
-        "a":        np.random.lognormal(0, 0.5, size=1000),
-        "tau":      np.random.gamma(2.0, 0.2, size=1000),
-        "s_v":      np.random.gamma(0.5, 0.2, size=1000),
-        "s_tau":    np.random.gamma(0.5, 0.2, size=1000),
+        "v":        lambda: np.random.lognormal(3.0, 1.5),
+        "a":        lambda: np.random.gamma(3, 0.25),
+        "tau":      lambda: np.random.beta(5.0, 2.0),
+        "s_v":      lambda: halfnorm.rvs(loc=0.0, scale=0.25),
+        "s_tau":    lambda: np.random.beta(2.0, 5.0),
+        # "decay":  np.random.gamma(1.0, 0.4),
     }
 
 def ddm_priors():
