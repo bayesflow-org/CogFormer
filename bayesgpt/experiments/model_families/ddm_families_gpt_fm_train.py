@@ -84,7 +84,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 20 == 0:
+            if (epoch + 1) % 100 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -189,7 +189,7 @@ class BayesGPTTrainer:
             adapted['param_indices'],
             adapted['regressor_indices'],
             adapted['param_masks'],
-            steps=fm_sample_steps,
+            steps=config["fm_sample_steps"],
             num_samples=num_samples
         )
         print(pred_set.shape)
@@ -239,12 +239,13 @@ class BayesGPTTrainer:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="Debug mode")
-    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
-    parser.add_argument("--steps_per_epoch", type=int, default=500, help="number of steps per epoch")
+    parser.add_argument("--epochs", type=int, default=200, help="number of epochs")
+    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
+    parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
+    parser.add_argument("--use_wandb", type=bool, default=False, help="use wandb")
     parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
     parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
     parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
@@ -317,7 +318,7 @@ if __name__ == "__main__":
     }
 
     val_config = {
-        "fm_sample_steps": 1000,
+        "fm_sample_steps": args.fm_sample_steps,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,

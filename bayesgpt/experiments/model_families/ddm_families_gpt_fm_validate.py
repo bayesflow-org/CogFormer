@@ -97,9 +97,8 @@ def parse_args():
     p.add_argument("--add_interaction", action="store_true", default=True)
 
     # Inference mode
-    p.add_argument("--point_estimates", action="store_true", help="Use point estimates instead of posterior sampling")
-    p.add_argument("--num_sample_steps", type=int, default=100)
-    p.add_argument("--num_samples", type=int, default=100)
+    p.add_argument("--num_sample_steps", type=int, default=200)
+    p.add_argument("--num_samples", type=int, default=200)
 
     # MUST match training architecture
     p.add_argument("--encoder_num_layers", type=int, default=4)
@@ -223,24 +222,20 @@ def main():
             adapted["param_masks"],
         )
 
-        true_set = target_velocity.detach().cpu().numpy()[:, :, 0]
+        true_set = adapted["param_matrices"].detach().cpu().numpy()
         n_cols = len(intrinsic_params)
         n_rows = true_set.shape[1] // n_cols
         true_set = true_set.reshape(args.batch_size, n_rows, n_cols)
 
-        if args.point_estimates:
-            pred_set = pred_velocity.detach().cpu().numpy()[:, :, 0]
-            pred_set = pred_set.reshape(args.batch_size, n_rows, n_cols)
-        else:
-            pred_set = bayesgpt.sample(
-                adapted["input_data"],
-                adapted["param_indices"],
-                adapted["regressor_indices"],
-                adapted["param_masks"],
-                steps=args.num_sample_steps,
-                num_samples=args.num_samples,
-            )
-            pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, n_cols)
+        pred_set = bayesgpt.sample(
+            adapted["input_data"],
+            adapted["param_indices"],
+            adapted["regressor_indices"],
+            adapted["param_masks"],
+            steps=args.num_sample_steps,
+            num_samples=args.num_samples,
+        )
+        pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, n_cols)
 
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         params_mask = params_mask.reshape((args.batch_size, n_rows, n_cols))[0]
@@ -258,10 +253,7 @@ def main():
             interaction_color=colors["interaction"],
         )
 
-        if args.point_estimates:
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_pt_recovery.pdf"
-        else:
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_recovery.pdf"
+        figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_recovery.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
