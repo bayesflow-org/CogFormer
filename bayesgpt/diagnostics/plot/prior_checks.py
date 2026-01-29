@@ -8,6 +8,17 @@ from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
 
 
+def prior_predictive_check(
+    design_config: dict,
+    intrinsic_params: list[str],
+    variable_names: list[str],
+    fig_size: tuple = None,
+    title_fontsize: int = 18,
+    label_fontsize: int = 14,
+):
+    raise NotImplementedError
+
+
 def prior_pushforward_check(
     design_config: dict,
     intrinsic_params: list[str],
@@ -15,9 +26,10 @@ def prior_pushforward_check(
     figsize: tuple[int, int] = None,
     title_fontsize=18,
 ):
+    num_rows = len(list(design_config.keys()))
     num_params = len(intrinsic_params)
     if figsize is None:
-        figsize = (3 * num_params, 3)
+        figsize = (3 * num_params, 3 * num_rows)
 
     fig, axarr = plt.subplots(1, num_params, figsize=figsize)
 

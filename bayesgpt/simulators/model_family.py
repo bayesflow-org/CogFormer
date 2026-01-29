@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from collections.abc import Callable
 
 from .model import Model
@@ -371,3 +373,118 @@ class NestedModelFamily:
             "max_num_regressors": max_num_regressors,
             "max_num_categories": max_num_categories,
         }
+
+    def check_regressed_priors(
+        self,
+        design_config: dict[str, list[str]],
+        num_draws: int = 200,
+        num_obs: int = 200,
+        max_num_categories: int = 4,
+        link_fun: Callable = shifted_softplus,
+        context: dict[str, np.ndarray] | None = None,
+        discrete_prob: float = 0.5,
+        keep_intercept: bool = True,
+        run_simulator: bool = False,
+        fixed_config: bool = True,   # keep design_config as provided
+        add_interaction: bool = False,
+        return_coeff_draws: bool = True,
+        seed: int | None = None,
+        plot: bool = True
+    ) -> dict:
+        """
+        Draw from the induced prior over per-trial intrinsic parameters for a given design_config.
+
+        Returns
+        -------
+        out : dict
+            - design_config
+            - column_labels
+            - theta_draws: (num_draws, num_obs, num_intrinsic_params)
+            - (optional) coef_draws: (num_draws, num_cols, num_intrinsic_params)
+            - (optional) sim_draws: list[dict] of simulator outputs, length num_draws
+        """
+        if seed is not None:
+            np.random.seed(seed)
+
+        # Resolve context (unstandardized X behavior already comes from ContextManager.build_design_matrix)
+        if context is None and hasattr(self.model, "build_default_context"):
+            context = self.model.build_default_context(num_obs=num_obs)
+
+        # Build mask from provided design_config (the key part: "any design config")
+        parameter_mask = self.context_manager.build_parameter_mask(
+            design_config=design_config,
+            intrinsic_params=self.intrinsic_params,
+            max_num_categories=max_num_categories,
+            keep_intercept=keep_intercept,
+        )
+
+        # Build fixed labels for interpretability
+        column_labels = self.context_manager.build_column_labels(
+            design_config=design_config,
+            max_num_categories=max_num_categories,
+            keep_intercept=keep_intercept,
+        )
+
+        # We re-sample X each draw unless the user supplies it via context
+        # (context keys like "u_1" etc. already override columns in build_design_matrix).
+        theta_draws = []
+        coef_draws = [] if return_coeff_draws else None
+        sim_draws = np.array((num_draws, num_obs, 1)) if run_simulator else None
+
+        for _ in range(num_draws):
+            X = self.context_manager.build_design_matrix(
+                design_config=design_config,
+                num_obs=num_obs,
+                context=context,
+                discrete_prob=discrete_prob,
+                keep_intercept=keep_intercept,
+                max_num_categories=max_num_categories,
+                main_discrete_mask=None,  # allow randomness unless you pass a fixed one
+            )
+
+            B = self.context_manager.sample_parameter_matrix(
+                parameter_mask=parameter_mask,
+                prior_fun=self.prior_fun,
+                intrinsic_params=self.intrinsic_params,
+                keep_intercept=keep_intercept,
+            )
+
+            theta = link_fun(X @ B)  # (num_obs, num_intrinsic_params)
+            theta_draws.append(theta.astype(np.float32, copy=False))
+
+            if return_coeff_draws:
+                coef_draws.append(B.astype(np.float32, copy=False))
+
+            if run_simulator:
+                params = {
+                    name: theta[:, j].astype(np.float32, copy=False)
+                    for j, name in enumerate(self.intrinsic_params)
+                }
+                params = self.model.prepare_params(params=params, num_obs=num_obs, context=context)
+                sim = self.model.simulate(params, context=context)
+                sim_draws.append(self.model.simulate(params, context=context))
+
+        theta_draws = np.stack(theta_draws, axis=0)
+
+        if plot:
+            f, axarr = plt.subplots(1, len(self.intrinsic_params), figsize=(15, 3))
+
+            for i, ax in enumerate(axarr):
+                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True)
+                ax.set_xlabel(self.intrinsic_params[i])
+
+            f.tight_layout()
+            return f
+
+        out = {
+            "design_config": design_config,
+            "column_labels": column_labels,
+            "intrinsic_params": self.intrinsic_params,
+            "theta_draws": theta_draws,
+        }
+        if return_coeff_draws:
+            out["coef_draws"] = np.stack(coef_draws, axis=0)  # (D, C, P)
+        if run_simulator:
+            out["sim_draws"] = sim_draws
+
+        return out

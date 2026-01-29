@@ -331,7 +331,15 @@ class ContextManager:
                 col = np.asarray(context[key], dtype=np.float32).reshape(-1)
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
-                col = (col - col.mean()) / col.std()
+
+                # eps = 1e-8
+                # mean = float(col.mean())
+                # std = float(col.std())
+                # if std < eps:
+                #     col = col - mean
+                # else:
+                #     col = (col - mean) / (std + eps)
+
                 design_matrix[:, start] = col
                 continue
 
@@ -347,8 +355,16 @@ class ContextManager:
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
-                x = np.random.uniform(0.0, 1.0, size=num_obs)
-                x = (x - x.mean()) / x.std()
+                x = np.random.uniform(0.0, 1.0, size=num_obs).astype(np.float32, copy=False)
+
+                # safe standardize
+                # eps = 1e-8
+                # mu = float(x.mean())
+                # sd = float(x.std())
+                # if sd < eps:
+                #     x = x - mu  # becomes all zeros
+                # else:
+                #     x = (x - mu) / (sd + eps)
                 design_matrix[:, start] = x
 
         # Interaction effect
@@ -481,3 +497,32 @@ class ContextManager:
         one_hot = np.random.multinomial(1, [p] * num_categories, size=num_obs)
         dummies = one_hot[:, :num_categories - 1]
         return dummies
+
+    def build_column_labels(
+        self,
+        design_config: dict[str, list[str]],
+        max_num_categories: int = 4,
+        keep_intercept: bool = False,
+    ) -> list[str]:
+        """
+        Build human-readable column labels aligned with build_design_matrix() output.
+
+        Only for prior predictive checks.
+        """
+        regressor_keys = list(design_config.keys())
+        has_intercept = ("1" in regressor_keys) and keep_intercept
+        regressor_keys = [k for k in regressor_keys if k != "1"]
+
+        block_width = max_num_categories - 1
+        labels: list[str] = []
+
+        if has_intercept:
+            labels.append("1")
+
+        for key in regressor_keys:
+            # Reserve a whole block; first col usually holds continuous regressor
+            labels.append(key)
+            for j in range(1, block_width):
+                labels.append(f"{key}[{j+1}]")  # 2..block_width as dummy-like slots
+
+        return labels
