@@ -73,8 +73,8 @@ def adaptive_recovery(
                     y_lo, y_hi = ci[0], ci[1]
                     y_err = np.vstack([y_mean - y_lo, y_hi - y_mean])
 
-                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.5, linewidth=1.5, color=color)
-                    sns.scatterplot(x=x, y=y_mean, ax=ax, color=color, alpha=0.5)
+                    ax.errorbar(x, y_mean, yerr=y_err, fmt="none", alpha=0.3, linewidth=1.5, color=color)
+                    sns.scatterplot(x=x, y=y_mean, ax=ax, color=color, alpha=0.7)
 
                     corr = np.corrcoef(x, y_mean)[0, 1]
                 else:              # Point estimate
@@ -101,11 +101,11 @@ def adaptive_recovery(
                 for sp in ax.spines.values():
                     sp.set_visible(False)
                 ax.text(
-                    0.5, 0.5, "Excluded",
+                    0.5, 0.5, "N/A",
                     transform=ax.transAxes,
                     ha="center",
                     va="center",
-                    fontsize=14,
+                    fontsize=18,
                     weight="bold",
                     alpha=0.7,
                     color=color
@@ -151,4 +151,4 @@ if __name__ == "__main__":
             label_fontsize=14,
         )
         fig.savefig("test_recovery.pdf")
-        print("success")
+        print("groovy")

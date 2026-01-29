@@ -97,7 +97,7 @@ def bayesgpt_vi_colors():
         # BayesGPT-VI
         "intercept": "#4E2A84",
         "main_effect": "#6969FF",
-        "interaction": "#3EB1C8",
+        "interaction": "#47b5ff",
     }
 
     return colors
@@ -105,7 +105,7 @@ def bayesgpt_vi_colors():
 def bayesgpt_fm_colors():
     colors = {
         # BayesGPT-FM
-        "intercept": "#4E2A84",
+        "intercept": "#59315F",
         "main_effect": "#EC008C",
         "interaction": "#FF6969",
     }
