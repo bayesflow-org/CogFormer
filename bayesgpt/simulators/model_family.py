@@ -472,7 +472,7 @@ class NestedModelFamily:
                 }
                 params = self.model.prepare_params(params=params, num_obs=num_obs, context=context)
                 sim = self.model.simulate(params, context=context)
-                sim_draws.append(self.model.simulate(params, context=context))
+                sim_draws.append(sim)
 
         theta_draws = np.stack(theta_draws, axis=0)
 
@@ -488,9 +488,6 @@ class NestedModelFamily:
             )
 
             for i, ax in enumerate(axarr):
-                # Full regressed prior (includes X effects)
-                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed")
-
                 # Intercept-only induced prior overlay
                 if intercept_theta_draws is not None:
                     sns.histplot(
@@ -499,11 +496,13 @@ class NestedModelFamily:
                         kde=True,
                         stat="density",
                         element="step",
-                        fill=False,
                         label="intercept only",
+                        color="#69ff69"
                     )
-                    ax.legend()
 
+                # Full regressed prior (includes X effects)
+                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#6969ff")
+                ax.legend()
                 ax.set_xlabel(self.intrinsic_params[i])
 
             f.tight_layout()
