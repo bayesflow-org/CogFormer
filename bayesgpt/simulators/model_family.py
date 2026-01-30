@@ -429,7 +429,13 @@ class NestedModelFamily:
         # (context keys like "u_1" etc. already override columns in build_design_matrix).
         theta_draws = []
         coef_draws = [] if return_coeff_draws else None
-        sim_draws = np.array((num_draws, num_obs, 1)) if run_simulator else None
+        sim_draws = [] if run_simulator else None
+
+        # For intercept-only induced priors (one value per draw per intrinsic param)
+        intercept_theta_draws = []  # list of (num_intrinsic_params,)
+        intercept_idx = None
+        if keep_intercept and ("1" in column_labels):
+            intercept_idx = column_labels.index("1")
 
         for _ in range(num_draws):
             X = self.context_manager.build_design_matrix(
@@ -448,6 +454,10 @@ class NestedModelFamily:
                 intrinsic_params=self.intrinsic_params,
                 keep_intercept=keep_intercept,
             )
+
+            if intercept_idx is not None:
+                theta0 = link_fun(B[intercept_idx, :])  # (num_intrinsic_params,)
+                intercept_theta_draws.append(theta0.astype(np.float32, copy=False))
 
             theta = link_fun(X @ B)  # (num_obs, num_intrinsic_params)
             theta_draws.append(theta.astype(np.float32, copy=False))
@@ -468,9 +478,32 @@ class NestedModelFamily:
 
         if plot:
             f, axarr = plt.subplots(1, len(self.intrinsic_params), figsize=(15, 3))
+            if len(self.intrinsic_params) == 1:
+                axarr = [axarr]
+
+            intercept_theta_draws = (
+                np.stack(intercept_theta_draws, axis=0)
+                if (intercept_idx is not None and len(intercept_theta_draws) > 0)
+                else None
+            )
 
             for i, ax in enumerate(axarr):
-                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True)
+                # Full regressed prior (includes X effects)
+                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed")
+
+                # Intercept-only induced prior overlay
+                if intercept_theta_draws is not None:
+                    sns.histplot(
+                        intercept_theta_draws[:, i],
+                        ax=ax,
+                        kde=True,
+                        stat="density",
+                        element="step",
+                        fill=False,
+                        label="intercept only",
+                    )
+                    ax.legend()
+
                 ax.set_xlabel(self.intrinsic_params[i])
 
             f.tight_layout()
