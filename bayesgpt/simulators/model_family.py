@@ -6,7 +6,7 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 
-from ..utils.simulator_utils import shifted_softplus
+from ..utils.simulator_utils import shifted_softplus, softplus
 from ..viz import visualize_matrix, visualize_matrices, visualize_design_configs
 
 
@@ -380,7 +380,7 @@ class NestedModelFamily:
         num_draws: int = 200,
         num_obs: int = 200,
         max_num_categories: int = 4,
-        link_fun: Callable = shifted_softplus,
+        link_fun: Callable = softplus,
         context: dict[str, np.ndarray] | None = None,
         discrete_prob: float = 0.5,
         keep_intercept: bool = True,
