@@ -183,17 +183,17 @@ class BayesGPTTrainer:
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
         fm_sample_steps = config["fm_sample_steps"]
-        num_samples = 500
+        fm_num_samples = config["fm_num_samples"]
         pred_set = self.gpt.sample(
             adapted['input_data'],
             adapted['param_indices'],
             adapted['regressor_indices'],
             adapted['param_masks'],
-            steps=config["fm_sample_steps"],
-            num_samples=num_samples
+            steps=fm_sample_steps,
+            num_samples=fm_num_samples
         )
         print(pred_set.shape)
-        pred_set = pred_set.reshape(config["batch_size"], num_samples, n_rows, n_cols)
+        pred_set = pred_set.reshape(config["batch_size"], fm_num_samples, n_rows, n_cols)
         if self.debug:
             print(pred_set.shape)
 
@@ -213,7 +213,7 @@ class BayesGPTTrainer:
             interaction_color=colors["interaction"],
         )
 
-        figures_dir = Path("./experiments/figures")
+        figures_dir = Path("./bayesgpt/experiments/figures")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
         recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery.pdf", bbox_inches="tight")
@@ -241,11 +241,12 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
-    parser.add_argument("--fm_sample_steps", type=int, default=1000, help="number of fm sample steps")
+    parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
+    parser.add_argument("--fm_num_samples", type=int, default=200, help="number of seeds")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--use_wandb", type=bool, default=False, help="use wandb")
+    parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
     parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
     parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
     parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
@@ -319,6 +320,7 @@ if __name__ == "__main__":
 
     val_config = {
         "fm_sample_steps": args.fm_sample_steps,
+        "fm_num_samples": args.fm_num_samples,
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
@@ -387,6 +389,7 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
+        f"./bayesgpt/experiments/checkpoints/"
         f"bayesgpt_fm"
         f"_eps{train_config['epochs']}"
         f"_stp{train_config['steps_per_epoch']}"

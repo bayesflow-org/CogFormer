@@ -86,7 +86,7 @@ def build_encoder_input_dim(max_num_regressors: int, max_num_categories: int, ke
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT .pt checkpoint")
-    p.add_argument("--outdir", type=str, default="./experiments/figures/benchmark_recovery", help="Output directory")
+    p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/benchmark_recovery", help="Output directory")
 
     # Validation settings
     p.add_argument("--batch_size", type=int, default=200)
