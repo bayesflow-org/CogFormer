@@ -7,7 +7,7 @@ def ddm_baseline_priors():
         "v":        lambda: np.random.gamma(5., 0.5),
         "a":        lambda: np.random.gamma(8, 0.25), #np.random.normal(-.1, 0.3),
         "tau":      lambda: np.random.gamma(2.0, 0.25),#np.random.normal(-1.5, 0.3),
-        "s_v":      lambda: halfnorm.rvs(loc=0.0, scale=0.5),
+        "s_v":      lambda: halfnorm.rvs(loc=0.0, scale=1.0),
         "s_tau":    lambda: np.random.beta(1.0, 3.0), #np.random.beta(1.0, 3.0),
         # "decay":  np.random.gamma(1.0, 0.4),
     }
