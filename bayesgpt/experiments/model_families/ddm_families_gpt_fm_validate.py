@@ -97,8 +97,8 @@ def parse_args():
     p.add_argument("--add_interaction", action="store_true", default=True)
 
     # Inference mode
-    p.add_argument("--num_sample_steps", type=int, default=200)
-    p.add_argument("--num_samples", type=int, default=200)
+    p.add_argument("--num_sample_steps", type=int, default=1000)
+    p.add_argument("--num_samples", type=int, default=500)
 
     # MUST match training architecture
     p.add_argument("--encoder_num_layers", type=int, default=4)

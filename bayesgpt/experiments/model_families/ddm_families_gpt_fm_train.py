@@ -183,7 +183,7 @@ class BayesGPTTrainer:
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
         fm_sample_steps = config["fm_sample_steps"]
-        num_samples = 200
+        num_samples = 500
         pred_set = self.gpt.sample(
             adapted['input_data'],
             adapted['param_indices'],
@@ -239,9 +239,9 @@ class BayesGPTTrainer:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="Debug mode")
-    parser.add_argument("--epochs", type=int, default=200, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
-    parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
+    parser.add_argument("--fm_sample_steps", type=int, default=1000, help="number of fm sample steps")
     parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
