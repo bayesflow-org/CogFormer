@@ -1,5 +1,9 @@
 import numpy as np
 
+def softplus(x: np.ndarray):
+
+    sp = np.log1p(1 + np.exp(x))
+    return sp - np.log(2.0)
 
 def shifted_softplus(x: np.ndarray):
     """
