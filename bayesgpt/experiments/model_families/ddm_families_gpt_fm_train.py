@@ -84,7 +84,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 50 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -183,7 +183,7 @@ class BayesGPTTrainer:
         true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
         fm_sample_steps = config["fm_sample_steps"]
-        num_samples = 500
+        num_samples = 200
         pred_set = self.gpt.sample(
             adapted['input_data'],
             adapted['param_indices'],
