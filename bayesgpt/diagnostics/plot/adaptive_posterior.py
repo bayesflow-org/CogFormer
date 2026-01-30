@@ -22,6 +22,7 @@ def adaptive_posterior(
     legend_fontsize: int = 14,
     num_bins: int = 10,
     height: int = 2.5,
+    unfold: bool = True
 ):
 
     if isinstance(samples, np.ndarray):
@@ -35,7 +36,7 @@ def adaptive_posterior(
     g.map_lower(sns.kdeplot, fill=True, color=intercept_color, alpha=0.4)
 
     # upper triangle: scatter
-    g.map_upper(sns.scatterplot, linewidth=0.2, alpha=0.3, color=intercept_color)
+    g.map_upper(sns.scatterplot, linewidth=0, alpha=0.3, color=intercept_color)
     return g
 
 
@@ -54,6 +55,8 @@ if __name__ == "__main__":
     debug = True
     colors = bayesgpt_cm_colors()
 
+    design_config = {}
+
     import pandas as pd
 
     rng = np.random.default_rng(0)
@@ -65,6 +68,10 @@ if __name__ == "__main__":
 
     samples = rng.normal(size=(N, num_params))
 
-    g = adaptive_posterior(samples, variable_names=variable_names, height=2.0)
+    g = adaptive_posterior(
+        samples=samples,
+        variable_names=variable_names,
+        height=2.0,
+    )
     g.savefig("adaptive_posterior.pdf")
     print("awesome")
