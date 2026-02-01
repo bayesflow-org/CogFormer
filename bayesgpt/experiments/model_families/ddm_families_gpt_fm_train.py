@@ -251,7 +251,7 @@ def parse_args():
     parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
     parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
-    parser.add_argument("--projection_dim", type=int, default=128, help="dimension of projection layers")
+    parser.add_argument("--projection_dim", type=int, default=256, help="dimension of projection layers")
     parser.add_argument("--dropout", type=float, default=0.05, help="dropout rate")
     parser.add_argument("--layer_dropout", type=float, default=0.05, help="layer dropout rate")
     return parser.parse_args()
