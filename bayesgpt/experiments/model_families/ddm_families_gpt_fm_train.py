@@ -247,12 +247,13 @@ def parse_args():
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
-    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
-    parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
+    parser.add_argument("--encoder_num_layers", type=int, default=8, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
+    parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
-    parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
-    parser.add_argument("--layer_dropout", type=float, default=0.1, help="layer dropout rate")
+    parser.add_argument("--projection_dim", type=int, default=128, help="dimension of projection layers")
+    parser.add_argument("--dropout", type=float, default=0.05, help="dropout rate")
+    parser.add_argument("--layer_dropout", type=float, default=0.05, help="layer dropout rate")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -345,7 +346,7 @@ if __name__ == "__main__":
         "decoder_num_heads": 8,
         "num_seeds": args.num_seeds,
         "seed_dim": args.seed_dim,
-        "proj_dim": 64,
+        "proj_dim": args.projection_dim,
         "dropout": args.dropout,
         "layer_dropout": args.layer_dropout,
     }
