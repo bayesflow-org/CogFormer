@@ -269,7 +269,7 @@ if __name__ == "__main__":
     max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
-    num_obs = 500
+    num_obs = 1000
 
     model_family_config = {
         "max_num_regressors": max_num_regressors,
@@ -392,6 +392,7 @@ if __name__ == "__main__":
     checkpoint_path = (
         f"./bayesgpt/experiments/checkpoints/"
         f"bayesgpt_fm"
+        f"_obs{model_family_config['num_obs']}"
         f"_eps{train_config['epochs']}"
         f"_stp{train_config['steps_per_epoch']}"
         f"_bse{train_config['batch_size']}"
