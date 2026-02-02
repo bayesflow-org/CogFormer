@@ -13,6 +13,21 @@ def ddm_baseline_priors():
         # "s_tau":    lambda: np.random.beta(2.0, 5.0), #np.random.beta(1.0, 3.0),
         # "decay":  np.random.gamma(1.0, 0.4),
     }
+
+def ddm_full_priors():
+    return {
+        "v":        {"intercept": lambda: np.random.gamma(2., 1.),
+                     "slope": lambda: np.random.normal(0., 1.)},
+        "a":        {"intercept": lambda: np.random.normal(-1, 0.3),
+                     "slope": lambda: np.random.normal(0., 1.)},
+        "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
+                     "slope": lambda: np.random.normal(0., 0.5)},
+        "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
+                     "slope": lambda: np.random.normal(0., 1.)},
+        "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
+                     "slope": lambda: np.random.normal(0., 1.)}
+    }
+
 def ddm_baseline_priors2():
     return {
         "v":        lambda: np.random.gamma(5., 0.5),
@@ -59,18 +74,4 @@ def ddm_log_priors():
                      "slope": lambda: 0.0},
         "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
                      "slope": lambda: 0.0}
-    }
-
-def ddm_full_priors():
-    return {
-        "v":        {"intercept": lambda: np.random.gamma(2., 1.),
-                     "slope": lambda: np.random.normal(0., 1.)},
-        "a":        {"intercept": lambda: np.random.normal(-1, 0.3),
-                     "slope": lambda: np.random.normal(0., 1.)},
-        "tau":      {"intercept": lambda: np.random.normal(-1.5, 0.3),
-                     "slope": lambda: np.random.normal(0., 0.5)},
-        "s_v":      {"intercept": lambda: halfnorm.rvs(loc=0.0, scale=1.0),
-                     "slope": lambda: np.random.normal(0., 1.)},
-        "s_tau":    {"intercept": lambda: np.random.beta(1.0, 3.0),
-                     "slope": lambda: np.random.normal(0., 1.)}
     }
