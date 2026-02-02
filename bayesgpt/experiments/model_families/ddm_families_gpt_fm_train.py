@@ -71,7 +71,7 @@ class BayesGPTTrainer:
                 )
                 # Log metrics
                 if self.use_wandb:
-                    wandb.log(
+                     wandb.log(
                         {
                             "train/loss": loss,
                             "opt/lr": current_lr,

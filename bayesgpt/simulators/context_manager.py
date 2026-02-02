@@ -355,7 +355,8 @@ class ContextManager:
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
-                x = np.random.uniform(0.0, 1.0, size=num_obs).astype(np.float32, copy=False)
+                # x = np.random.standard_normal(size=num_obs).astype(np.float32, copy=False)
+                x = np.random.uniform(size=num_obs).astype(np.float32, copy=False)
 
                 # safe standardize
                 # eps = 1e-8

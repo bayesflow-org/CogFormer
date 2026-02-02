@@ -11,6 +11,7 @@ from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
@@ -85,7 +86,7 @@ def build_encoder_input_dim(max_num_regressors: int, max_num_categories: int, ke
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT .pt checkpoint")
+    p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT checkpoint")
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/benchmark_recovery", help="Output directory")
 
     # Validation settings
@@ -97,19 +98,19 @@ def parse_args():
     p.add_argument("--add_interaction", action="store_true", default=True)
 
     # Inference mode
-    p.add_argument("--num_sample_steps", type=int, default=1000)
+    p.add_argument("--num_sample_steps", type=int, default=500)
     p.add_argument("--num_samples", type=int, default=500)
 
     # MUST match training architecture
-    p.add_argument("--encoder_num_layers", type=int, default=4)
-    p.add_argument("--decoder_num_layers", type=int, default=4)
+    p.add_argument("--encoder_num_layers", type=int, default=8)
+    p.add_argument("--decoder_num_layers", type=int, default=8)
     p.add_argument("--encoder_num_heads", type=int, default=8)
     p.add_argument("--decoder_num_heads", type=int, default=8)
-    p.add_argument("--num_seeds", type=int, default=10)
+    p.add_argument("--num_seeds", type=int, default=40)
     p.add_argument("--seed_dim", type=int, default=64)
-    p.add_argument("--proj_dim", type=int, default=64)
-    p.add_argument("--dropout", type=float, default=0.1)
-    p.add_argument("--layer_dropout", type=float, default=0.1)
+    p.add_argument("--proj_dim", type=int, default=256)
+    p.add_argument("--dropout", type=float, default=0.05)
+    p.add_argument("--layer_dropout", type=float, default=0.05)
 
     return p.parse_args()
 
@@ -253,11 +254,22 @@ def main():
             interaction_color=colors["interaction"],
         )
 
-        figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_recovery.pdf"
+        figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_recovery_{args.num_sample_steps}steps.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
         logging.info(f"[saved] {figpath}")
+
+        for i in range(5):
+            postfig = adaptive_posterior(
+                samples=pred_set[i],
+                design_config=design_config,
+                intrinsic_params=intrinsic_params,
+                max_num_categories=args.max_num_categories,
+                unfold=False,
+            )
+            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_samples_{i}_{args.num_sample_steps}steps.pdf"
+            postfig.savefig(figpath, bbox_inches="tight")
 
     logging.info("Done.")
 
