@@ -66,7 +66,7 @@ class NestedModelFamily:
         num_regressors: int = 2,
         max_num_regressors: int = 5,
         max_num_categories: int = 4,
-        link_fun: dict | Callable = shifted_softplus,
+        link_fun: dict | Callable = softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
         discrete_prob: float = 0.5,
@@ -212,6 +212,7 @@ class NestedModelFamily:
         design_config: dict[str, list[str]] | None = None,
         num_regressors: int | None = None,
         context: dict[str, np.ndarray] | None = None,
+        link_fun: dict | Callable = softplus,
         min_num_obs: int = 10,
         max_num_obs: int = 600,
         min_num_regressors: int = 0,
@@ -272,6 +273,7 @@ class NestedModelFamily:
                 flatten_param_outputs=flatten_param_outputs,
                 fixed_config=fixed_config,
                 add_interaction=add_interaction,
+                link_fun=link_fun,
             )
 
             sim_instance["num_obs"] = num_obs
@@ -380,13 +382,11 @@ class NestedModelFamily:
             num_draws: int = 200,
             num_obs: int = 200,
             max_num_categories: int = 4,
-            link_fun: Callable | dict | None = shifted_softplus,
+            link_fun: Callable | dict | None = softplus,
             context: dict[str, np.ndarray] | None = None,
             discrete_prob: float = 0.5,
             keep_intercept: bool = True,
             run_simulator: bool = False,
-            fixed_config: bool = True,  # keep design_config as provided
-            add_interaction: bool = False,
             return_coeff_draws: bool = True,
             seed: int | None = None,
             plot: bool = True
@@ -508,14 +508,14 @@ class NestedModelFamily:
                         kde=True,
                         stat="density",
                         element="step",
-                        label="intercept only",
-                        color="#69ff69",
+                        label="intercept",
+                        color="#6969ff",
                         bins=20
                     )
 
                 # Full regressed prior (includes X effects)
-                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#6969ff",
-                             bins=100)
+                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#ff6969",
+                             bins=20)
                 ax.legend()
                 ax.set_xlabel(self.intrinsic_params[i])
 

@@ -2,15 +2,17 @@ import numpy as np
 
 
 def sigmoid(x: np.ndarray):
+    print("sigmoid")
     return 1. / (1. + np.exp(-x))
 
 def softmax(x: np.ndarray):
+    print("softmax")
     return np.exp(x) / np.sum(np.exp(x))
 
 def softplus(x: np.ndarray):
-
+    print("softplus")
     sp = np.log1p(1. + np.exp(x))
-    return sp - np.log1p(2.0)
+    return sp
 
 def shifted_softplus(x: np.ndarray):
     """
@@ -27,9 +29,10 @@ def shifted_softplus(x: np.ndarray):
     np.ndarray
         Same shape as x.
     """
+    print("shifted")
     # Stable softplus: max(x,0) + log1p(exp(-|x|))
     sp = np.maximum(x, 0) + np.log1p(np.exp(-np.abs(x)))
-    return sp - np.log(2.0)
+    return sp
 
 
 def as_1d(x, n: int, allow_scalar: bool = True) -> np.ndarray:

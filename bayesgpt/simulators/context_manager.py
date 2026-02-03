@@ -147,21 +147,34 @@ class ContextManager:
     ):
         priors = {}
 
-        for k in prior_fun.keys():
+        for k, spec in prior_fun.items():
             # If the user provides a fixed value for a fixed intrinsic parameter,
             # use that value. Otherwise, default to zero.
             if k in fixed_intrinsics and k in fixed_values:
                 fixed_value = fixed_values[k]
             else:
                 fixed_value = 0.0
-            prior = {
-                k: {
-                    # Assign variable to avoid late-binding issues
-                    "intercept": prior_fun[k] if k in free_intrinsics else lambda v=fixed_value: v,
-                    "slope": lambda key=k: np.random.normal(0.0, 1.0) if key in free_intrinsics else lambda: 0.0
+
+            if k in free_intrinsics:
+                # SciPy priors
+                if hasattr(spec, "rvs"):
+                    # print("Identified SciPy priors")
+                    scale = spec.std()
+                    sampler = lambda rv=spec: rv.rvs()
+                    priors[k] = {
+                        "intercept": sampler,
+                        "slope": lambda std=scale: np.random.normal(0.0, std)
+                    }
+                else:
+                    priors[k] = {
+                        "intercept": spec,
+                        "slope": lambda: np.random.normal(0.0, 1.0)
+                    }
+            else:
+                priors[k] = {
+                    "intercept": lambda v=fixed_value: v,
+                    "slope": lambda: 0.0
                 }
-            }
-            priors = priors | prior
 
         return priors
 
@@ -311,11 +324,6 @@ class ContextManager:
                 discrete_prob=discrete_prob,
             )
 
-        discrete_mask = self.build_random_discrete_mask(
-            num_regressors=len(main_effect_keys),
-            discrete_prob=discrete_prob
-        )
-
         # Fill in the matrix
         col_idx = 0
         if has_intercept:
@@ -463,7 +471,7 @@ class ContextManager:
         # Get number of intrinsic params
         num_intrinsic_params = len(intrinsic_params)
         indices = np.tile(
-            np.repeat(np.linspace(0.0, 1.0, num_intrinsic_params), num_categories - 1),
+            np.repeat(np.linspace(0.0, 0.5, num_intrinsic_params), num_categories - 1),
             num_regressors
         )
         return indices
