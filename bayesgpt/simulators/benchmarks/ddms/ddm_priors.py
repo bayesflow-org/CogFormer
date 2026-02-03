@@ -1,5 +1,16 @@
 import numpy as np
-from scipy.stats import halfnorm
+from scipy.stats import halfnorm, gamma, norm, beta, lognorm
+
+
+def ddm_priors():
+    return {
+        "v": lognorm(s=0.5),
+        "a": norm(loc=0., scale=0.5),
+        "tau": beta(a=2., b=5.),
+        "s_v": halfnorm(loc=0., scale=1.),
+        "s_tau": beta(a=2., b=5.)
+    }
+
 
 def ddm_baseline_priors():
     return {
@@ -48,19 +59,6 @@ def ddm_test_priors():
         # "decay":  np.random.gamma(1.0, 0.4),
     }
 
-def ddm_priors():
-    return {
-        "v":        {"intercept": lambda: np.random.gamma(2.5, 0.5),
-                     "slope": lambda: 0.0},
-        "a":        {"intercept": lambda: np.random.lognormal(0, 0.5),
-                     "slope": lambda: 0.0},
-        "tau":      {"intercept": lambda: np.random.gamma(2.0, 0.2),
-                     "slope": lambda: 0.0},
-        "s_v":      {"intercept": lambda: np.random.gamma(0.5, 0.2),
-                     "slope": lambda: 0.0},
-        "s_tau":    {"intercept": lambda: np.random.gamma(0.5, 0.2),
-                     "slope": lambda: 0.0}
-    }
 
 def ddm_log_priors():
     return {
