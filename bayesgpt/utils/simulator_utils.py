@@ -1,9 +1,16 @@
 import numpy as np
 
+
+def sigmoid(x: np.ndarray):
+    return 1. / (1. + np.exp(-x))
+
+def softmax(x: np.ndarray):
+    return np.exp(x) / np.sum(np.exp(x))
+
 def softplus(x: np.ndarray):
 
-    sp = np.log1p(1 + np.exp(x))
-    return sp - np.log(2.0)
+    sp = np.log1p(1. + np.exp(x))
+    return sp - np.log1p(2.0)
 
 def shifted_softplus(x: np.ndarray):
     """
@@ -37,3 +44,14 @@ def as_1d(x, n: int, allow_scalar: bool = True) -> np.ndarray:
     if a.size != n:
         raise ValueError(f"array has length {a.size}; expected {n}.")
     return a
+
+def inspect(out: dict, verbose=False):
+    for k, v in out.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, list):
+            print(k, len(v) if not verbose else (v[i] for i in v))
+        elif isinstance(v, dict):
+            print(v.keys())
+        else:
+            print(k, v)

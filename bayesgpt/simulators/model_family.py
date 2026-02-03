@@ -6,7 +6,7 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 
-from ..utils.simulator_utils import shifted_softplus, softplus
+from ..utils.simulator_utils import shifted_softplus, softplus, inspect
 from ..viz import visualize_matrix, visualize_matrices, visualize_design_configs
 
 
@@ -66,7 +66,7 @@ class NestedModelFamily:
         num_regressors: int = 2,
         max_num_regressors: int = 5,
         max_num_categories: int = 4,
-        link_fun: Callable = shifted_softplus,
+        link_fun: dict | Callable = shifted_softplus,
         context: dict[str, np.ndarray] | None = None,
         mask_randomizer_kwargs: dict | None = None,
         discrete_prob: float = 0.5,
@@ -154,8 +154,17 @@ class NestedModelFamily:
             keep_intercept=keep_intercept,
         )
 
+        # Build link function
+        link_funs = self.context_manager.build_link_functions(
+            intrinsic_params=self.intrinsic_params,
+            link_fun=link_fun,
+            default_link_fun=None
+        )
         # Compose per-trial intrinsic values
-        regressed_parameters = link_fun(design_matrix @ parameter_matrix)
+        predictor = design_matrix @ parameter_matrix
+        regressed_parameters = np.empty_like(predictor, dtype=np.float32)
+        for j, name in enumerate(self.intrinsic_params):
+            regressed_parameters[:, j] = link_funs[name](predictor[:, j]).astype(np.float32, copy=False)
 
         # Package for model
         params = {
@@ -192,16 +201,7 @@ class NestedModelFamily:
         }
 
         if debug:
-            for k, v in out.items():
-                if isinstance(v, np.ndarray):
-                    print(k, v.shape)
-                elif isinstance(v, list):
-                    for i in v:
-                        print(i)
-                elif isinstance(v, dict):
-                    print(v.keys())
-                else:
-                    print(k, v)
+            inspect(out)
 
         return out
 
@@ -375,21 +375,21 @@ class NestedModelFamily:
         }
 
     def check_regressed_priors(
-        self,
-        design_config: dict[str, list[str]],
-        num_draws: int = 200,
-        num_obs: int = 200,
-        max_num_categories: int = 4,
-        link_fun: Callable = softplus,
-        context: dict[str, np.ndarray] | None = None,
-        discrete_prob: float = 0.5,
-        keep_intercept: bool = True,
-        run_simulator: bool = False,
-        fixed_config: bool = True,   # keep design_config as provided
-        add_interaction: bool = False,
-        return_coeff_draws: bool = True,
-        seed: int | None = None,
-        plot: bool = True
+            self,
+            design_config: dict[str, list[str]],
+            num_draws: int = 200,
+            num_obs: int = 200,
+            max_num_categories: int = 4,
+            link_fun: Callable | dict | None = shifted_softplus,
+            context: dict[str, np.ndarray] | None = None,
+            discrete_prob: float = 0.5,
+            keep_intercept: bool = True,
+            run_simulator: bool = False,
+            fixed_config: bool = True,  # keep design_config as provided
+            add_interaction: bool = False,
+            return_coeff_draws: bool = True,
+            seed: int | None = None,
+            plot: bool = True
     ) -> dict:
         """
         Draw from the induced prior over per-trial intrinsic parameters for a given design_config.
@@ -437,6 +437,13 @@ class NestedModelFamily:
         if keep_intercept and ("1" in column_labels):
             intercept_idx = column_labels.index("1")
 
+        # Per-parameter link functions
+        link_funs = self.context_manager.build_link_functions(
+            intrinsic_params=self.intrinsic_params,
+            link_fun=link_fun,
+            default_link_fun=None,
+        )
+
         for _ in range(num_draws):
             X = self.context_manager.build_design_matrix(
                 design_config=design_config,
@@ -456,11 +463,16 @@ class NestedModelFamily:
             )
 
             if intercept_idx is not None:
-                theta0 = link_fun(B[intercept_idx, :])  # (num_intrinsic_params,)
-                intercept_theta_draws.append(theta0.astype(np.float32, copy=False))
+                theta0 = np.empty((len(self.intrinsic_params),), dtype=np.float32)
+                for j, name in enumerate(self.intrinsic_params):
+                    theta0[j] = float(link_funs[name](B[intercept_idx, j]))
+                intercept_theta_draws.append(theta0)
 
-            theta = link_fun(X @ B)  # (num_obs, num_intrinsic_params)
-            theta_draws.append(theta.astype(np.float32, copy=False))
+            Z = X @ B
+            theta = np.empty_like(Z, dtype=np.float32)
+            for j, name in enumerate(self.intrinsic_params):
+                theta[:, j] = link_funs[name](Z[:, j]).astype(np.float32, copy=False)
+            theta_draws.append(theta)
 
             if return_coeff_draws:
                 coef_draws.append(B.astype(np.float32, copy=False))
@@ -497,11 +509,13 @@ class NestedModelFamily:
                         stat="density",
                         element="step",
                         label="intercept only",
-                        color="#69ff69"
+                        color="#69ff69",
+                        bins=20
                     )
 
                 # Full regressed prior (includes X effects)
-                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#6969ff")
+                sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#6969ff",
+                             bins=100)
                 ax.legend()
                 ax.set_xlabel(self.intrinsic_params[i])
 
@@ -520,3 +534,4 @@ class NestedModelFamily:
             out["sim_draws"] = sim_draws
 
         return out
+

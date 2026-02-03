@@ -1,6 +1,8 @@
 import numpy as np
 from typing import Callable
 
+from bayesgpt.utils.simulator_utils import shifted_softplus
+
 
 class ContextManager:
     """
@@ -355,8 +357,8 @@ class ContextManager:
                 num_categories = dummies.shape[1]
                 design_matrix[:, start:(start + num_categories)] = dummies
             else:
-                # x = np.random.standard_normal(size=num_obs).astype(np.float32, copy=False)
-                x = np.random.uniform(size=num_obs).astype(np.float32, copy=False)
+                x = np.random.standard_normal(size=num_obs).astype(np.float32, copy=False)
+                # x = np.random.uniform(size=num_obs).astype(np.float32, copy=False)
 
                 # safe standardize
                 # eps = 1e-8
@@ -393,6 +395,61 @@ class ContextManager:
 
             design_matrix[:, start] = design_matrix[:, a0] * design_matrix[:, b0]
         return design_matrix
+
+    def build_link_functions(
+            self,
+            intrinsic_params: list[str],
+            link_fun: Callable | dict | None,
+            default_link_fun: Callable | None = None,
+    ) -> dict[str, Callable]:
+        """Build a per-intrinsic-parameter link-function mapping.
+
+        Parameters
+        ----------
+        intrinsic_params
+            List of intrinsic parameter names.
+        link_fun
+            Either a single callable (applied to all parameters), a dictionary
+            mapping parameter name -> callable, or None.
+        default_link_fun
+            Optional default callable used to fill missing keys when `link_fun`
+            is a dict. If None and keys are missing, raises.
+
+        Returns
+        -------
+        link_funs
+            Dictionary mapping each intrinsic parameter name to a callable.
+        """
+        # None -> default to softplus
+        if link_fun is None:
+            return {k: shifted_softplus for k in intrinsic_params}
+
+        # Single callable -> broadcast to all params
+        if callable(link_fun):
+            return {k: link_fun for k in intrinsic_params}
+
+        # Dict -> validate and (optionally) fill missing
+        if not isinstance(link_fun, dict):
+            raise TypeError(
+                "link_fun must be a callable, a dict[str, callable], or None; "
+                f"got {type(link_fun)}"
+            )
+
+        unknown = [k for k in link_fun.keys() if k not in intrinsic_params]
+        if unknown:
+            raise KeyError(
+                "Unknown link_fun keys not in intrinsic_params: " + ", ".join(map(str, unknown))
+            )
+
+        missing = [k for k in intrinsic_params if k not in link_fun]
+        if missing:
+            if default_link_fun is None:
+                raise KeyError(
+                    "Missing link_fun for intrinsic_params: " + ", ".join(map(str, missing))
+                )
+            return {k: link_fun.get(k, default_link_fun) for k in intrinsic_params}
+
+        return {k: link_fun[k] for k in intrinsic_params}
 
     def build_parameter_indices(
         self,
