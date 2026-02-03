@@ -4,9 +4,10 @@ os.environ["KERAS_BACKEND"] = "torch"
 import numpy as np
 import bayesflow as bf
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.utils.simulator_utils import inspect
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -23,17 +24,23 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
     )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, check=False, **kwargs):
+        intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
+
+        design_config = {
+            "1": intrinsic_params,
+            "u_1": ["v", "a", "tau", "s_v"],
+            "u_2": ["v", "a", "tau"],
+            "u_1:u_2": ["v", "a"]
+        }
 
         if isinstance(batch_size, tuple):
              batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 2,
+            "design_config": design_config,
             "max_num_regressors": 2,
             "max_num_categories": 2,
-            "fixed_config": True,
-            "add_interaction": True
         }
 
         samples = self.model_family.batch_sample(
@@ -50,7 +57,9 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
+        if check:
+            f = ddm_family.check_regressed_priors(design_config=design_config, num_obs=num_obs)
+            inspect(samples)
 
         return {"rts": rts, "choices": choices, "params": params}
 
