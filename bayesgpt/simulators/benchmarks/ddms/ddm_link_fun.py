@@ -7,7 +7,7 @@ def ddm_link_fun():
     return {
         "v": shifted_softplus,
         "a": shifted_softplus,
-        "tau": sigmoid,
+        "tau": shifted_softplus,
         "s_v": shifted_softplus,
         "s_tau": sigmoid
     }

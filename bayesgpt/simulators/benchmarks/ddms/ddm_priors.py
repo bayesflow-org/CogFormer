@@ -4,11 +4,11 @@ from scipy.stats import halfnorm, gamma, norm, beta, lognorm
 
 def ddm_priors():
     return {
-        "v": lognorm(s=0.5),
-        "a": norm(loc=0., scale=0.5),
-        "tau": beta(a=2., b=5.),
-        "s_v": halfnorm(loc=0., scale=1.),
-        "s_tau": beta(a=2., b=5.)
+        "v": norm(loc=1., scale=1.), #lognorm(s=0.5),
+        "a": norm(loc=2., scale=0.75),
+        "tau": norm(loc=-1., scale=0.75),
+        "s_v": norm(loc=-1.5, scale=1.),
+        "s_tau": norm(loc=-1., scale=1.5)
     }
 
 

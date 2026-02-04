@@ -160,10 +160,11 @@ class ContextManager:
                 if hasattr(spec, "rvs"):
                     # print("Identified SciPy priors")
                     scale = spec.std()
+                    scale = spec.mean()
                     sampler = lambda rv=spec: rv.rvs()
                     priors[k] = {
                         "intercept": sampler,
-                        "slope": lambda std=scale: np.random.normal(0.0, std)
+                        "slope": lambda std=scale: np.random.normal(0.0, 0.3 * std)
                     }
                 else:
                     priors[k] = {
