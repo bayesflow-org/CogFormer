@@ -103,7 +103,7 @@ class BayesGPTTrainer:
             **config["train_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            link_fun=self.link_fun()
+            link_fun=ddm_link_fun()
         )
 
         # Adapt for network
@@ -157,7 +157,7 @@ class BayesGPTTrainer:
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
             design_config=design_config,
-            link_fun=self.link_fun
+            link_fun=ddm_link_fun()
         )
 
         # Adapt
