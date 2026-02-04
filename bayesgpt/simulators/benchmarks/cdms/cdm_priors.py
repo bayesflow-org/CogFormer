@@ -1,5 +1,17 @@
 import numpy as np
 from numba import njit
+from scipy import norm
+
+
+def cdm_priors():
+    return {
+        "v": norm(loc=1.0, scale=0.4),
+        "v_theta": norm(loc=0.0, scale=1.5),
+        "a": norm(loc=0.25, scale=0.5),
+        "tau": norm(loc=-1.2, scale=0.5),
+        "s_v": norm(loc=-1.0, scale=0.6),
+        "s_tau": norm(loc=-1.5, scale=0.7),
+    }
 
 @njit
 def cdm_baseline_priors() -> np.ndarray:
@@ -21,7 +33,7 @@ def cdm_baseline_priors() -> np.ndarray:
     )
 
 @njit
-def cdm_priors():
+def cdm_full_priors():
     return {
         "v":        {"intercept": np.random.normal(1.0, 2.0),
                      "slope": 0.0},
@@ -38,7 +50,7 @@ def cdm_priors():
     }
 
 @njit
-def cdm_full_priors():
+def cdm_custom_priors():
     return {
         "v":        {"intercept": np.random.normal(1.0, 2.0),
                      "slope": np.random.normal(0.0, 3.0)},

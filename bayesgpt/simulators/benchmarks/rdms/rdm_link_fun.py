@@ -1,20 +1,19 @@
-import numpy as np
+from bayesgpt.utils.simulator_utils import exponential, sigmoid, shifted_softplus
 
-from bayesgpt.utils.simulator_utils import sigmoid, shifted_softplus, exponential
-
-
-def ddm_link_fun():
+def rdm_link_fun():
     return {
         "v": shifted_softplus,
+        "v_diff": shifted_softplus,
         "a": shifted_softplus,
         "tau": shifted_softplus,
         "s_v": shifted_softplus,
         "s_tau": sigmoid
     }
 
-def ddm_link_fun2():
+def rdm_link_fun2():
     return {
         "v": exponential,
+        "v_diff": shifted_softplus,
         "a": exponential,
         "tau": exponential,
         "s_v": exponential,
