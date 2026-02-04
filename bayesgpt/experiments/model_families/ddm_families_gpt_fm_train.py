@@ -37,7 +37,7 @@ class BayesGPTTrainer:
         self.gpt=gpt
         self.model=model
         self.prior_fun=prior_fun
-        self.link_fun=link_fun
+        self.link_fun=link_fun()
         self.adapter=adapter
         self.use_wandb = use_wandb
         if model_family is not None:
@@ -381,7 +381,6 @@ if __name__ == "__main__":
         model=DDM(),
         name="DDM",
         prior_fun=ddm_baseline_priors(),
-        link_fun=ddm_link_fun(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
