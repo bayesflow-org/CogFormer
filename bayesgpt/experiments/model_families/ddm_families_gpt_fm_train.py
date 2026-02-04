@@ -14,7 +14,7 @@ np.set_printoptions(suppress=True)
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors, ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
@@ -87,7 +87,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 5 == 0:
                 self.val_step(val_config, global_step)
 
             scheduler.step()
@@ -245,6 +245,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--num_obs", type=int, default=500, help="number of observations")
+    parser.add_argument("--min_num_obs", type=int, default=200, help="minimum number of observations")
+    parser.add_argument("--max_num_obs", type=int, default=800, help="maximum number of observations")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
@@ -281,7 +283,6 @@ if __name__ == "__main__":
         "max_num_regressors": max_num_regressors,
         "max_num_categories": max_num_categories,
         "keep_intercept": keep_intercept,
-        "num_obs": num_obs,
         "add_interaction": True
     }
 
@@ -300,12 +301,15 @@ if __name__ == "__main__":
     train_sample_config = {
         "mask_randomizer_kwargs": train_params_kwargs,
         "min_num_regressors": 0,
+        "min_num_obs": args.min_num_obs,
+        "max_num_obs": args.max_num_obs,
         "fixed_config": False,
     }
 
     val_sample_config = {
         "mask_randomizer_kwargs": val_params_kwargs,
         "min_num_regressors": 2,
+        "num_obs": args.num_obs,
         "fixed_config": False
     }
 
@@ -380,7 +384,7 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_baseline_priors(),
+        prior_fun=ddm_priors(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
