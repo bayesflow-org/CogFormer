@@ -14,7 +14,8 @@ np.set_printoptions(suppress=True)
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors, ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
@@ -27,6 +28,7 @@ class BayesGPTTrainer:
         gpt,
         model=None,
         prior_fun=None,
+        link_fun=None,
         model_family=None,
         adapter=None,
         use_wandb=False,
@@ -35,6 +37,7 @@ class BayesGPTTrainer:
         self.gpt=gpt
         self.model=model
         self.prior_fun=prior_fun
+        self.link_fun=link_fun
         self.adapter=adapter
         self.use_wandb = use_wandb
         if model_family is not None:
@@ -99,7 +102,8 @@ class BayesGPTTrainer:
             **config["model_family_config"],
             **config["train_sample_config"],
             batch_size=config["batch_size"],
-            flatten_param_outputs=True
+            flatten_param_outputs=True,
+            link_fun=self.link_fun
         )
 
         # Adapt for network
@@ -152,7 +156,8 @@ class BayesGPTTrainer:
             **config["val_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            design_config=design_config
+            design_config=design_config,
+            link_fun=self.link_fun
         )
 
         # Adapt
@@ -239,16 +244,17 @@ class BayesGPTTrainer:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", help="Debug mode")
+    parser.add_argument("--num_obs", type=int, default=500, help="number of observations")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
-    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
+    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
     parser.add_argument("--fm_num_samples", type=int, default=200, help="number of seeds")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
     parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
-    parser.add_argument("--encoder_num_layers", type=int, default=8, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
+    parser.add_argument("--encoder_num_layers", type=int, default=3, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=3, help="number of decoder layers")
     parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
     parser.add_argument("--projection_dim", type=int, default=256, help="dimension of projection layers")
@@ -269,7 +275,7 @@ if __name__ == "__main__":
     max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
-    num_obs = 1000
+    num_obs = args.num_obs
 
     model_family_config = {
         "max_num_regressors": max_num_regressors,
@@ -375,6 +381,7 @@ if __name__ == "__main__":
         model=DDM(),
         name="DDM",
         prior_fun=ddm_baseline_priors(),
+        link_fun=ddm_link_fun(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
