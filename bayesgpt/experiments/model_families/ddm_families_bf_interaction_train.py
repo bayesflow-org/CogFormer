@@ -7,6 +7,7 @@ import bayesflow as bf
 from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.utils.simulator_utils import inspect
 
 
@@ -24,7 +25,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
     )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, check=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, check=False, **kwargs):
         intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
 
         design_config = {
@@ -47,6 +48,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             batch_size=batch_size,
             num_obs=num_obs,
             flatten_param_outputs=flatten_param_outputs,
+            link_fun=ddm_link_fun(),
             **sample_kwargs,
             **kwargs
         )
@@ -58,8 +60,11 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
         if check:
-            f = ddm_family.check_regressed_priors(design_config=design_config, num_obs=num_obs)
-            inspect(samples)
+            f = self.model_family.check_regressed_priors(
+                design_config=design_config,
+                num_obs=num_obs,
+                link_fun=ddm_link_fun()
+            )
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -76,7 +81,6 @@ def test():
         else:
             print(k, v)
 
-    print(ddm_samples["params"])
 
 def main():
     # Define simulator
@@ -91,11 +95,17 @@ def main():
     )
 
     # define networks
-    summary_net = bf.networks.SetTransformer()
+    summary_net = bf.networks.SetTransformer(
+        summary_dim=256,
+        seed_dim=128,
+        num_seeds=40,
+        dropout=0.05,
+        layer_norm=True
+    )
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_interaction"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_interaction"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -107,7 +117,7 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=500,
+        epochs=1000,
         steps_per_epoch=100,
         batch_size=32
     )

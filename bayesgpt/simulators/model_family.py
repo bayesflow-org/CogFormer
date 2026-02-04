@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import wasserstein_distance
 from collections.abc import Callable
 
 from .model import Model
@@ -516,9 +517,18 @@ class NestedModelFamily:
                 # Full regressed prior (includes X effects)
                 sns.histplot(theta_draws[:, 0, i], ax=ax, kde=True, stat="density", label="regressed", color="#ff6969",
                              bins=20)
-                ax.legend()
-                ax.set_xlabel(self.intrinsic_params[i])
 
+                # Compute Wasserstein distance
+                w1 = wasserstein_distance(
+                    intercept_theta_draws[:, i],
+                    theta_draws[:, 0, i],
+                )
+                metric_label = f"$W_1 = {w1:.3f}$"
+                ax.text(0.9, 0.9, metric_label, ha="right", va="center", transform=ax.transAxes, size=12)
+                ax.grid(False)
+                sns.despine()
+                ax.set_xlabel(self.intrinsic_params[i])
+                ax.set_ylabel("Density" if i == 0 else None)
             f.tight_layout()
             return f
 
