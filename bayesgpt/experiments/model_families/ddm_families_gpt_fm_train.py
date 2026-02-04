@@ -37,7 +37,7 @@ class BayesGPTTrainer:
         self.gpt=gpt
         self.model=model
         self.prior_fun=prior_fun
-        self.link_fun=link_fun()
+        self.link_fun=link_fun
         self.adapter=adapter
         self.use_wandb = use_wandb
         if model_family is not None:
@@ -103,7 +103,7 @@ class BayesGPTTrainer:
             **config["train_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            link_fun=self.link_fun
+            link_fun=self.link_fun()
         )
 
         # Adapt for network
