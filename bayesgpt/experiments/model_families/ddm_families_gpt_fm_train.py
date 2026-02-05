@@ -274,6 +274,7 @@ if __name__ == "__main__":
 
     use_wandb = args.use_wandb
 
+
     max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
