@@ -14,8 +14,8 @@ np.set_printoptions(suppress=True)
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
-from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors, ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun, ddm_link_fun2
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
@@ -103,7 +103,7 @@ class BayesGPTTrainer:
             **config["train_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            link_fun=ddm_link_fun()
+            link_fun=ddm_link_fun2()
         )
 
         # Adapt for network
@@ -157,7 +157,7 @@ class BayesGPTTrainer:
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
             design_config=design_config,
-            link_fun=ddm_link_fun()
+            link_fun=ddm_link_fun2()
         )
 
         # Adapt
@@ -221,7 +221,7 @@ class BayesGPTTrainer:
         figures_dir = Path("./bayesgpt/experiments/figures")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
-        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery.pdf", bbox_inches="tight")
+        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery_2.pdf", bbox_inches="tight")
 
         if self.use_wandb:
             wandb.log(
@@ -384,7 +384,7 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors(),
+        prior_fun=ddm_priors2(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
@@ -408,7 +408,7 @@ if __name__ == "__main__":
         f"_bse{train_config['batch_size']}"
         f"_nls{bayesgpt_config['decoder_num_layers']}"
         f"_nhs{bayesgpt_config['decoder_num_heads']}"
-        f"_nss{bayesgpt_config['num_seeds']}.pt"
+        f"_nss{bayesgpt_config['num_seeds']}_2.pt"
     )
 
     # Train
