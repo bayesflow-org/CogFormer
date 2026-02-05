@@ -53,7 +53,7 @@ def adaptive_recovery(
             regressor_id = (r - 1) // (max_num_categories - 1) + 1
 
             regressor_key = regressor_keys[regressor_id]
-            ylabel = fr"${regressor_key} | c_{category_id}$"
+            ylabel = fr"${regressor_key}$" + (fr"$ | c_{category_id}$" if max_num_categories > 2 else "")
             color = interaction_color if ":" in regressor_key else main_effect_color
         else:
             ylabel = r"$1$"
