@@ -15,7 +15,7 @@ np.set_printoptions(suppress=True)
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors, ddm_priors2
-from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun, ddm_link_fun2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun, ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
@@ -103,7 +103,7 @@ class BayesGPTTrainer:
             **config["train_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            link_fun=ddm_link_fun2()
+            link_fun=ddm_link_fun()
         )
 
         # Adapt for network
@@ -157,7 +157,7 @@ class BayesGPTTrainer:
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
             design_config=design_config,
-            link_fun=ddm_link_fun2()
+            link_fun=ddm_link_fun()
         )
 
         # Adapt
