@@ -1,5 +1,7 @@
 import numpy as np
 
+def exponential(x: np.ndarray):
+    return np.exp(x)
 
 def sigmoid(x: np.ndarray):
     return 1. / (1. + np.exp(-x))

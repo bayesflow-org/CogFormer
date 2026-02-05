@@ -164,7 +164,7 @@ class ContextManager:
                     sampler = lambda rv=spec: rv.rvs()
                     priors[k] = {
                         "intercept": sampler,
-                        "slope": lambda std=scale: np.random.normal(0.0, 0.3 * std)
+                        "slope": lambda std=scale: np.random.normal(0.0, 1.0)
                     }
                 else:
                     priors[k] = {
