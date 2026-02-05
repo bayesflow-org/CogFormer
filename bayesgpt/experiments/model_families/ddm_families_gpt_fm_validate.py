@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors, ddm_priors, ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
@@ -88,7 +89,7 @@ def parse_args():
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/benchmark_recovery", help="Output directory")
 
     # Validation settings
-    p.add_argument("--batch_size", type=int, default=200)
+    p.add_argument("--batch_size", type=int, default=300)
     p.add_argument("--num_obs", type=int, default=500)
     p.add_argument("--max_num_regressors", type=int, default=2)
     p.add_argument("--max_num_categories", type=int, default=2)
@@ -137,7 +138,7 @@ def main():
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_baseline_priors(),
+        prior_fun=ddm_priors(),# ddm_baseline_priors(),
         mask_randomizer_kwargs={  # default; per-config we’ll override
             "free_intrinsics": intrinsic_params,
             "fixed_intrinsics": [],

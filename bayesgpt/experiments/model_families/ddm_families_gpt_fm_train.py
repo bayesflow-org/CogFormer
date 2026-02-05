@@ -181,7 +181,7 @@ class BayesGPTTrainer:
         print(true_set.shape)
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$\log a$", r"$\log \tau$", r"$s_v$", r"$s_\tau$"]
+        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
@@ -246,7 +246,7 @@ def parse_args():
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--num_obs", type=int, default=500, help="number of observations")
     parser.add_argument("--min_num_obs", type=int, default=200, help="minimum number of observations")
-    parser.add_argument("--max_num_obs", type=int, default=800, help="maximum number of observations")
+    parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
     parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
@@ -254,7 +254,7 @@ def parse_args():
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
-    parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
+    parser.add_argument("--use_wandb", action="store_true", help="use wandb")
     parser.add_argument("--encoder_num_layers", type=int, default=3, help="number of encoder layers")
     parser.add_argument("--decoder_num_layers", type=int, default=3, help="number of decoder layers")
     parser.add_argument("--num_seeds", type=int, default=40, help="number of seeds")
