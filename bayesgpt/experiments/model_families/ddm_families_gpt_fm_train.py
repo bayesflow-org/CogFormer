@@ -221,7 +221,7 @@ class BayesGPTTrainer:
         figures_dir = Path("./bayesgpt/experiments/figures")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
-        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery_2a.pdf", bbox_inches="tight")
+        recovery_fig.savefig(figures_dir / "ddm_family_gpt_fm_test_recovery_0.pdf", bbox_inches="tight")
 
         if self.use_wandb:
             wandb.log(
@@ -385,7 +385,7 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors2(),
+        prior_fun=ddm_priors(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
@@ -409,7 +409,7 @@ if __name__ == "__main__":
         f"_bse{train_config['batch_size']}"
         f"_nls{bayesgpt_config['decoder_num_layers']}"
         f"_nhs{bayesgpt_config['decoder_num_heads']}"
-        f"_nss{bayesgpt_config['num_seeds']}_2a.pt"
+        f"_nss{bayesgpt_config['num_seeds']}_0.pt"
     )
 
     # Train
