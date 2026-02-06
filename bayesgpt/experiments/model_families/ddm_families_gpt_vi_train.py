@@ -14,13 +14,14 @@ np.set_printoptions(suppress=True)
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_full_priors, ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPTv1
-from bayesgpt.networks.loss import mse_loss, nll_loss
+from bayesgpt.networks.loss import nll_loss
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.utils.plot_utils import bayesgpt_vi_colors
-from bayesgpt.diagnostics.plot.correlation import correlation
+
 
 
 class BayesGPTTrainer:
@@ -29,6 +30,7 @@ class BayesGPTTrainer:
         gpt,
         model=None,
         prior_fun=None,
+        link_fun=None,
         model_family=None,
         adapter=None,
         use_wandb=False,
@@ -37,6 +39,7 @@ class BayesGPTTrainer:
         self.gpt = gpt
         self.model = model
         self.prior_fun = prior_fun
+        self.link_fun = link_fun
         self.adapter = adapter
         self.use_wandb = use_wandb
         if model_family is not None:
@@ -49,7 +52,13 @@ class BayesGPTTrainer:
             )
         self.debug = False
 
-    def train(self, train_config, val_config, checkpoint_path="bayesgpt_vi.pt"):
+    def train(
+        self,
+        train_config,
+        val_config,
+        checkpoint_path="bayesgpt_vi.pt",
+        fig_path="fig.pdf"
+    ):
         # Define global step
         global_step = 0
 
@@ -88,13 +97,15 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 10 == 0:
-                self.val_step(val_config, global_step)
+            if (epoch + 1) % 100 == 0:
+                self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
             pbar.close()
 
-        torch.save(self.gpt.state_dict(), checkpoint_path)
+        checkpoint_dir = Path("./bayesgpt/experiments/checkpoints/vi/")
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.gpt.state_dict(), checkpoint_dir / checkpoint_path)
 
     def train_step(self, config, optimizer, scheduler, loss_fn):
         """Training step"""
@@ -103,7 +114,8 @@ class BayesGPTTrainer:
             **config["model_family_config"],
             **config["train_sample_config"],
             batch_size=config["batch_size"],
-            flatten_param_outputs=True
+            flatten_param_outputs=True,
+            link_fun=ddm_link_fun()
         )
 
         # Adapt for network
@@ -141,9 +153,7 @@ class BayesGPTTrainer:
         return loss, current_lr
 
 
-    def val_step(self, config, global_step):
-        """Validation steps, used for validation only"""
-
+    def val_step(self, config, global_step, fig_path):
         # Generate training samples
         design_config = {
             '1': ["v", "a", "tau", "s_v", "s_tau"],
@@ -157,7 +167,8 @@ class BayesGPTTrainer:
             **config["val_sample_config"],
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
-            design_config=design_config
+            design_config=design_config,
+            link_fun=ddm_link_fun()
         )
 
         # Adapt
@@ -181,7 +192,7 @@ class BayesGPTTrainer:
         var = np.exp(0.5 * logvar)
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$\log a$", r"$\log \tau$", r"$s_v$", r"$s_\tau$"]
+        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         n_cols = len(params)
         n_rows = true_set.shape[1] // n_cols
@@ -202,7 +213,6 @@ class BayesGPTTrainer:
 
         # Log recovery plot
         colors = bayesgpt_vi_colors()
-        # fig = recovery(true_set, pred_set, params=["v", "a", "tau", "s_v", "s_tau"])
         recovery_fig = adaptive_recovery(
             true_set, pred_set,
             design_config=design_config,
@@ -215,28 +225,19 @@ class BayesGPTTrainer:
             interaction_color=colors["interaction"],
         )
 
-        # correlation_fig = correlation(
-        #     true_set, pred_set,
-        #     free_params=config['free_params'],
-        #     fixed_params=config['fixed_params']
-        # )
-
-        figures_dir = Path("./experiments/figures")
+        figures_dir = Path("./bayesgpt/experiments/figures/vi/recovery")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
-        recovery_fig.savefig(figures_dir / "ddm_family_gpt_vi_recovery.pdf", bbox_inches="tight")
-        # correlation_fig.savefig(figures_dir / "ddm_family_gpt_fixed_variability_correlation.pdf", bbox_inches="tight")
+        recovery_fig.savefig(figures_dir / fig_path, bbox_inches="tight")
 
         if self.use_wandb:
             wandb.log(
                 {
                     "val/recovery": wandb.Image(recovery_fig),
-                    # "val/correlation": wandb.Image(correlation_fig)
                 },
                 step=global_step,
             )
             plt.close(recovery_fig)
-            # plt.close(correlation_fig)
 
         self.gpt.train()
 
@@ -246,19 +247,32 @@ class BayesGPTTrainer:
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    # General
     parser.add_argument("--debug", action="store_true", help="Debug mode")
-    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
-    parser.add_argument("--steps_per_epoch", type=int, default=200, help="number of steps per epoch")
-    parser.add_argument("--train_batch_size", type=int, default=32, help="batch size")
+    parser.add_argument("--use_wandb", action="store_true", help="use wandb")
+
+    # Network dimensions
+    parser.add_argument("--encoder_num_layers", type=int, default=8, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=8, help="number of decoder layers")
+    parser.add_argument("--encoder_num_heads", type=int, default=8, help="number of encoder heads")
+    parser.add_argument("--decoder_num_heads", type=int, default=8, help="number of decoder heads")
+    parser.add_argument("--projection_dim", type=int, default=256, help="dimension of projection dims")
+    parser.add_argument("--num_seeds", type=int, default=32, help="number of seeds")
+    parser.add_argument("--seed_dim", type=int, default=128, help="dimension of seeds")
+
+    # Hyperparameters
+    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
+    parser.add_argument("--dropout", type=float, default=0.05, help="dropout rate")
+    parser.add_argument("--layer_dropout", type=float, default=0.05, help="layer dropout rate")
+
+    # Training
+    parser.add_argument("--num_obs", type=int, default=500, help="number of observations")
+    parser.add_argument("--min_num_obs", type=int, default=200, help="minimum number of observations")
+    parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
+    parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
-    parser.add_argument("--lr", type=float, default=2e-4, help="learning rate")
-    parser.add_argument("--use_wandb", type=bool, default=True, help="use wandb")
-    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
-    parser.add_argument("--num_seeds", type=int, default=10, help="number of seeds")
-    parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
-    parser.add_argument("--dropout", type=float, default=0.1, help="dropout rate")
-    parser.add_argument("--layer_dropout", type=float, default=0.1, help="layer dropout rate")
+    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
+    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -274,13 +288,12 @@ if __name__ == "__main__":
     max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
-    num_obs = 500
+    num_obs = args.num_obs
 
     model_family_config = {
         "max_num_regressors": max_num_regressors,
         "max_num_categories": max_num_categories,
         "keep_intercept": keep_intercept,
-        "num_obs": num_obs,
         "add_interaction": True
     }
 
@@ -299,12 +312,15 @@ if __name__ == "__main__":
     train_sample_config = {
         "mask_randomizer_kwargs": train_params_kwargs,
         "min_num_regressors": 0,
+        "min_num_obs": args.min_num_obs,
+        "max_num_obs": args.max_num_obs,
         "fixed_config": False,
     }
 
     val_sample_config = {
         "mask_randomizer_kwargs": val_params_kwargs,
         "min_num_regressors": 2,
+        "num_obs": args.num_obs,
         "fixed_config": False
     }
 
@@ -334,7 +350,7 @@ if __name__ == "__main__":
     }
 
     wandb_config = {
-        "project_name": "bayesgpt-vi",
+        "project_name": "bayesgpt-vi-iclr",
         "run_name": None,
         "tags": ["BayesGPTv1", "ModelFamily"],
         "watch_log": "gradients",
@@ -345,11 +361,11 @@ if __name__ == "__main__":
         "encoder_input_dim": encoder_input_dim,
         "encoder_num_layers": args.encoder_num_layers,
         "decoder_num_layers": args.decoder_num_layers,
-        "encoder_num_heads": 8,
-        "decoder_num_heads": 8,
+        "encoder_num_heads": args.encoder_num_heads,
+        "decoder_num_heads": args.decoder_num_heads,
         "num_seeds": args.num_seeds,
         "seed_dim": args.seed_dim,
-        "proj_dim": 64,
+        "proj_dim": args.projection_dim,
         "dropout": args.dropout,
         "layer_dropout": args.layer_dropout,
     }
@@ -377,7 +393,7 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_baseline_priors(),
+        prior_fun=ddm_priors2(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
@@ -393,19 +409,37 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
-        f"bayesgpt_vi"
-        f"_eps{train_config['epochs']}"
-        f"_stp{train_config['steps_per_epoch']}"
-        f"_bse{train_config['batch_size']}"
-        f"_nls{bayesgpt_config['decoder_num_layers']}"
-        f"_nhs{bayesgpt_config['decoder_num_heads']}"
-        f"_nss{bayesgpt_config['num_seeds']}.pt"
+        f"bayesgpt_vi_iclr"
+        f"_l{bayesgpt_config['decoder_num_layers']}"
+        f"_h{bayesgpt_config['decoder_num_heads']}"
+        f"_p{bayesgpt_config['proj_dim']}"
+        f"_s{bayesgpt_config['num_seeds']}"
+        f"_d{bayesgpt_config['seed_dim']}"
+        f"_o{val_sample_config['num_obs']}"
+        f"_b{train_config['batch_size']}"
+        f"_e{train_config['epochs']}"
+        f"_t{train_config['steps_per_epoch']}.pt"
+    )
+
+    fig_path = (
+        f"bayesgpt_vi_iclr"
+        f"_l{bayesgpt_config['decoder_num_layers']}"
+        f"_h{bayesgpt_config['decoder_num_heads']}"
+        f"_p{bayesgpt_config['proj_dim']}"
+        f"_s{bayesgpt_config['num_seeds']}"
+        f"_d{bayesgpt_config['seed_dim']}"
+        f"_o{val_sample_config['num_obs']}"
+        f"_b{train_config['batch_size']}"
+        f"_e{train_config['epochs']}"
+        f"_t{train_config['steps_per_epoch']}"
+        f"_test_recovery.pdf"
     )
 
     # Train
     trainer.train(
         train_config=train_config,
         val_config=val_config,
-        checkpoint_path=checkpoint_path
+        checkpoint_path=checkpoint_path,
+        fig_path=fig_path
     )
     trainer.finish()

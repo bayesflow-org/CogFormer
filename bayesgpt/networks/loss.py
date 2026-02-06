@@ -5,7 +5,6 @@ def nll_loss(true_params, mu, logvar, param_masks) -> torch.Tensor:
     """
     Heteroskedastic Gaussian NLL with masking.
     """
-
     mu = mu.squeeze(dim=-1)
     logvar = logvar.squeeze(dim=-1)
 

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 from ..encoder import Encoder
@@ -60,3 +61,13 @@ class BayesGPTv1(nn.Module):
         )
 
         return decoded_mu, decoded_logvar
+
+
+    def compute_loss(self, true_params, mu, logvar, param_masks) -> torch.Tensor:
+        """"""
+
+        inv_var = torch.exp(-logvar)
+        nll = F.gaussian_nll_loss(mu, true_params, inv_var, reduction="none").squeeze(-1)
+        nll_masked = nll * param_masks
+        num_active_params = param_masks.sum(dim=-1)
+        return torch.mean(nll_masked.sum(dim=-1) / num_active_params)
