@@ -6,7 +6,7 @@ import bayesflow as bf
 
 from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.utils.simulator_utils import inspect
 
@@ -16,7 +16,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_baseline_priors(),
+            prior_fun=ddm_priors2(),
             regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
@@ -56,6 +56,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
         params = samples["param_matrices"]
+
+        params = params[:, params[0] != 0]
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
@@ -98,7 +100,7 @@ def main():
     summary_net = bf.networks.SetTransformer(
         summary_dim=256,
         seed_dim=128,
-        num_seeds=40,
+        num_seeds=32,
         dropout=0.05,
         layer_norm=True
     )
@@ -119,7 +121,7 @@ def main():
     history = workflow.fit_online(
         epochs=1000,
         steps_per_epoch=100,
-        batch_size=32
+        batch_size=64
     )
 
 if __name__ == '__main__':
