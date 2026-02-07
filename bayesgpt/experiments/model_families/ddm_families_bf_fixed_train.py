@@ -3,9 +3,11 @@ os.environ["KERAS_BACKEND"] = "torch"
 
 import bayesflow as bf
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -13,7 +15,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_baseline_priors(),
+            prior_fun=ddm_priors2(),
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],
                 fixed_intrinsics=["s_v", "s_tau"],
@@ -37,6 +39,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             batch_size=batch_size,
             num_obs=num_obs,
             flatten_param_outputs=flatten_param_outputs,
+            link_fun=ddm_link_fun(),
             **sample_kwargs,
             **kwargs
         )
@@ -64,7 +67,16 @@ def main():
     )
 
     # define networks
-    summary_net = bf.networks.SetTransformer()
+    summary_net = bf.networks.SetTransformer(
+        summary_dim=32,
+        seed_dim=128,
+        num_heads=(8, 8),
+        mlp_depths=(8, 8),
+        # embed_dims=(128, 128),
+        num_seeds=32,
+        dropout=0.05,
+        layer_norm=True
+    )
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath

@@ -4,9 +4,11 @@ os.environ["KERAS_BACKEND"] = "torch"
 import numpy as np
 import bayesflow as bf
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+from bayesgpt.utils.simulator_utils import inspect
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -14,8 +16,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_baseline_priors(),
-            regressed_params=["v", "a"],
+            prior_fun=ddm_priors2(),
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
                 fixed_intrinsics=[],
@@ -23,22 +24,29 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
     )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, check=False, **kwargs):
+        intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
+
+        design_config = {
+            "1": intrinsic_params,
+            "u_1": ["v", "a"],
+            "u_2": ["v", "a"]
+        }
 
         if isinstance(batch_size, tuple):
              batch_size = batch_size[0]
 
         sample_kwargs = {
-            'min_num_regressors': 2,
+            "design_config": design_config,
             "max_num_regressors": 2,
             "max_num_categories": 2,
-            "fixed_config": True
         }
 
         samples = self.model_family.batch_sample(
             batch_size=batch_size,
             num_obs=num_obs,
             flatten_param_outputs=flatten_param_outputs,
+            link_fun=ddm_link_fun(),
             **sample_kwargs,
             **kwargs
         )
@@ -47,9 +55,16 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         choices = samples["sim_data"]["choices"]
         params = samples["param_matrices"]
 
+        params = params[:, params[0] != 0]
+
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
+        if check:
+            f = self.model_family.check_regressed_priors(
+                design_config=design_config,
+                num_obs=num_obs,
+                link_fun=ddm_link_fun()
+            )
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -65,8 +80,8 @@ def test():
             print(k, v.keys())
         else:
             print(k, v)
-
     print(ddm_samples["params"])
+
 
 def main():
     # Define simulator
@@ -81,11 +96,20 @@ def main():
     )
 
     # define networks
-    summary_net = bf.networks.SetTransformer()
+    summary_net = bf.networks.SetTransformer(
+        summary_dim=32,
+        seed_dim=128,
+        num_heads=(8, 8),
+        mlp_depths=(8, 8),
+        # embed_dims=(128, 128),
+        num_seeds=32,
+        dropout=0.05,
+        layer_norm=True
+    )
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_regressed"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_regressed"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -97,12 +121,14 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=500,
+        epochs=1000,
         steps_per_epoch=100,
-        batch_size=32
+        batch_size=64
     )
 
 if __name__ == '__main__':
     debug = False
-    if not debug:
+    if debug:
+        test()
+    else:
         main()
