@@ -12,7 +12,7 @@ from pathlib import Path
 
 from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 
@@ -21,7 +21,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_priors(),
+            prior_fun=ddm_priors2(),
             regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
@@ -62,6 +62,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         choices = samples["sim_data"]["choices"]
         params = samples["param_matrices"]
 
+        params = params[:, params[0] != 0]
+
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
         if check:
@@ -73,7 +75,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(batch_size=300, num_samples=300, case="interaction"):
+def main(batch_size=200, num_samples=200, case="interaction"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
@@ -84,9 +86,9 @@ def main(batch_size=300, num_samples=300, case="interaction"):
     # Make directories
     param_names = [
         r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
-        r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$", r"$u_{1, s_v}$", r"$u_{1, s_\tau}$",
-        r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$", r"$u_{2, s_v}$", r"$u_{2, s_\tau}$",
-        r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, \tau}$", r"$u_1:u_{2, s_v}$", r"$u_1:u_{2, s_\tau}$",
+        r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$", r"$u_{1, s_v}$",
+        r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
+        r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$",
     ]
 
     data_dir = Path("./bayesgpt/experiments/data")
@@ -144,9 +146,9 @@ def main(batch_size=300, num_samples=300, case="interaction"):
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(15, 12),
+        figsize=(15, 9),
         label_fontsize=14,
-        num_row=4,
+        num_row=3,
         num_col=5
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
@@ -154,7 +156,7 @@ def main(batch_size=300, num_samples=300, case="interaction"):
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
-    for i in range(10):
+    for i in range(5):
         posterior = bf.diagnostics.plots.pairs_posterior(
             estimates=post_draws,
             targets=val_sims,

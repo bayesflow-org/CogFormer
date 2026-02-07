@@ -100,6 +100,8 @@ def main():
     summary_net = bf.networks.SetTransformer(
         summary_dim=256,
         seed_dim=128,
+        num_heads=(8, 8),
+        mlp_depths=(8, 8),
         num_seeds=32,
         dropout=0.05,
         layer_norm=True
