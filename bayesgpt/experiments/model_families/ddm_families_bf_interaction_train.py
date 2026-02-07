@@ -82,6 +82,7 @@ def test():
             print(k, v.keys())
         else:
             print(k, v)
+    print(ddm_samples["params"])
 
 
 def main():
@@ -98,10 +99,11 @@ def main():
 
     # define networks
     summary_net = bf.networks.SetTransformer(
-        summary_dim=256,
+        summary_dim=32,
         seed_dim=128,
         num_heads=(8, 8),
         mlp_depths=(8, 8),
+        # embed_dims=(128, 128),
         num_seeds=32,
         dropout=0.05,
         layer_norm=True
@@ -127,7 +129,7 @@ def main():
     )
 
 if __name__ == '__main__':
-    debug = False
+    debug = True
     if debug:
         test()
     else:
