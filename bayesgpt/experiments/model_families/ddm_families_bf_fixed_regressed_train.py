@@ -51,7 +51,6 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
         params = params[:, params[0] != 0]
-        print(params.shape)
 
         return {"rts": rts, "choices": choices, "params": params}
 
