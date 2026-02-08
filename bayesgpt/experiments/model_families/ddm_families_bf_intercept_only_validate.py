@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -20,7 +21,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_baseline_priors(),
+            prior_fun=ddm_priors2(),
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
                 fixed_intrinsics=[],
@@ -43,6 +44,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             batch_size=batch_size,
             num_obs=num_obs,
             flatten_param_outputs=flatten_param_outputs,
+            link_fun=ddm_link_fun(),
             **sample_kwargs,
             **kwargs
         )
@@ -57,12 +59,12 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
-def main(num_samples=300, case="intercept_only"):
+def main(num_samples=200, case="intercept_only"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
@@ -70,9 +72,9 @@ def main(num_samples=300, case="intercept_only"):
         r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"
     ]
 
-    data_dir = Path("./experiments/data")
-    figures_dir = Path("./experiments/figures")
-    evals_dir = Path("./experiments/evaluations")
+    data_dir = Path("./bayesgpt/experiments/data")
+    figures_dir = Path(f"./bayesgpt/experiments/figures/bf/{case}")
+    evals_dir = Path("./bayesgpt/experiments/evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
     evals_dir.mkdir(parents=True, exist_ok=True)
@@ -133,15 +135,17 @@ def main(num_samples=300, case="intercept_only"):
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
-    posterior = bf.diagnostics.plots.pairs_posterior(
-        estimates=post_draws,
-        targets=val_sims,
-        dataset_id=0,
-        variable_names=param_names
-    )
-    posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior.pdf"
-    posterior.savefig(posterior_path)
-    logging.info(f"Saved posterior pairplot to {posterior_path}")
+    for i in range(10):
+        posterior = bf.diagnostics.plots.pairs_posterior(
+            estimates=post_draws,
+            targets=val_sims,
+            priors=val_sims,
+            dataset_id=i,
+            variable_names=param_names
+        )
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
+        posterior.savefig(posterior_path)
+        logging.info(f"Saved posterior pairplot to {posterior_path}")
 if __name__ == "__main__":
     debug = False
 

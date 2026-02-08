@@ -17,7 +17,6 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_priors2(),
-            regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
                 fixed_intrinsics=[],

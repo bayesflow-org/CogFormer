@@ -92,9 +92,9 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=500,
+        epochs=1000,
         steps_per_epoch=100,
-        batch_size=32
+        batch_size=64
     )
 
 if __name__ == '__main__':

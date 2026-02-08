@@ -22,7 +22,6 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_priors2(),
-            regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
                 fixed_intrinsics=[],
@@ -75,6 +74,21 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         return {"rts": rts, "choices": choices, "params": params}
 
+
+def load_data(data_path: str):
+    data = np.load(data_path, allow_pickle=True)
+    return data
+
+
+def test():
+    data = load_data("./bayesgpt/experiments/data/ddm_families_bf_interaction_data.npz")
+    # val_sim = {
+    #     "rts": data["sim_data"]["rts"],
+    #     "choices": data["sim_data"]["choices"],
+    #     "params": data["sim_data"]["params"]
+    # }
+    print(data["rts"])
+
 def main(batch_size=200, num_samples=200, case="interaction"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
@@ -92,7 +106,7 @@ def main(batch_size=200, num_samples=200, case="interaction"):
     ]
 
     data_dir = Path("./bayesgpt/experiments/data")
-    figures_dir = Path("./bayesgpt/experiments/figures")
+    figures_dir = Path("./bayesgpt/experiments/figures/bf/")
     evals_dir = Path("./bayesgpt/experiments/evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -103,9 +117,9 @@ def main(batch_size=200, num_samples=200, case="interaction"):
     post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
 
     # Save some of them
-    rts = val_sims["rts"][:15]
-    choices = val_sims["choices"][:15]
-    params = post_draws["params"][:15]
+    rts = val_sims["rts"]
+    choices = val_sims["choices"]
+    params = post_draws["params"]
 
     np.savez(
         data_dir / f"ddm_families_bf_{case}_data.npz",
@@ -156,17 +170,22 @@ def main(batch_size=200, num_samples=200, case="interaction"):
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
-    for i in range(5):
+    for i in range(10):
         posterior = bf.diagnostics.plots.pairs_posterior(
             estimates=post_draws,
             targets=val_sims,
+            priors=val_sims,
             dataset_id=i,
             variable_names=param_names
         )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior_{i}.pdf"
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
         posterior.savefig(posterior_path)
         logging.info(f"Saved posterior pairplot {i} to {posterior_path}")
 
 
 if __name__ == '__main__':
-    main()
+    debug = False
+    if debug:
+        test()
+    else:
+        main()

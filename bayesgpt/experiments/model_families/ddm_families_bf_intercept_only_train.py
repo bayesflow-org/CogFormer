@@ -73,7 +73,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./experiments/checkpoints/ddm_families_bf_intercept_only"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_intercept_only"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
