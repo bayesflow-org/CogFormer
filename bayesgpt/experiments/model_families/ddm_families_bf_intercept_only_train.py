@@ -1,5 +1,5 @@
 import os
-os.environ["KERAS_BACKEND"] = "torch"
+os.environ["KERAS_BACKEND"] = "jax"
 
 import bayesflow as bf
 
@@ -62,13 +62,12 @@ def main():
     # define networks
     summary_net = bf.networks.SetTransformer(
         summary_dim=32,
-        seed_dim=128,
-        num_heads=(8, 8),
-        mlp_depths=(8, 8),
-        # embed_dims=(128, 128),
-        num_seeds=32,
-        dropout=0.05,
-        layer_norm=True
+        seed_dim=64,
+        num_heads=(4, 4, 4, 4),
+        mlp_depths=(1, 1, 1, 1),
+        embed_dims=(128, 128, 128, 128),
+        mlp_widths=(128, 128, 128, 128),
+        num_seeds=4,
     )
     inference_net = bf.networks.FlowMatching()
 
