@@ -106,7 +106,7 @@ def main(batch_size=200, num_samples=200, case="interaction"):
     ]
 
     data_dir = Path("./bayesgpt/experiments/data")
-    figures_dir = Path("./bayesgpt/experiments/figures/bf/")
+    figures_dir = Path(f"./bayesgpt/experiments/figures/bf/{case}")
     evals_dir = Path("./bayesgpt/experiments/evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)

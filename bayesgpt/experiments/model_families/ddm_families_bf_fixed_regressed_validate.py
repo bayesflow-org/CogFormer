@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -21,7 +21,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_priors2(),
-            regressed_params=["v", "a", "tau"],
+            regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],
                 fixed_intrinsics=["s_v", "s_tau"],
@@ -56,6 +56,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
         params = params[:, params[0] != 0]
+        print(params.shape)
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -70,8 +71,8 @@ def main(num_samples=200, case="fixed_regressed"):
     # Make directories
     param_names = [
         r"$v$", r"$a$", r"$\tau$", #r"$s_v$", r"$s_\tau$",
-        r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$",
-        r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
+        r"$u_{1, v}$", r"$u_{1, a}$", #r"$u_{1, \tau}$",
+        r"$u_{2, v}$", r"$u_{2, a}$", #r"$u_{2, \tau}$",
     ]
 
     data_dir = Path("./bayesgpt/experiments/data")
@@ -149,7 +150,7 @@ def main(num_samples=200, case="fixed_regressed"):
         )
         posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
         posterior.savefig(posterior_path)
-    logging.info(f"Saved posterior pairplot to {posterior_path}")
+        logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 if __name__ == "__main__":
     debug = False

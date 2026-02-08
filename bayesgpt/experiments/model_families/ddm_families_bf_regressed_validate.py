@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-from simulators.model_family import NestedModelFamily
-from simulators.benchmarks.ddms.ddm import DDM
-from simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.model_family import NestedModelFamily
+from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 
@@ -46,7 +46,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             batch_size=batch_size,
             num_obs=num_obs,
             flatten_param_outputs=flatten_param_outputs,
-            link_fun=ddm_link_fun()
+            link_fun=ddm_link_fun(),
             **sample_kwargs,
             **kwargs
         )
@@ -66,7 +66,7 @@ def main(num_samples=200, case="regressed"):
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
