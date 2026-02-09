@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 def get_benchmark_design_configs():
@@ -103,7 +103,7 @@ def main():
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors(),# ddm_baseline_priors(),
+        prior_fun=ddm_priors2(),# ddm_baseline_priors(),
         mask_randomizer_kwargs={  # default; per-config we’ll override
             "free_intrinsics": intrinsic_params,
             "fixed_intrinsics": [],
@@ -147,7 +147,7 @@ def main():
 
         # save
         save_path = outdir / f"ddm_{cfg_name}_data.npz"
-        np.savez_compressed(save_path, **test_samples)
+        np.savez(save_path, **test_samples)
 
 if __name__ == "__main__":
     main()

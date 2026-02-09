@@ -1,5 +1,5 @@
 import os
-os.environ["KERAS_BACKEND"] = "torch"
+os.environ["KERAS_BACKEND"] = "jax"
 
 import keras
 import logging
@@ -81,7 +81,7 @@ def load_data(data_path: str):
 
 
 def test():
-    data = load_data("./bayesgpt/experiments/data/ddm_families_bf_interaction_data.npz")
+    data = load_data("./bayesgpt/experiments/data/ddm_interaction_data.npz")
     # val_sim = {
     #     "rts": data["sim_data"]["rts"],
     #     "choices": data["sim_data"]["choices"],
@@ -89,7 +89,7 @@ def test():
     # }
     print(data["rts"])
 
-def main(batch_size=200, num_samples=200, case="interaction"):
+def main(batch_size=200, num_samples=200, case="interaction", data_path=None):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
 

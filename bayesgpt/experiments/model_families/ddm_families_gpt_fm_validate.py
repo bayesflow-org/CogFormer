@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors, ddm_priors, ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt import BayesGPT
@@ -115,7 +115,7 @@ def parse_args():
 
 
 @torch.no_grad()
-def main():
+def main(data_path=None):
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -138,7 +138,7 @@ def main():
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors(),# ddm_baseline_priors(),
+        prior_fun=ddm_priors2(),# ddm_baseline_priors(),
         mask_randomizer_kwargs={  # default; per-config we’ll override
             "free_intrinsics": intrinsic_params,
             "fixed_intrinsics": [],
@@ -196,14 +196,17 @@ def main():
             "fixed_config": True,  # make intent explicit
         }
 
-        # Simulate
-        test_samples = model_family.batch_sample(
-            **model_family_config,
-            **val_sample_config,
-            batch_size=args.batch_size,
-            flatten_param_outputs=True,
-            design_config=design_config,
-        )
+        if data_path is not None:
+            test_samples = np.load(data_path, allow_pickle=True)
+        else:
+            # Simulate
+            test_samples = model_family.batch_sample(
+                **model_family_config,
+                **val_sample_config,
+                batch_size=args.batch_size,
+                flatten_param_outputs=True,
+                design_config=design_config,
+            )
 
         # Adapt
         adapted = adapter.adapt(test_samples, intrinsic_params=model_family.intrinsic_params)
@@ -212,15 +215,6 @@ def main():
         for k, v in adapted.items():
             if torch.is_tensor(v):
                 adapted[k] = v.to(device)
-
-        # Forward or sample
-        pred_velocity, target_velocity = bayesgpt(
-            adapted["param_matrices"][..., None],
-            adapted["input_data"],
-            adapted["param_indices"],
-            adapted["regressor_indices"],
-            adapted["param_masks"],
-        )
 
         true_set = adapted["param_matrices"].detach().cpu().numpy()
         n_cols = len(intrinsic_params)

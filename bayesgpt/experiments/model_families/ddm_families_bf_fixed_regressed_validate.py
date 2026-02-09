@@ -1,5 +1,5 @@
 import os
-os.environ["KERAS_BACKEND"] = "torch"
+os.environ["KERAS_BACKEND"] = "jax"
 
 import keras
 import logging
@@ -29,7 +29,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
         )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, **kwargs):
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
 
@@ -65,7 +65,7 @@ def main(num_samples=200, case="fixed_regressed"):
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = f"./experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}_test/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
@@ -132,7 +132,7 @@ def main(num_samples=200, case="fixed_regressed"):
         variable_names=param_names,
         figsize=(15, 6),
         label_fontsize=14,
-        num_row=2,
+        num_row=4,
         num_col=5
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
@@ -140,7 +140,7 @@ def main(num_samples=200, case="fixed_regressed"):
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
-    for i in range(10):
+    for i in range(4):
         posterior = bf.diagnostics.plots.pairs_posterior(
             estimates=post_draws,
             targets=val_sims,
@@ -148,7 +148,7 @@ def main(num_samples=200, case="fixed_regressed"):
             dataset_id=i,
             variable_names=param_names
         )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_test_posterior{i}.pdf"
         posterior.savefig(posterior_path)
         logging.info(f"Saved posterior pairplot to {posterior_path}")
 

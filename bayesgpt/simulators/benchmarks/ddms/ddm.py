@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit, prange
 from scipy.stats import halfnorm
 
-from .ddm_priors import ddm_baseline_priors
+from .ddm_priors import ddm_priors2
 
 from bayesgpt.simulators import Model
 
@@ -92,7 +92,7 @@ class DDM(Model):
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
 
-        params = {k: [] for k in ddm_baseline_priors().keys()}
+        params = {k: [] for k in ddm_priors2().keys()}
         rts = []
         choices = []
         # prior_draws = sample_ddm_baseline_priors()
@@ -100,7 +100,7 @@ class DDM(Model):
         #     prior_draws[k] = np.zeros((batch_size, 1), dtype=np.float32)
 
         for i in range(batch_size):
-            prior_draw = ddm_baseline_priors()
+            prior_draw = ddm_priors2()
             for k, v in prior_draw.items():
                 params[k].append(v)
                 # prior_draws[k][i] = v

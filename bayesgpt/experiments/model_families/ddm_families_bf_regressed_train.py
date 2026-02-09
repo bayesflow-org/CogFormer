@@ -8,7 +8,6 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
-from bayesgpt.utils.simulator_utils import inspect
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -17,6 +16,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         self.model_family = NestedModelFamily(
             model=DDM(),
             prior_fun=ddm_priors2(),
+            regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau", "s_v", "s_tau"],
                 fixed_intrinsics=[],
@@ -27,19 +27,14 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, check=False, **kwargs):
         intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
 
-        design_config = {
-            "1": intrinsic_params,
-            "u_1": ["v", "a"],
-            "u_2": ["v", "a"]
-        }
-
         if isinstance(batch_size, tuple):
              batch_size = batch_size[0]
 
         sample_kwargs = {
-            "design_config": design_config,
+            'min_num_regressors': 2,
             "max_num_regressors": 2,
             "max_num_categories": 2,
+            "fixed_config": True
         }
 
         samples = self.model_family.batch_sample(
@@ -59,12 +54,12 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
-        if check:
-            f = self.model_family.check_regressed_priors(
-                design_config=design_config,
-                num_obs=num_obs,
-                link_fun=ddm_link_fun()
-            )
+        # if check:
+        #     f = self.model_family.check_regressed_priors(
+        #         design_config=design_config,
+        #         num_obs=num_obs,
+        #         link_fun=ddm_link_fun()
+        #     )
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -105,6 +100,17 @@ def main():
         mlp_widths=(128, 128, 128, 128),
         num_seeds=4,
     )
+
+    # summary_net = bf.networks.SetTransformer(
+    #     summary_dim=64,
+    #     seed_dim=128,
+    #     num_heads=(4, 4, 4, 4),
+    #     mlp_depths=(2, 2, 2, 2),
+    #     embed_dims=(128, 128, 128, 128),
+    #     mlp_widths=(512, 512, 512, 512),
+    #     num_seeds=8,
+    # )
+
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath

@@ -1,6 +1,7 @@
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
+import numpy as np
 import bayesflow as bf
 
 from bayesgpt.simulators.model_family import NestedModelFamily
@@ -23,7 +24,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
         )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, **kwargs):
 
         if isinstance(batch_size, tuple):
              batch_size = batch_size[0]
@@ -50,9 +51,22 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
+        # params = params[:, params[0] != 0]
 
         return {"rts": rts, "choices": choices, "params": params}
+
+def test():
+    ddm_family_simulator = DDMModelFamilyBF()
+    ddm_samples = ddm_family_simulator.sample(4)
+
+    for k, v in ddm_samples.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, dict):
+            print(k, v.keys())
+        else:
+            print(k, v)
+    print(ddm_samples["params"])
 
 def main():
     # Define simulator
@@ -79,7 +93,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed_test"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -91,13 +105,16 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=1000,
-        steps_per_epoch=100,
+        epochs=100,
+        steps_per_epoch=10,
         batch_size=64
     )
 
 if __name__ == '__main__':
     debug = False
 
+
     if not debug:
         main()
+    else:
+        test()
