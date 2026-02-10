@@ -106,7 +106,7 @@ def main():
 
     history = workflow.fit_online(
         epochs=100,
-        steps_per_epoch=10,
+        steps_per_epoch=20,
         batch_size=64
     )
 

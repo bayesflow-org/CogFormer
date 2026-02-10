@@ -30,8 +30,9 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         )
 
     def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, **kwargs):
+
         if isinstance(batch_size, tuple):
-            batch_size = batch_size[0]
+             batch_size = batch_size[0]
 
         sample_kwargs = {
             'min_num_regressors': 2,
@@ -55,8 +56,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
-        print(params.shape)
+        # params = params[:, params[0] != 0]
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -70,9 +70,10 @@ def main(num_samples=200, case="fixed_regressed"):
 
     # Make directories
     param_names = [
-        r"$v$", r"$a$", r"$\tau$", #r"$s_v$", r"$s_\tau$",
-        r"$u_{1, v}$", r"$u_{1, a}$", #r"$u_{1, \tau}$",
-        r"$u_{2, v}$", r"$u_{2, a}$", #r"$u_{2, \tau}$",
+        r"$v$", r"$a$", r"$\tau$", "", "", #r"$s_v$", r"$s_\tau$",
+        r"$u_{1, v}$", r"$u_{1, a}$", "", "", "",#r"$u_{1, \tau}$",
+        r"$u_{2, v}$", r"$u_{2, a}$", "", "", "",#r"$u_{2, \tau}$",
+        "", "", "", "", ""
     ]
 
     data_dir = Path("./bayesgpt/experiments/data")
@@ -90,6 +91,7 @@ def main(num_samples=200, case="fixed_regressed"):
     rts = val_sims["rts"][:10]
     choices = val_sims["choices"][:10]
     params = post_draws["params"][:10]
+    print(params.shape)
 
     np.savez(
         data_dir / f"ddm_families_bf_{case}_data.npz",
@@ -130,7 +132,7 @@ def main(num_samples=200, case="fixed_regressed"):
         estimates=post_draws,
         targets=val_sims,
         variable_names=param_names,
-        figsize=(15, 6),
+        figsize=(15, 12),
         label_fontsize=14,
         num_row=4,
         num_col=5

@@ -9,7 +9,6 @@ from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 
-
 class DDMModelFamilyBF(bf.simulators.Simulator):
 
     def __init__(self):
