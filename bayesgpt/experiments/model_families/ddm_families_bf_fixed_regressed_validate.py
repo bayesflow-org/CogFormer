@@ -14,6 +14,8 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+from bayesgpt.utils.plot_utils import bf_colors
+
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
 
@@ -57,6 +59,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
         # params = params[:, params[0] != 0]
+        # print(params.shape)
 
         return {"rts": rts, "choices": choices, "params": params}
 
@@ -85,6 +88,10 @@ def main(num_samples=200, case="fixed_regressed"):
 
     # Generate validation samples
     val_sims = ddm_family_simulator.sample(num_samples)
+
+    for k, v in val_sims.items():
+        print(k, v.shape)
+
     post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
 
     # Save some of them
