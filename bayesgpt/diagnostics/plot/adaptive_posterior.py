@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
 from bayesgpt.simulators.context_manager import ContextManager
@@ -99,15 +98,14 @@ def samples_to_unfolded_df(
 ):
     """
     Convert samples into a DataFrame aligned with the unfolded parameter matrix.
-
-    Expected sample shapes (pick one):
-      - (N, R, C) posterior over matrix elements
-      - (N, R*C)  already-flattened
-
-    If unfold=False, drops masked-out columns.
-    If unfold=True, keeps all columns, but masked-out columns are set to NaN.
+    ...
     """
-    names = unfolded_names(design_config, intrinsic_params, max_num_categories)
+    names = unfolded_names(
+        design_config=design_config,
+        intrinsic_params=intrinsic_params,
+        max_num_categories=max_num_categories,
+        col_labels=col_labels,
+    )
 
     if isinstance(samples, pd.DataFrame):
         # assume user already provided correct columns
@@ -145,36 +143,40 @@ def samples_to_unfolded_df(
     return df.loc[:, active_cols], active_cols, patched_cols
 
 
-def patch_pairgrid_axes(g: sns.PairGrid, patched_cols: list[str], patch_label: str = "N/A"):
+def patch_pairgrid_axes(g: sns.PairGrid, patched_cols: set[str], patch_label: str = "N/A"):
     """
-    Hide axes involving patched variables (either x or y is patched).
-    Works only when unfold=True and we included patched columns.
+    Patch cells corresponding to inactive parameters with a grey background.
+    Works even when PairGrid was created with corner=True.
     """
-    vars_ = list(g.x_vars)
-    patched = set(patched_cols)
+    for i, row_name in enumerate(g.y_vars):
+        for j, col_name in enumerate(g.x_vars):
 
-    for i, yv in enumerate(vars_):
-        for j, xv in enumerate(vars_):
             ax = g.axes[i, j]
-            if (xv in patched) or (yv in patched):
+
+            # <-- NEW: skip non-existent axes (happens when corner=True)
+            if ax is None:
+                continue
+
+            if (row_name in patched_cols) or (col_name in patched_cols):
+                ax.cla()
                 ax.set_facecolor("lightgray")
-                ax.patch.set_alpha(0.15)
                 ax.set_xticks([])
                 ax.set_yticks([])
-                for sp in ax.spines.values():
-                    sp.set_visible(False)
                 ax.text(
                     0.5, 0.5, patch_label,
-                    transform=ax.transAxes,
                     ha="center", va="center",
-                    fontsize=12, weight="bold", alpha=0.6
+                    transform=ax.transAxes,
+                    fontsize=10, color="gray"
                 )
+
 
 def adaptive_posterior(
     samples: np.ndarray | pd.DataFrame,
     design_config: dict,
     intrinsic_params: list[str],
     max_num_categories: int,
+    targets: np.ndarray = None,   # (still unused; consider removing)
+    priors: np.ndarray = None,    # now USED if show_prior=True
     parameter_mask: np.ndarray = None,
     col_labels: list[str] | None = None,
     intercept_color: str = "#4e2a84",
@@ -184,17 +186,20 @@ def adaptive_posterior(
     height: float = 2.5,
     unfold: bool = True,
     add_legend: bool = False,
+    show_upper_scatter: bool = True,
+    show_prior: bool = False,
+    prior_color: str = "0.3",
+    prior_alpha: float = 0.12,
 ):
     """
-    Pairplot of posterior samples with adaptive "patching" consistent with adaptive_recovery:
+    Pairplot of posterior samples with adaptive "patching" consistent with adaptive_recovery.
 
-    - unfold=False: only show elements in design_config scope (mask==1)
-    - unfold=True: show unfolded layout, but hide patched elements (mask==0)
-
-    Colors are inferred from the unfolded column labels:
-      - "1:..."                -> intercept_color
-      - "u_k|c*:..."            -> main_effect_color
-      - "u_k:u_j|c*:..."        -> interaction_color
+    New options
+    -----------
+    show_upper_scatter : bool
+        If False, omits the upper triangle entirely (diag + lower only).
+    show_prior : bool
+        If True and `priors` is provided, draws prior samples behind posterior.
     """
     if parameter_mask is None:
         cm = ContextManager()
@@ -207,7 +212,7 @@ def adaptive_posterior(
     if parameter_mask.ndim == 3:
         parameter_mask = parameter_mask[0]
 
-    df, active_cols, patched_cols = samples_to_unfolded_df(
+    df_post, active_cols, patched_cols = samples_to_unfolded_df(
         samples=samples,
         design_config=design_config,
         intrinsic_params=intrinsic_params,
@@ -217,43 +222,69 @@ def adaptive_posterior(
         col_labels=col_labels,
     )
 
+    df_prior = None
+    if show_prior and priors is not None:
+        df_prior, _, _ = samples_to_unfolded_df(
+            samples=priors,
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=max_num_categories,
+            parameter_mask=parameter_mask,
+            unfold=unfold,
+            col_labels=col_labels,
+        )
+
     colors = {
         "intercept": intercept_color,
         "main": main_effect_color,
         "interaction": interaction_color,
     }
 
-    g = sns.PairGrid(df, corner=False, height=height)
+    # If we don't want upper triangle, let seaborn handle layout cleanly.
+    g = sns.PairGrid(df_post, corner=(not show_upper_scatter), height=height)
 
     def _diag_hist(x, **kwargs):
-        x = x.dropna()
-        if x.size < 2:
-            return
-        # Avoid kde warnings for constant vectors
-        if np.nanstd(x.values) == 0.0:
-            sns.histplot(x=x, bins=num_bins, color=colors[effect_type_from_unfolded_name(getattr(x, "name", ""))])
-            return
-
         name = getattr(x, "name", "")
         c = colors[effect_type_from_unfolded_name(name)]
-        sns.histplot(x=x, kde=True, bins=num_bins, color=c)
+
+        x_post = x.dropna()
+        if x_post.size < 2:
+            return
+
+        # Prior behind posterior (if available)
+        if df_prior is not None and name in df_prior.columns:
+            x_pr = df_prior[name].dropna()
+            if x_pr.size >= 2:
+                sns.histplot(x=x_pr, bins=num_bins, stat="density", color=prior_color, alpha=prior_alpha)
+
+        # Avoid kde warnings for constant vectors
+        if np.nanstd(x_post.values) == 0.0:
+            sns.histplot(x=x_post, bins=num_bins, stat="density", color=c, alpha=0.9)
+            return
+
+        sns.histplot(x=x_post, kde=True, bins=num_bins, stat="density", color=c, alpha=0.9)
 
     def _lower_kde(x, y, **kwargs):
-        # Paired dropna is essential (x and y can have different NaN patterns)
-        tmp = pd.concat([x, y], axis=1)
-        tmp.columns = ["x", "y"]
-        tmp = tmp.dropna()
+        xname = getattr(x, "name", "")
+        yname = getattr(y, "name", "")
 
-        # Not enough points → skip (prevents KDE warnings)
-        if tmp.shape[0] < 10:
+        # Posterior
+        post = pd.concat([x, y], axis=1)
+        post.columns = ["x", "y"]
+        post = post.dropna()
+        if post.shape[0] < 10:
+            return
+        if np.nanstd(post["x"].values) < 1e-12 or np.nanstd(post["y"].values) < 1e-12:
             return
 
-        # Avoid singular KDE (constant / near-constant)
-        if np.nanstd(tmp["x"].values) < 1e-12 or np.nanstd(tmp["y"].values) < 1e-12:
-            return
+        # Prior behind posterior (if available)
+        if df_prior is not None and (xname in df_prior.columns) and (yname in df_prior.columns):
+            pr = pd.DataFrame({"x": df_prior[xname], "y": df_prior[yname]}).dropna()
+            if pr.shape[0] >= 10 and np.nanstd(pr["x"].values) >= 1e-12 and np.nanstd(pr["y"].values) >= 1e-12:
+                sns.kdeplot(x=pr["x"], y=pr["y"], fill=True, color=prior_color, alpha=prior_alpha)
 
-        c = pick_pair_color(getattr(x, "name", ""), getattr(y, "name", ""), colors)
-        sns.kdeplot(x=tmp["x"], y=tmp["y"], fill=True, color=c, alpha=0.35)
+        c = pick_pair_color(xname, yname, colors)
+        sns.kdeplot(x=post["x"], y=post["y"], fill=True, color=c, alpha=0.35)
 
     def _upper_scatter(x, y, **kwargs):
         tmp = pd.DataFrame({"x": x, "y": y}).dropna()
@@ -265,7 +296,9 @@ def adaptive_posterior(
 
     g.map_diag(_diag_hist)
     g.map_lower(_lower_kde)
-    g.map_upper(_upper_scatter)
+
+    if show_upper_scatter:
+        g.map_upper(_upper_scatter)
 
     if unfold and len(patched_cols) > 0:
         patch_pairgrid_axes(g, patched_cols=patched_cols, patch_label="N/A")
@@ -279,50 +312,6 @@ def adaptive_posterior(
         g.legend(handles=handles, loc="upper right", frameon=False)
 
     return g
-
-
-# def adaptive_posterior(
-#     samples: np.ndarray | pd.DataFrame,
-#     design_config: dict = None,
-#     intrinsic_params: list[str] = None,
-#     variable_names: list[str] = None,
-#     max_num_categories: int = None,
-#     parameter_mask: np.ndarray = None,
-#     intercept_color: str = "#4e2a84",
-#     main_effect_color: str = "#6969ff",
-#     interaction_color: str = "#ff6969",
-#     label_fontsize: int = 14,
-#     title_fontsize: int = 14,
-#     legend_fontsize: int = 14,
-#     num_bins: int = 10,
-#     height: int = 2.5,
-#     unfold: bool = True
-# ):
-#
-#     if isinstance(samples, np.ndarray):
-#         samples = pd.DataFrame(samples, columns=variable_names)
-#     g = sns.PairGrid(samples, corner=False, height=height)
-#
-#     # diagonal: 1D hist
-#     g.map_diag(sns.histplot, kde=True, bins=num_bins, color=intercept_color)
-#
-#     # lower triangle: 2D KDE
-#     g.map_lower(sns.kdeplot, fill=True, color=intercept_color, alpha=0.4)
-#
-#     # upper triangle: scatter
-#     g.map_upper(sns.scatterplot, linewidth=0, alpha=0.3, color=intercept_color)
-#     return g
-
-
-def create_labels(
-    design_config: dict,
-):
-    labels = []
-    for k, v in design_config.items():
-        if k == "1":
-            pass
-
-    return labels
 
 
 if __name__ == "__main__":
@@ -354,15 +343,19 @@ if __name__ == "__main__":
     unfold = True
 
     # posterior over the full unfolded matrix
+    prior_samples = np.random.normal(0.0, 5.0, (num_draws, R, C))
     posterior_samples = np.random.normal(0.0, 1.0, (num_draws, R, C))
     print(posterior_samples.shape)
 
     g = adaptive_posterior(
         samples=posterior_samples,  # (N, R, C) or (N, R*C)
+        priors=prior_samples,
         design_config=design_config,
         intrinsic_params=intrinsic_params,
         max_num_categories=2,
         unfold=True,  # or False
+        show_prior=True,
+        show_upper_scatter=False
     )
     g.savefig(f"posterior_pairplot{'_unfolded' if unfold else ''}.pdf")
     print("awesome")
