@@ -54,7 +54,10 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        params = samples["param_matrices"]
+        param_matrices = samples["param_matrices"]
+        mask = samples["param_masks"]
+        active_idx = mask[0].astype(bool)
+        params = param_matrices[:, active_idx]
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
@@ -68,16 +71,16 @@ def main(num_samples=200, case="fixed_regressed"):
     ddm_family_simulator = DDMModelFamilyBF()
 
     # define checkpoint filepath
-    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}_test/model.keras"
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}_t/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
 
     # Make directories
     param_names = [
-        r"$v$", r"$a$", r"$\tau$", "", "", #r"$s_v$", r"$s_\tau$",
-        r"$u_{1, v}$", r"$u_{1, a}$", "", "", "",#r"$u_{1, \tau}$",
-        r"$u_{2, v}$", r"$u_{2, a}$", "", "", "",#r"$u_{2, \tau}$",
-        "", "", "", "", ""
+        r"$v$", r"$a$", r"$\tau$",
+        r"$u_{1, v}$", r"$u_{1, a}$",
+        r"$u_{2, v}$", r"$u_{2, a}$"
     ]
+    print(len(param_names))
 
     data_dir = Path("./bayesgpt/experiments/data")
     figures_dir = Path(f"./bayesgpt/experiments/figures/bf/{case}")
@@ -88,17 +91,33 @@ def main(num_samples=200, case="fixed_regressed"):
 
     # Generate validation samples
     val_sims = ddm_family_simulator.sample(num_samples)
+    conditions = {"rts": val_sims["rts"], "choices": val_sims["choices"]}
+    targets = val_sims["params"]
 
     for k, v in val_sims.items():
         print(k, v.shape)
 
-    post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
+    post_draws = approximator.sample(conditions=conditions, num_samples=num_samples)
+    estimates = post_draws["params"]
+
+    for k, v in post_draws.items():
+        print(k, v.shape)
+
+    for i in range(10):
+        posterior = bf.diagnostics.plots.pairs_posterior(
+            estimates=estimates,
+            targets=targets,
+            dataset_id=i,
+            variable_names=param_names,
+        )
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_test_posterior{i}.pdf"
+        posterior.savefig(posterior_path)
+        logging.info(f"Saved posterior pairplot to {posterior_path}")
 
     # Save some of them
     rts = val_sims["rts"][:10]
     choices = val_sims["choices"][:10]
     params = post_draws["params"][:10]
-    print(params.shape)
 
     np.savez(
         data_dir / f"ddm_families_bf_{case}_data.npz",
@@ -135,6 +154,8 @@ def main(num_samples=200, case="fixed_regressed"):
     metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
+    colors = bf_colors()
+
     recovery = bf.diagnostics.recovery(
         estimates=post_draws,
         targets=val_sims,
@@ -142,24 +163,13 @@ def main(num_samples=200, case="fixed_regressed"):
         figsize=(15, 12),
         label_fontsize=14,
         num_row=4,
-        num_col=5
+        num_col=5,
+        color=colors["intercept"],
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
     recovery.savefig(recovery_path)
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
-
-    for i in range(4):
-        posterior = bf.diagnostics.plots.pairs_posterior(
-            estimates=post_draws,
-            targets=val_sims,
-            priors=val_sims,
-            dataset_id=i,
-            variable_names=param_names
-        )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_test_posterior{i}.pdf"
-        posterior.savefig(posterior_path)
-        logging.info(f"Saved posterior pairplot to {posterior_path}")
 
 if __name__ == "__main__":
     debug = False

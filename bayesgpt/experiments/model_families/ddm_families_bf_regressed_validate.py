@@ -54,11 +54,10 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        params = samples["param_matrices"]
-
-        # Special treatment for BF:
-        # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
+        param_matrices = samples["param_matrices"]
+        mask = samples["param_masks"]
+        active_idx = mask[0].astype(bool)
+        params = param_matrices[:, active_idx]
 
         return {"rts": rts, "choices": choices, "params": params}
 

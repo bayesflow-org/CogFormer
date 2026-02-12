@@ -47,7 +47,10 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        params = samples["param_matrices"]
+        param_matrices = samples["param_matrices"]
+        mask = samples["param_masks"]
+        active_idx = mask[0].astype(bool)
+        params = param_matrices[:, active_idx]
 
         # Special treatment for BF:
         # Trim away zeros from non-regressed params
@@ -93,7 +96,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed_test"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed_t"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -105,14 +108,13 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=100,
-        steps_per_epoch=20,
+        epochs=200,
+        steps_per_epoch=100,
         batch_size=64
     )
 
 if __name__ == '__main__':
     debug = False
-
 
     if not debug:
         main()
