@@ -97,6 +97,7 @@ class ContextManager:
         self,
         design_config: dict[str, list[str]],
         intrinsic_params: list[str],
+        fixed_params: list[str] = None,
         max_num_categories: int = 3,
         keep_intercept: bool = False
     ) -> np.ndarray:
@@ -121,7 +122,7 @@ class ContextManager:
         row_idx = 0
         if has_intercept:
             for name in design_config.get("1", []):
-                if name in intrinsic_params:
+                if name in intrinsic_params and name not in fixed_params:
                     j = intrinsic_params.index(name)
                     mask[row_idx, j] = 1.0
             row_idx = 1
@@ -343,14 +344,6 @@ class ContextManager:
                 if col.shape[0] != num_obs:
                     raise ValueError(f"context['{key}'] length {col.shape[0]} != num_obs {num_obs}")
 
-                # eps = 1e-8
-                # mean = float(col.mean())
-                # std = float(col.std())
-                # if std < eps:
-                #     col = col - mean
-                # else:
-                #     col = (col - mean) / (std + eps)
-
                 design_matrix[:, start] = col
                 continue
 
@@ -369,14 +362,6 @@ class ContextManager:
                 x = np.random.standard_normal(size=num_obs).astype(np.float32, copy=False)
                 # x = np.random.uniform(size=num_obs).astype(np.float32, copy=False)
 
-                # safe standardize
-                # eps = 1e-8
-                # mu = float(x.mean())
-                # sd = float(x.std())
-                # if sd < eps:
-                #     x = x - mu  # becomes all zeros
-                # else:
-                #     x = (x - mu) / (sd + eps)
                 design_matrix[:, start] = x
 
         # Interaction effect

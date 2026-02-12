@@ -80,6 +80,11 @@ class NestedModelFamily:
     ):
         # Create design config and parameter mask, either dynamically or based on user input
         if design_config is None:
+            if mask_randomizer_kwargs is None:
+                kwargs = self.mask_randomizer_kwargs
+            else:
+                kwargs = mask_randomizer_kwargs
+            kwargs = kwargs or {}
             if fixed_config and self.regressed_params is not None:
                 design_config = self.context_manager.build_design_config(
                     intrinsic_params=self.intrinsic_params,
@@ -91,6 +96,7 @@ class NestedModelFamily:
                 parameter_mask = self.context_manager.build_parameter_mask(
                     design_config=design_config,
                     intrinsic_params=self.intrinsic_params,
+                    fixed_params=kwargs.get("fixed_intrinsics"),
                     max_num_categories=max_num_categories,
                     keep_intercept=keep_intercept,
                     # max_num_regressors=max_num_regressors,
@@ -113,9 +119,15 @@ class NestedModelFamily:
                     add_interaction=add_interaction,
                 )
         else:
+            if mask_randomizer_kwargs is None:
+                kwargs = self.mask_randomizer_kwargs
+            else:
+                kwargs = mask_randomizer_kwargs
+            kwargs = kwargs or {}
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
+                fixed_params=kwargs.get("fixed_intrinsics"),
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
                 # max_num_regressors=max_num_regressors,
