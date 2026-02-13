@@ -93,7 +93,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 2 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     }
 
     val_sample_config = {
-        "mask_randomizer_kwargs": val_params_kwargs,
+        # "mask_randomizer_kwargs": val_params_kwargs,
         "min_num_regressors": 2,
         "num_obs": args.num_obs,
         "fixed_config": False
@@ -352,9 +352,9 @@ if __name__ == "__main__":
         "batch_size": args.val_batch_size,
         "model_family_config": model_family_config,
         "val_sample_config": val_sample_config,
-        "free_params": val_params_kwargs["free_intrinsics"],
-        "fixed_params": val_params_kwargs["fixed_intrinsics"],
-        "fixed_values": val_params_kwargs["fixed_values"],
+        # "free_params": val_params_kwargs["free_intrinsics"],
+        # "fixed_params": val_params_kwargs["fixed_intrinsics"],
+        # "fixed_values": val_params_kwargs["fixed_values"],
     }
 
     wandb_config = {
