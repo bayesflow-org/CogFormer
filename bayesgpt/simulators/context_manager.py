@@ -122,9 +122,15 @@ class ContextManager:
         row_idx = 0
         if has_intercept:
             for name in design_config.get("1", []):
-                if name in intrinsic_params and name not in fixed_params:
-                    j = intrinsic_params.index(name)
-                    mask[row_idx, j] = 1.0
+                if name in intrinsic_params:
+                    if fixed_params is None:
+                        j = intrinsic_params.index(name)
+                        mask[row_idx, j] = 1.0
+                    else:
+                        if name not in fixed_params:
+                            j = intrinsic_params.index(name)
+                            mask[row_idx, j] = 1.0
+
             row_idx = 1
 
         # Then to each regressor
