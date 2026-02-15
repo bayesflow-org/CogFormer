@@ -114,7 +114,7 @@ def main():
     inference_net = bf.networks.FlowMatching()
 
     # define checkpoint filepath
-    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed_t"
+    checkpoint_path = "./bayesgpt/experiments/checkpoints/ddm_families_bf_fixed_regressed"
 
     # Set up workflow
     workflow = bf.BasicWorkflow(
@@ -126,7 +126,7 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=300,
+        epochs=1000,
         steps_per_epoch=100,
         batch_size=64
     )
