@@ -52,14 +52,19 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             **kwargs
         )
 
+        design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
         param_matrices = samples["param_matrices"]
-        mask = samples["param_masks"]
-        active_idx = mask[0].astype(bool)
-        params = param_matrices[:, active_idx]
+        param_masks = samples["param_masks"]
 
-        return {"rts": rts, "choices": choices, "params": params}
+        return {
+            "design_matrices": design_matrices,
+            "rts": rts,
+            "choices": choices,
+            "params": param_matrices,
+            "masks": param_masks
+        }
 
 
 def test():
@@ -83,8 +88,9 @@ def main():
     # Define adapter
     adapter = (
         bf.Adapter()
+        .drop(["masks"])
         .convert_dtype("float64", "float32")
-        .concatenate(["rts", "choices"], into="summary_variables")
+        .concatenate(["design_matrices", "rts", "choices"], into="summary_variables")
         .rename("params", "inference_variables")
     )
 

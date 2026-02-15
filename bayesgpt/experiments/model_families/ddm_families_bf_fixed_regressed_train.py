@@ -45,18 +45,19 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             **kwargs
         )
 
+        design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
         param_matrices = samples["param_matrices"]
-        mask = samples["param_masks"]
-        active_idx = mask[0].astype(bool)
-        params = param_matrices[:, active_idx]
+        param_masks = samples["param_masks"]
 
-        # Special treatment for BF:
-        # Trim away zeros from non-regressed params
-        # params = params[:, params[0] != 0]
-
-        return {"rts": rts, "choices": choices, "params": params}
+        return {
+            "design_matrices": design_matrices,
+            "rts": rts,
+            "choices": choices,
+            "params": param_matrices,
+            "masks": param_masks
+        }
 
 def test():
     ddm_family_simulator = DDMModelFamilyBF()
@@ -69,7 +70,23 @@ def test():
             print(k, v.keys())
         else:
             print(k, v)
-    print(ddm_samples["params"])
+
+    adapter = (
+        bf.Adapter()
+        .drop(["masks"])
+        .convert_dtype("float64", "float32")
+        .concatenate(["design_matrices", "rts", "choices"], into="summary_variables")
+        .rename("params", "inference_variables")
+    )
+
+    adapted_sims = adapter(ddm_family_simulator.sample(4))
+    for k, v in adapted_sims.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, dict):
+            print(k, v.keys())
+        else:
+            print(k, v)
 
 def main():
     # Define simulator
@@ -78,8 +95,9 @@ def main():
     # Define adapter
     adapter = (
         bf.Adapter()
+        .drop(["masks"])
         .convert_dtype("float64", "float32")
-        .concatenate(["rts", "choices"], into="summary_variables")
+        .concatenate(["design_matrices", "rts", "choices"], into="summary_variables")
         .rename("params", "inference_variables")
     )
 
@@ -108,7 +126,7 @@ def main():
     )
 
     history = workflow.fit_online(
-        epochs=200,
+        epochs=300,
         steps_per_epoch=100,
         batch_size=64
     )

@@ -51,15 +51,19 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             **kwargs
         )
 
+        design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        params = samples["param_matrices"]
+        param_matrices = samples["param_matrices"]
+        param_masks = samples["param_masks"]
 
-        # Special treatment for BF:
-        # Trim away zeros from non-regressed params
-        params = params[:, params[0] != 0]
-
-        return {"rts": rts, "choices": choices, "params": params}
+        return {
+            "design_matrices": design_matrices,
+            "rts": rts,
+            "choices": choices,
+            "params": param_matrices,
+            "masks": param_masks
+        }
 
 def main(num_samples=200, case="intercept_only"):
     # Define simulator

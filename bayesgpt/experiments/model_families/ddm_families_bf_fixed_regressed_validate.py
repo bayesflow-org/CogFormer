@@ -14,6 +14,8 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.utils.plot_utils import bf_colors
 
 
@@ -52,19 +54,41 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             **kwargs
         )
 
+        design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
         param_matrices = samples["param_matrices"]
-        mask = samples["param_masks"]
-        active_idx = mask[0].astype(bool)
-        params = param_matrices[:, active_idx]
+        param_masks = samples["param_masks"]
 
-        # Special treatment for BF:
-        # Trim away zeros from non-regressed params
-        # params = params[:, params[0] != 0]
-        # print(params.shape)
+        return {
+            "design_matrices": design_matrices,
+            "rts": rts,
+            "choices": choices,
+            "params": param_matrices,
+            "masks": param_masks
+        }
 
-        return {"rts": rts, "choices": choices, "params": params}
+def test(case="fixed_regressed"):
+    ddm_family_simulator = DDMModelFamilyBF()
+
+    # define checkpoint filepath
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}_t/model.keras"
+    approximator = keras.saving.load_model(checkpoint_path)
+    print("Loaded model")
+
+    val_sims = ddm_family_simulator.sample(100)
+    conditions = {"rts": val_sims["rts"], "choices": val_sims["choices"]}
+    targets = val_sims["params"]
+    post_draws = approximator.sample(conditions=conditions, num_samples=100)
+    estimates = post_draws["params"]
+    print(targets.shape, estimates.shape)
+
+    masks = val_sims['masks']
+    active_idx = masks[0].astype(bool)
+    true_params = targets[:, active_idx]
+    pred_params = estimates[:, :, active_idx]
+    print(true_params.shape, pred_params.shape)
+
 
 def main(num_samples=200, case="fixed_regressed"):
     # Define simulator
@@ -91,22 +115,25 @@ def main(num_samples=200, case="fixed_regressed"):
 
     # Generate validation samples
     val_sims = ddm_family_simulator.sample(num_samples)
-    conditions = {"rts": val_sims["rts"], "choices": val_sims["choices"]}
+    conditions = {
+        "rts": val_sims["rts"],
+        "choices": val_sims["choices"],
+        "design_matrices": val_sims["design_matrices"]
+    }
     targets = val_sims["params"]
-
-    for k, v in val_sims.items():
-        print(k, v.shape)
-
     post_draws = approximator.sample(conditions=conditions, num_samples=num_samples)
     estimates = post_draws["params"]
 
-    for k, v in post_draws.items():
-        print(k, v.shape)
+    masks = val_sims['masks']
+    active_idx = masks[0].astype(bool)
+    true_params = targets[:, active_idx]
+    pred_params = estimates[:, :, active_idx]
 
     for i in range(10):
         posterior = bf.diagnostics.plots.pairs_posterior(
-            estimates=estimates,
-            targets=targets,
+            estimates=pred_params,
+            targets=true_params,
+            priors=true_params,
             dataset_id=i,
             variable_names=param_names,
         )
@@ -127,19 +154,19 @@ def main(num_samples=200, case="fixed_regressed"):
 
     # Compute and save metric evaluations
     rmse = bf.diagnostics.metrics.root_mean_squared_error(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     log_gamma = bf.diagnostics.metrics.calibration_log_gamma(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     calibration_errors = bf.diagnostics.metrics.calibration_error(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     contraction = bf.diagnostics.metrics.posterior_contraction(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     metrics = pd.DataFrame(
@@ -156,9 +183,18 @@ def main(num_samples=200, case="fixed_regressed"):
 
     colors = bf_colors()
 
+    # recovery = adaptive_recovery(
+    #     true=val_sims["params"],
+    #     pred=post_draws["params"],
+    #     design_config=design_config,
+    #     intercept_color=colors["intercept"],
+    #     main_effect_color=colors["main_effect"],
+    #     interaction_color=colors["interaction"]
+    # )
+
     recovery = bf.diagnostics.recovery(
-        estimates=post_draws,
-        targets=val_sims,
+        estimates=pred_params,
+        targets=true_params,
         variable_names=param_names,
         figsize=(15, 12),
         label_fontsize=14,
@@ -176,3 +212,5 @@ if __name__ == "__main__":
 
     if not debug:
         main()
+    else:
+        test()
