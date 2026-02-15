@@ -89,7 +89,7 @@ def parse_args():
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/benchmark_recovery", help="Output directory")
 
     # Validation settings
-    p.add_argument("--batch_size", type=int, default=300)
+    p.add_argument("--batch_size", type=int, default=200)
     p.add_argument("--num_obs", type=int, default=500)
     p.add_argument("--max_num_regressors", type=int, default=2)
     p.add_argument("--max_num_categories", type=int, default=2)
@@ -97,17 +97,17 @@ def parse_args():
     p.add_argument("--add_interaction", action="store_true", default=True)
 
     # Inference mode
-    p.add_argument("--num_sample_steps", type=int, default=500)
-    p.add_argument("--num_samples", type=int, default=500)
+    p.add_argument("--num_sample_steps", type=int, default=200)
+    p.add_argument("--num_samples", type=int, default=200)
 
     # MUST match training architecture
-    p.add_argument("--encoder_num_layers", type=int, default=8)
-    p.add_argument("--decoder_num_layers", type=int, default=8)
-    p.add_argument("--encoder_num_heads", type=int, default=8)
-    p.add_argument("--decoder_num_heads", type=int, default=8)
-    p.add_argument("--num_seeds", type=int, default=40)
-    p.add_argument("--seed_dim", type=int, default=64)
-    p.add_argument("--proj_dim", type=int, default=256)
+    p.add_argument("--encoder_num_layers", type=int, default=4)
+    p.add_argument("--decoder_num_layers", type=int, default=4)
+    p.add_argument("--encoder_num_heads", type=int, default=4)
+    p.add_argument("--decoder_num_heads", type=int, default=4)
+    p.add_argument("--num_seeds", type=int, default=8)
+    p.add_argument("--seed_dim", type=int, default=32)
+    p.add_argument("--proj_dim", type=int, default=64)
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--layer_dropout", type=float, default=0.05)
 
@@ -206,6 +206,7 @@ def main(data_path=None):
                 batch_size=args.batch_size,
                 flatten_param_outputs=True,
                 design_config=design_config,
+                link_fun=ddm_link_fun()
             )
 
         # Adapt
@@ -230,6 +231,7 @@ def main(data_path=None):
             num_samples=args.num_samples,
         )
         pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, n_cols)
+        print(true_set.shape, pred_set.shape)
 
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         params_mask = params_mask.reshape((args.batch_size, n_rows, n_cols))[0]
@@ -263,6 +265,7 @@ def main(data_path=None):
             )
             figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_samples_{i}_{args.num_sample_steps}steps.pdf"
             postfig.savefig(figpath, bbox_inches="tight")
+            plt.close(postfig)
 
     logging.info("Done.")
 
