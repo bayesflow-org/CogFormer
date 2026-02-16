@@ -44,8 +44,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        param_matrices = samples["param_matrices"]
-        param_masks = samples["param_masks"]
+        param_matrices = samples["param_matrices"].squeeze(axis=1)
+        param_masks = samples["param_masks"].squeeze(axis=1)
 
         return {
             "design_matrices": design_matrices,

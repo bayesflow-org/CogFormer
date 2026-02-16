@@ -1,6 +1,7 @@
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
+import numpy as np
 import bayesflow as bf
 
 from bayesgpt.simulators.model_family import NestedModelFamily
@@ -46,8 +47,8 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
-        param_matrices = samples["param_matrices"]
-        param_masks = samples["param_masks"]
+        param_matrices = samples["param_matrices"].squeeze(axis=1)
+        param_masks = samples["param_masks"].squeeze(axis=1)
 
         return {
             "design_matrices": design_matrices,
@@ -56,6 +57,35 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             "params": param_matrices,
             "masks": param_masks
         }
+
+def test():
+    ddm_family_simulator = DDMModelFamilyBF()
+    ddm_samples = ddm_family_simulator.sample(4)
+
+    for k, v in ddm_samples.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, dict):
+            print(k, v.keys())
+        else:
+            print(k, v)
+
+    adapter = (
+        bf.Adapter()
+        .drop(["masks"])
+        .convert_dtype("float64", "float32")
+        .concatenate(["design_matrices", "rts", "choices"], into="summary_variables")
+        .rename("params", "inference_variables")
+    )
+
+    adapted_sims = adapter(ddm_family_simulator.sample(4))
+    for k, v in adapted_sims.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, dict):
+            print(k, v.keys())
+        else:
+            print(k, v)
 
 def main():
     # Define simulator
@@ -105,3 +135,5 @@ if __name__ == '__main__':
 
     if not debug:
         main()
+    else:
+        test()
