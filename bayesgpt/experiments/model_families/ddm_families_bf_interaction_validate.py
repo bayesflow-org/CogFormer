@@ -14,6 +14,8 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
+from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.utils.plot_utils import bf_colors
 
 
@@ -30,7 +32,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
     )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, check=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, **kwargs):
         intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
 
         design_config = {
@@ -73,19 +75,30 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
         }
 
 
-def load_data(data_path: str):
-    data = np.load(data_path, allow_pickle=True)
-    return data
+def test(case="interaction"):
+    ddm_family_simulator = DDMModelFamilyBF()
 
+    # define checkpoint filepath
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    approximator = keras.saving.load_model(checkpoint_path)
+    print("Loaded model")
 
-def test():
-    data = load_data("./bayesgpt/experiments/data/ddm_interaction_data.npz")
-    # val_sim = {
-    #     "rts": data["sim_data"]["rts"],
-    #     "choices": data["sim_data"]["choices"],
-    #     "params": data["sim_data"]["params"]
-    # }
-    print(data["rts"])
+    val_sims = ddm_family_simulator.sample(100)
+    conditions = {
+        "rts": val_sims["rts"],
+        "choices": val_sims["choices"],
+        "design_matrices": val_sims["design_matrices"],
+    }
+    targets = val_sims["params"]
+    post_draws = approximator.sample(conditions=conditions, num_samples=100)
+    estimates = post_draws["params"]
+    print(targets.shape, estimates.shape)
+
+    masks = val_sims['masks']
+    active_idx = masks[0].astype(bool)
+    true_params = targets[:, active_idx]
+    pred_params = estimates[:, :, active_idx]
+    print(true_params.shape, pred_params.shape)
 
 def main(num_samples=200, case="interaction", data_path=None):
     # Define simulator
@@ -126,26 +139,31 @@ def main(num_samples=200, case="interaction", data_path=None):
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]
 
+    colors = bf_colors()
+
     for i in range(10):
         posterior = bf.diagnostics.plots.pairs_posterior(
             estimates=pred_params,
             targets=true_params,
-            priors=true_params,
             dataset_id=i,
             variable_names=param_names,
+            post_color=colors["intercept"],
+            place_legend_below=True
         )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_test_posterior{i}.pdf"
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
         posterior.savefig(posterior_path)
         logging.info(f"Saved posterior pairplot to {posterior_path}")
 
     # Save some of them
     rts = val_sims["rts"][:10]
     choices = val_sims["choices"][:10]
+    design_matrices = val_sims["design_matrices"][:10]
+    param_masks = val_sims["masks"][:10]
     params = post_draws["params"][:10]
 
     np.savez(
         data_dir / f"ddm_families_bf_{case}_data.npz",
-        rts=rts, choices=choices, params=params
+        rts=rts, choices=choices, params=params, design_matrices=design_matrices, param_masks=param_masks
     )
     logging.info(f"Saved data to {data_dir}")
 
@@ -177,8 +195,6 @@ def main(num_samples=200, case="interaction", data_path=None):
 
     metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
-
-    colors = bf_colors()
 
     recovery = bf.diagnostics.recovery(
         estimates=pred_params,

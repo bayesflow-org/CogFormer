@@ -14,7 +14,8 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
-from bayesgpt.diagnostics.plot import adaptive_recovery, adaptive_posterior
+from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.utils.plot_utils import bf_colors
 
 
@@ -31,7 +32,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             )
         )
 
-    def sample(self, batch_size, num_obs=500, flatten_param_outputs=False, **kwargs):
+    def sample(self, batch_size, num_obs=500, flatten_param_outputs=True, **kwargs):
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
 
@@ -65,6 +66,31 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
             "masks": param_masks
         }
 
+def test(case="intercept_only"):
+    ddm_family_simulator = DDMModelFamilyBF()
+
+    # define checkpoint filepath
+    checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}/model.keras"
+    approximator = keras.saving.load_model(checkpoint_path)
+    print("Loaded model")
+
+    val_sims = ddm_family_simulator.sample(100)
+    conditions = {
+        "rts": val_sims["rts"],
+        "choices": val_sims["choices"],
+        "design_matrices": val_sims["design_matrices"],
+    }
+    targets = val_sims["params"]
+    post_draws = approximator.sample(conditions=conditions, num_samples=100)
+    estimates = post_draws["params"]
+    print(targets.shape, estimates.shape)
+
+    masks = val_sims['masks']
+    active_idx = masks[0].astype(bool)
+    true_params = targets[:, active_idx]
+    pred_params = estimates[:, :, active_idx]
+    print(true_params.shape, pred_params.shape)
+
 def main(num_samples=200, case="intercept_only"):
     # Define simulator
     ddm_family_simulator = DDMModelFamilyBF()
@@ -87,34 +113,63 @@ def main(num_samples=200, case="intercept_only"):
 
     # Generate validation samples
     val_sims = ddm_family_simulator.sample(num_samples)
-    post_draws = approximator.sample(conditions=val_sims, num_samples=num_samples)
+    conditions = {
+        "rts": val_sims["rts"],
+        "choices": val_sims["choices"],
+        "design_matrices": val_sims["design_matrices"]
+    }
+    targets = val_sims["params"]
+    post_draws = approximator.sample(conditions=conditions, num_samples=num_samples)
+    estimates = post_draws["params"]
+
+    masks = val_sims['masks']
+    active_idx = masks[0].astype(bool)
+    true_params = targets[:, active_idx]
+    pred_params = estimates[:, :, active_idx]
+
+    colors = bf_colors()
+
+    for i in range(10):
+        posterior = bf.diagnostics.plots.pairs_posterior(
+            estimates=pred_params,
+            targets=true_params,
+            dataset_id=i,
+            variable_names=param_names,
+            post_color=colors["intercept"],
+            place_legend_below=True
+        )
+        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
+        posterior.savefig(posterior_path)
+        logging.info(f"Saved posterior pairplot to {posterior_path}")
 
     # Save some of them
     rts = val_sims["rts"][:10]
     choices = val_sims["choices"][:10]
+    design_matrices = val_sims["design_matrices"][:10]
+    param_masks = val_sims["masks"][:10]
     params = post_draws["params"][:10]
 
     np.savez(
         data_dir / f"ddm_families_bf_{case}_data.npz",
-        rts=rts, choices=choices, params=params
+        rts=rts, choices=choices, params=params, design_matrices=design_matrices, param_masks=param_masks
     )
     logging.info(f"Saved data to {data_dir}")
 
     # Compute and save metric evaluations
     rmse = bf.diagnostics.metrics.root_mean_squared_error(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     log_gamma = bf.diagnostics.metrics.calibration_log_gamma(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     calibration_errors = bf.diagnostics.metrics.calibration_error(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     contraction = bf.diagnostics.metrics.posterior_contraction(
-        estimates=post_draws, targets=val_sims, variable_names=param_names
+        estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
     metrics = pd.DataFrame(
@@ -130,28 +185,20 @@ def main(num_samples=200, case="intercept_only"):
     logging.info("Metric evaluation is now finished.")
 
     recovery = bf.diagnostics.recovery(
-        estimates=post_draws,
-        targets=val_sims,
+        estimates=pred_params,
+        targets=true_params,
         variable_names=param_names,
-        figsize=(3 * len(param_names), 3),
+        figsize=(15, 12),
         label_fontsize=14,
+        num_row=4,
+        num_col=5,
+        color=colors["intercept"],
     )
     recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
     recovery.savefig(recovery_path)
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
-    for i in range(10):
-        posterior = bf.diagnostics.plots.pairs_posterior(
-            estimates=post_draws,
-            targets=val_sims,
-            priors=val_sims,
-            dataset_id=i,
-            variable_names=param_names
-        )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
-        posterior.savefig(posterior_path)
-        logging.info(f"Saved posterior pairplot to {posterior_path}")
 if __name__ == "__main__":
     debug = False
 
