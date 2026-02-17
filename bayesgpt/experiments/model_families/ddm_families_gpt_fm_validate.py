@@ -101,13 +101,13 @@ def parse_args():
     p.add_argument("--num_samples", type=int, default=200)
 
     # MUST match training architecture
-    p.add_argument("--encoder_num_layers", type=int, default=4)
-    p.add_argument("--decoder_num_layers", type=int, default=4)
-    p.add_argument("--encoder_num_heads", type=int, default=4)
-    p.add_argument("--decoder_num_heads", type=int, default=4)
-    p.add_argument("--num_seeds", type=int, default=8)
-    p.add_argument("--seed_dim", type=int, default=32)
-    p.add_argument("--proj_dim", type=int, default=64)
+    p.add_argument("--encoder_num_layers", type=int, default=2)
+    p.add_argument("--decoder_num_layers", type=int, default=2)
+    p.add_argument("--encoder_num_heads", type=int, default=2)
+    p.add_argument("--decoder_num_heads", type=int, default=2)
+    p.add_argument("--num_seeds", type=int, default=4)
+    p.add_argument("--seed_dim", type=int, default=16)
+    p.add_argument("--proj_dim", type=int, default=32)
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--layer_dropout", type=float, default=0.05)
 
@@ -249,13 +249,13 @@ def main(data_path=None):
             interaction_color=colors["interaction"],
         )
 
-        figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_recovery_{args.num_sample_steps}steps.pdf"
+        figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_recovery_S.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
         logging.info(f"[saved] {figpath}")
 
-        for i in range(5):
+        for i in range(10):
             postfig = adaptive_posterior(
                 samples=pred_set[i],
                 design_config=design_config,
@@ -263,9 +263,9 @@ def main(data_path=None):
                 max_num_categories=args.max_num_categories,
                 unfold=False,
             )
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_samples_{i}_{args.num_sample_steps}steps.pdf"
+            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_samples_{i}_S.pdf"
             postfig.savefig(figpath, bbox_inches="tight")
-            plt.close(postfig)
+            plt.close(postfig.fig)
 
     logging.info("Done.")
 
