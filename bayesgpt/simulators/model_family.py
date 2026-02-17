@@ -85,14 +85,23 @@ class NestedModelFamily:
             else:
                 kwargs = mask_randomizer_kwargs
             kwargs = kwargs or {}
-            if fixed_config and self.regressed_params is not None:
-                design_config = self.context_manager.build_design_config(
-                    intrinsic_params=self.intrinsic_params,
-                    regressed_params=self.regressed_params,
-                    num_regressors=num_regressors,
-                    keep_intercept=keep_intercept,
-                    add_interaction=add_interaction,
-                )
+            if fixed_config:
+                if self.regressed_params is not None:
+                    design_config = self.context_manager.build_design_config(
+                        intrinsic_params=self.intrinsic_params,
+                        regressed_params=self.regressed_params,
+                        num_regressors=num_regressors,
+                        keep_intercept=keep_intercept,
+                        add_interaction=add_interaction,
+                    )
+                else:
+                    design_config = self.context_manager.build_design_config(
+                        intrinsic_params=self.intrinsic_params,
+                        num_regressors=num_regressors,
+                        keep_intercept=keep_intercept,
+                        add_interaction=add_interaction,
+                    )
+
                 parameter_mask = self.context_manager.build_parameter_mask(
                     design_config=design_config,
                     intrinsic_params=self.intrinsic_params,
