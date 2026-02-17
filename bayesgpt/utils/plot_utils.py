@@ -77,9 +77,9 @@ def hex_code():
 def bf_colors():
     colors = {
         # BF
-        "intercept": "#1B9E77",
-        "main_effect": "#1AC995",
-        "interaction": "#10E0A2",
+        "intercept": "#284734",
+        "main_effect": "#275D38",
+        "interaction": "#9CAF88",
     }
     return colors
 
