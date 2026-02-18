@@ -17,6 +17,53 @@ from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
+def check_data_path(data_path: str | None, case: str) -> Path | None:
+    if data_path is None:
+        return None
+
+    p = Path(data_path)
+
+    # If a directory, use default naming convention
+    if p.is_dir():
+        return p / f"ddm_families_bf_{case}_data.npz"
+
+    # If a template string
+    if "{case}" in str(p):
+        return Path(str(p).format(case=case))
+
+    # If a single file, treat it as that case's data (no looping)
+    if p.is_file() and p.suffix == ".npz":
+        return p
+
+    raise ValueError(f"Unrecognized data_path: {data_path}")
+
+
+def load_validation_data(data_path: Path):
+    dataset = np.load(data_path, allow_pickle=True)
+
+    # Required pieces
+    rts = dataset["rts"]
+    choices = dataset["choices"]
+    design_matrices = dataset["design_matrices"]
+    param_masks = dataset["param_masks"]
+
+    # True params (targets) must be present for recovery
+    if "true_set" not in dataset.files:
+        raise ValueError(
+            "BF npz is missing 'true_params'. Re-save from bf pipeline with true_set included."
+        )
+    true_params = dataset["true_set"]
+
+    # Construct a dict shaped like NestedModelFamily.batch_sample output
+    test_samples = {
+        "design_matrices": design_matrices,
+        "sim_data": {"rts": rts, "choices": choices},
+        "param_matrices": true_params,
+        "param_masks": param_masks,
+        # "meta": meta,
+    }
+    return test_samples
+
 def get_benchmark_design_configs():
     free_params = ["v", "a", "tau"]
     fixed_params = ["s_v", "s_tau"]
@@ -29,7 +76,7 @@ def get_benchmark_design_configs():
         "u_1:u_2": []
     }
 
-    av_regressed = {
+    regressed = {
         "1": intrinsic_params,
         "u_1": ["v", "a"],
         "u_2": ["v", "a"],
@@ -57,8 +104,8 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "a"]
     }
 
-    names = ["intercept_only", "av_regressed", "fixed", "fixed_regressed", "interaction"]
-    configs = [intercept_only, av_regressed, fixed, fixed_regressed, interaction]
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
     return list(zip(names, configs))
 
 
@@ -86,7 +133,7 @@ def build_encoder_input_dim(max_num_regressors: int, max_num_categories: int, ke
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT checkpoint")
-    p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/benchmark_recovery", help="Output directory")
+    p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/fm/", help="Output directory")
 
     # Validation settings
     p.add_argument("--batch_size", type=int, default=200)
@@ -119,8 +166,6 @@ def main(data_path=None):
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    outdir = Path(args.outdir)
-    outdir.mkdir(parents=True, exist_ok=True)
 
     # Intrinsics / display names
     intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
@@ -177,6 +222,9 @@ def main(data_path=None):
     default_fixed_values = {"s_v": 0.0, "s_tau": 0.0}
 
     for cfg_name, design_config in benchmark:
+        outdir = Path(args.outdir + cfg_name)
+        outdir.mkdir(parents=True, exist_ok=True)
+
         free_intr, fixed_intr, fixed_vals = infer_free_fixed_intrinsics(
             design_config=design_config,
             all_intrinsics=intrinsic_params,
@@ -197,7 +245,14 @@ def main(data_path=None):
         }
 
         if data_path is not None:
-            test_samples = np.load(data_path, allow_pickle=True)
+            data_path = Path(data_path + f"/ddm_{cfg_name}_data.npz")
+            test_samples = load_validation_data(data_path=data_path)
+
+            file_batch = test_samples["sim_data"]["rts"].shape[0]
+            assert file_batch == args.batch_size, (
+                f"Batch size mismatch: file={file_batch}, args={args.batch_size}"
+            )
+            test_samples = test_samples | model_family_config
         else:
             # Simulate
             test_samples = model_family.batch_sample(
@@ -211,6 +266,7 @@ def main(data_path=None):
 
         # Adapt
         adapted = adapter.adapt(test_samples, intrinsic_params=model_family.intrinsic_params)
+        print(adapted["input_data"].shape, adapted["param_indices"].shape, adapted["param_masks"].shape, adapted["regressor_indices"].shape)
 
         # Move tensors to device if adapter didn’t
         for k, v in adapted.items():
@@ -263,7 +319,7 @@ def main(data_path=None):
                 max_num_categories=args.max_num_categories,
                 unfold=False,
             )
-            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_post_samples_{i}_S.pdf"
+            figpath = outdir / f"ddm_benchmark_{cfg_name}_fm_posterior{i}_S.pdf"
             postfig.savefig(figpath, bbox_inches="tight")
             plt.close(postfig.fig)
 
@@ -275,14 +331,6 @@ if __name__ == "__main__":
     main()
 
     # To use
-    # 1) Point estimates
-    # python -m ddm_families_gpt_fm_validate.py \
-    # --checkpoint bayesgpt_fm_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
-    # --outdir ./experiments/figures/benchmark_recovery \
-    # --batch_size 200 \
-    # --point_estimates
-    #
-    # 2) Full posterior
     # python -m ddm_families_gpt_fm_validate.py \
     # --checkpoint bayesgpt_fm_eps500_stp200_bse32_nls4_nhs8_nss10.pt \
     # --batch_size 200 \
