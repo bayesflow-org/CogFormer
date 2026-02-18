@@ -143,15 +143,34 @@ def main(num_samples=200, case="intercept_only"):
         logging.info(f"Saved posterior pairplot to {posterior_path}")
 
     # Save some of them
-    rts = val_sims["rts"][:10]
-    choices = val_sims["choices"][:10]
-    design_matrices = val_sims["design_matrices"][:10]
-    param_masks = val_sims["masks"][:10]
-    params = post_draws["params"][:10]
+    rts = val_sims["rts"]
+    choices = val_sims["choices"]
+    design_matrices = val_sims["design_matrices"]
+    param_masks = val_sims["masks"]
+
+    true_set = val_sims["params"]
+    pred_set = post_draws["params"]
+
+    # meta = dict(
+    #     source="bf_validate",
+    #     case=case,
+    #     num_obs=500,
+    #     max_num_regressors=2,
+    #     max_num_categories=2,
+    #     fixed_config=True,
+    #     intrinsic_params=["v", "a", "tau", "s_v", "s_tau"]
+    # )
 
     np.savez(
-        data_dir / f"ddm_families_bf_{case}_data.npz",
-        rts=rts, choices=choices, params=params, design_matrices=design_matrices, param_masks=param_masks
+        data_dir / f"ddm_{case}_data.npz",
+        rts=rts,
+        choices=choices,
+        true_set=true_set,
+        pred_set=pred_set,
+        design_matrices=design_matrices,
+        param_masks=param_masks,
+        # meta=np.array(meta, dtype=object)
+
     )
     logging.info(f"Saved data to {data_dir}")
 
