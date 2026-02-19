@@ -104,9 +104,14 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "a"]
     }
 
+    benchmarks = {}
+
     names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
     configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
-    return list(zip(names, configs))
+
+    for name, config in zip(names, configs):
+        benchmarks[name] = config
+    return benchmarks
 
 
 def infer_free_fixed_intrinsics(
@@ -161,8 +166,42 @@ def parse_args():
     return p.parse_args()
 
 
+def test(case="fixed"):
+    intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
+    benchmarks = get_benchmark_design_configs()
+    for k, v in benchmarks.items():
+        print(k, v)
+
+    data_path = Path(f"bayesgpt/experiments/data/ddm_{case}_data.npz")
+    data = load_validation_data(data_path)
+
+    design_matrices = data["design_matrices"]
+    num_rows = len(list(benchmarks[case].keys()))
+    num_params = len(intrinsic_params)
+
+    if design_matrices.shape[-1] == 1:
+        batch_size, num_obs = design_matrices.shape[:2]
+        dm = np.zeros((batch_size, num_obs, num_rows))
+        dm[:,:,0] = design_matrices.squeeze(axis=-1)
+        data["design_matrices"] = dm
+
+        pmat = np.zeros((batch_size, num_rows * num_params))
+        pmask = np.zeros((batch_size, num_rows * num_params))
+
+        pmat[:, :num_params] = data["param_matrices"]
+        pmask[:, :num_params] = data["param_masks"]
+        data["param_matrices"] = pmat
+        data["param_masks"] = pmask
+
+    for k, v in data.items():
+        if isinstance(v, np.ndarray):
+            print(k, v.shape)
+        elif isinstance(v, dict):
+            for key, val in v.items():
+                print(key, val.shape)
+
 @torch.no_grad()
-def main(data_path=None):
+def main(data_dir=None):
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -221,7 +260,8 @@ def main(data_path=None):
 
     default_fixed_values = {"s_v": 0.0, "s_tau": 0.0}
 
-    for cfg_name, design_config in benchmark:
+    for cfg_name, design_config in benchmark.items():
+        print(f"Validating case {cfg_name}")
         outdir = Path(args.outdir + cfg_name)
         outdir.mkdir(parents=True, exist_ok=True)
 
@@ -244,9 +284,27 @@ def main(data_path=None):
             "fixed_config": True,  # make intent explicit
         }
 
-        if data_path is not None:
-            data_path = Path(data_path + f"/ddm_{cfg_name}_data.npz")
+        if data_dir is not None:
+            data_path = Path(data_dir + f"/ddm_{cfg_name}_data.npz")
             test_samples = load_validation_data(data_path=data_path)
+
+            design_matrices = test_samples["design_matrices"]
+            num_rows = len(list(benchmark[cfg_name].keys()))
+            num_params = len(intrinsic_params)
+
+            if design_matrices.shape[-1] == 1:
+                batch_size, num_obs = design_matrices.shape[:2]
+                dm = np.zeros((batch_size, num_obs, num_rows))
+                dm[:, :, 0] = design_matrices.squeeze(axis=-1)
+                test_samples["design_matrices"] = dm
+
+                pmat = np.zeros((batch_size, num_rows * num_params))
+                pmask = np.zeros((batch_size, num_rows * num_params))
+
+                pmat[:, :num_params] = test_samples["param_matrices"]
+                pmask[:, :num_params] = test_samples["param_masks"]
+                test_samples["param_matrices"] = pmat
+                test_samples["param_masks"] = pmask
 
             file_batch = test_samples["sim_data"]["rts"].shape[0]
             assert file_batch == args.batch_size, (
@@ -328,7 +386,13 @@ def main(data_path=None):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    main()
+
+    debug = False
+
+    if not debug:
+        main(data_dir="bayesgpt/experiments/data")
+    else:
+        test()
 
     # To use
     # python -m ddm_families_gpt_fm_validate.py \

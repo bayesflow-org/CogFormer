@@ -238,8 +238,10 @@ def main(batch_size=200, num_samples=200, case="fixed_regressed"):
         estimates=pred_params,
         targets=true_params,
         variable_names=param_names,
-        figsize=(15, 12),
+        difference=True,
+        figsize=(20, 16),
         label_fontsize=14,
+        legend_fontsize=10,
         num_row=4,
         num_col=5,
         color=colors["intercept"],
@@ -253,14 +255,16 @@ def main(batch_size=200, num_samples=200, case="fixed_regressed"):
         estimates=pred_params,
         targets=true_params,
         variable_names=param_names,
-        figsize=(15, 12),
+        difference=True,
+        figsize=(20, 16),
         label_fontsize=14,
+        legend_fontsize=10,
         num_row=4,
         num_col=5,
-        color=colors["intercept"],
+        rank_ecdf_color=colors["intercept"],
     )
     ecdf_path = figures_dir / f"ddm_families_bf_{case}_ecdf.pdf"
-    coverage.savefig(ecdf_path)
+    calibration_ecdf.savefig(ecdf_path)
     plt.close(calibration_ecdf)
     logging.info(f"Saved recovery plot to {ecdf_path}")
 
