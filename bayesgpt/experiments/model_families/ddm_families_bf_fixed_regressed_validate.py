@@ -234,6 +234,36 @@ def main(batch_size=200, num_samples=200, case="fixed_regressed"):
     plt.close(recovery)
     logging.info(f"Saved recovery plot to {recovery_path}")
 
+    coverage = bf.diagnostics.plots.coverage(
+        estimates=pred_params,
+        targets=true_params,
+        variable_names=param_names,
+        figsize=(15, 12),
+        label_fontsize=14,
+        num_row=4,
+        num_col=5,
+        color=colors["intercept"],
+    )
+    coverage_path = figures_dir / f"ddm_families_bf_{case}_coverage.pdf"
+    coverage.savefig(coverage_path)
+    plt.close(coverage)
+    logging.info(f"Saved recovery plot to {coverage_path}")
+
+    calibration_ecdf = bf.diagnostics.calibration_ecdf(
+        estimates=pred_params,
+        targets=true_params,
+        variable_names=param_names,
+        figsize=(15, 12),
+        label_fontsize=14,
+        num_row=4,
+        num_col=5,
+        color=colors["intercept"],
+    )
+    ecdf_path = figures_dir / f"ddm_families_bf_{case}_ecdf.pdf"
+    coverage.savefig(ecdf_path)
+    plt.close(calibration_ecdf)
+    logging.info(f"Saved recovery plot to {ecdf_path}")
+
 if __name__ == "__main__":
     debug = False
 
