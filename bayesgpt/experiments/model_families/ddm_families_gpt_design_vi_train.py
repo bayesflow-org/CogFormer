@@ -98,7 +98,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 50 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -234,7 +234,7 @@ class BayesGPTTrainer:
         posterior = adaptive_posterior(
             samples=pred_set[0],
             design_config=design_config,
-            intrinsic_params=self.model_family.intrinsic_params,
+            intrinsic_params=params,
             max_num_categories=max_num_categories,
             unfold=False,
         )
@@ -287,7 +287,7 @@ def parse_args():
     parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
-    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     return parser.parse_args()
 
@@ -320,9 +320,9 @@ if __name__ == "__main__":
     }
 
     val_params_kwargs = {
-        "free_intrinsics": ["v", "a", "tau"],
-        "fixed_intrinsics": ["s_v", "s_tau"],
-        "fixed_values": {"s_v": 0.0, "s_tau": 0.0},
+        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "fixed_intrinsics": [],
+        "fixed_values": {},
     }
 
     train_sample_config = {
