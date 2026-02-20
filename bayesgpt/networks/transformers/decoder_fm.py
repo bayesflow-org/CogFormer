@@ -25,9 +25,6 @@ class Decoder(nn.Module):
 
         layers = []
         for i in range(num_layers):
-
-            # TODO: there is design space here in terms of the injection of self-attention.
-            # Explore!
             l = MultiheadAttentionBlock(
                 query_dim=proj_dim,
                 key_dim=seed_dim,

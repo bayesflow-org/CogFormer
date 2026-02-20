@@ -5,6 +5,8 @@ from .attention_layers import (
     mixed_attention_layers,
     custom_attention_layers
 )
+from .self_attention_block import SelfAttentionBlock
+
 
 class Decoder(nn.Module):
 
@@ -88,13 +90,21 @@ class Decoder(nn.Module):
             query_block = query_mask == 0
 
             #  (B*H, Tq, Tk) - repeat batch mask across heads
-            attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
-            attn_mask = attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
-        else:
-            attn_mask = None
+            cross_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
+            cross_attn_mask = cross_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
 
-        for mab in self.layers:
-            out = mab(query=out, key=key, attn_mask=attn_mask)
+            self_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, query_dim)
+            self_attn_mask = self_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
+
+        else:
+            cross_attn_mask = None
+            self_attn_mask = None
+
+        for layer in self.layers:
+            if isinstance(layer, SelfAttentionBlock):
+                out = layer(query=out, key=None, attn_mask=self_attn_mask)
+            else:
+                out = layer(query=out, key=key, attn_mask=cross_attn_mask)
             out = self.post_dropout(out)
 
             if query_mask is not None:

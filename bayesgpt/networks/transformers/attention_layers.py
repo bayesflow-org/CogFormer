@@ -33,12 +33,8 @@ def self_attention_layers(
     dropout: float = 0.1,
     query_dim: int = 128,
     skip_first: bool = False,
-    skip_last: bool = False
+    skip_last: bool = False,
 ):
-    """
-    Customizable self-attention layers with the option
-    to use mab on the first and/or the last layer.
-    """
     layers = []
 
     if skip_first:
@@ -51,21 +47,22 @@ def self_attention_layers(
         )
     else:
         l = SelfAttentionBlock(
-            input_dim=key_dim,
-            num_heads=num_heads,
-            dropout=dropout,
-            layer_norm=layer_norm
-        )
-    layers.append(l)
-
-    for i in range(1, num_layers - 1):
-        l = SelfAttentionBlock(
-            input_dim=key_dim,
+            input_dim=query_dim,
             num_heads=num_heads,
             dropout=dropout,
             layer_norm=layer_norm,
         )
-        layers.append(l)
+    layers.append(l)
+
+    for _ in range(1, num_layers - 1):
+        layers.append(
+            SelfAttentionBlock(
+                input_dim=query_dim,
+                num_heads=num_heads,
+                dropout=dropout,
+                layer_norm=layer_norm,
+            )
+        )
 
     if skip_last:
         l = MultiheadAttentionBlock(
@@ -77,14 +74,15 @@ def self_attention_layers(
         )
     else:
         l = SelfAttentionBlock(
-            input_dim=key_dim,
+            input_dim=query_dim,
             num_heads=num_heads,
             dropout=dropout,
-            layer_norm=layer_norm
+            layer_norm=layer_norm,
         )
     layers.append(l)
 
     return nn.ModuleList(layers)
+
 
 def mixed_attention_layers(
     query_dim: int = 128,
@@ -95,40 +93,62 @@ def mixed_attention_layers(
     dropout: float = 0.1,
     mab_first: bool = True,
 ):
-    """
-    Customized attention layers with the simultaneous use of
-    self-attention (sab) and cross-attention blocks (mab).
-
-    By default, the blocks are arranged as an interlaced
-    undulation with mab first:
-
-    mab --> sab --> mab --> sab --> mab --> ...
-
-    The blocks can be arranged with sab comes first
-    with mab_first == False.
-    """
-    cross_attention_block = MultiheadAttentionBlock(
-        query_dim=query_dim,
-        key_dim=key_dim,
-        num_heads=num_heads,
-        dropout=dropout,
-        layer_norm=layer_norm
-    )
-    self_attention_block = SelfAttentionBlock(
-        input_dim=key_dim,
-        num_heads=num_heads,
-        dropout=dropout,
-        layer_norm=layer_norm
-    )
-
     layers = []
     for i in range(num_layers):
-        if i % 2 == 0:
-            l = cross_attention_block if mab_first else self_attention_block
+        use_mab = (i % 2 == 0) if mab_first else (i % 2 == 1)
+        if use_mab:
+            layers.append(
+                MultiheadAttentionBlock(
+                    query_dim=query_dim,
+                    key_dim=key_dim,
+                    num_heads=num_heads,
+                    dropout=dropout,
+                    layer_norm=layer_norm,
+                )
+            )
         else:
-            l = self_attention_block if mab_first else cross_attention_block
-        layers.append(l)
+            layers.append(
+                SelfAttentionBlock(
+                    input_dim=query_dim,
+                    num_heads=num_heads,
+                    dropout=dropout,
+                    layer_norm=layer_norm,
+                )
+            )
+    return nn.ModuleList(layers)
 
+
+def custom_attention_layers(
+    pattern: tuple = (1, 0, 0),
+    query_dim: int = 128,
+    key_dim: int = 128,
+    num_layers: int = 3,
+    num_heads: int = 4,
+    layer_norm: bool = True,
+    dropout: float = 0.1,
+):
+    design = [pattern[i % len(pattern)] for i in range(num_layers)]
+    layers = []
+    for i in range(num_layers):
+        if design[i] == 1:
+            layers.append(
+                MultiheadAttentionBlock(
+                    query_dim=query_dim,
+                    key_dim=key_dim,
+                    num_heads=num_heads,
+                    dropout=dropout,
+                    layer_norm=layer_norm,
+                )
+            )
+        else:
+            layers.append(
+                SelfAttentionBlock(
+                    input_dim=query_dim,
+                    num_heads=num_heads,
+                    dropout=dropout,
+                    layer_norm=layer_norm,
+                )
+            )
     return nn.ModuleList(layers)
 
 def custom_attention_layers(
@@ -147,7 +167,7 @@ def custom_attention_layers(
     if len(pattern) > num_layers:
         print("Pattern truncated to match with number of attention layers")
 
-    design = [pattern[i % num_layers] for i in range(num_layers)]
+    design = [pattern[i % len(pattern)] for i in range(num_layers)]
     layers = []
     for i in range(num_layers):
         if design[i] == 1:

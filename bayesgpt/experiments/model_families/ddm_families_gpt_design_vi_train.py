@@ -98,7 +98,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 100 == 0:
+            if (epoch + 1) % 5 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -235,7 +235,7 @@ class BayesGPTTrainer:
             samples=pred_set[0],
             design_config=design_config,
             intrinsic_params=self.model_family.intrinsic_params,
-            max_num_categories=args.max_num_categories,
+            max_num_categories=max_num_categories,
             unfold=False,
         )
 
@@ -248,7 +248,7 @@ class BayesGPTTrainer:
             wandb.log(
                 {
                     "val/recovery": wandb.Image(recovery),
-                    "val/posterior": wandb.Image(posterior),
+                    "val/posterior": wandb.Image(posterior.fig),
                 },
                 step=global_step,
             )
@@ -366,9 +366,9 @@ if __name__ == "__main__":
     }
 
     wandb_config = {
-        "project_name": "bayesgpt-vi-iclr",
+        "project_name": "bayesgpt-vi-design",
         "run_name": None,
-        "tags": ["BayesGPTv1", "ModelFamily"],
+        "tags": ["BayesGPTvI", "ModelFamily", "Designer"],
         "watch_log": "gradients",
         "watch_freq": 200
     }
@@ -384,7 +384,10 @@ if __name__ == "__main__":
         "proj_dim": args.projection_dim,
         "dropout": args.dropout,
         "layer_dropout": args.layer_dropout,
-        "decoder_layer_design": "mixed_attention"
+        "decoder_layer_design": "mixed_attention",
+        "decoder_layer_kwargs": {
+            "mab_first": True
+        }
     }
 
     logging.info(
