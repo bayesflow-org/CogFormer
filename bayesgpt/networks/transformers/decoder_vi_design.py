@@ -18,8 +18,7 @@ class Decoder(nn.Module):
         num_layers: int = 3,
         num_heads: int = 4,
         layer_norm: bool = False,
-        dropout: float = 0.0,
-        layer_dropout: float = 0.0,
+        dropout: float = 0.05,
         layer_design: str = None,
         layer_kwargs: dict = None,
     ):
@@ -61,15 +60,15 @@ class Decoder(nn.Module):
                         **layer_kwargs
                     )
         else:
-            self.layers = cross_attention_layers(
-                        query_dim=proj_dim,
-                        key_dim=seed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        layer_norm=layer_norm,
-                        dropout=dropout,
-                    )
-        self.post_dropout = nn.Dropout(layer_dropout) if layer_dropout > 0 else nn.Identity()
+            self.layers = mixed_attention_layers(
+                query_dim=proj_dim,
+                key_dim=seed_dim,
+                num_heads=num_heads,
+                num_layers=num_layers,
+                layer_norm=layer_norm,
+                dropout=dropout,
+                **layer_kwargs
+            )
 
         self.output_proj = nn.Linear(proj_dim, 2)
         self.num_heads = num_heads
@@ -102,10 +101,9 @@ class Decoder(nn.Module):
 
         for layer in self.layers:
             if isinstance(layer, SelfAttentionBlock):
-                out = layer(query=out, key=None, attn_mask=self_attn_mask)
+                out = layer(query=out, attn_mask=self_attn_mask)
             else:
                 out = layer(query=out, key=key, attn_mask=cross_attn_mask)
-            out = self.post_dropout(out)
 
             if query_mask is not None:
                 out = out * query_mask[..., None]

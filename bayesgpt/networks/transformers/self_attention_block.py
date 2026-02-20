@@ -18,7 +18,7 @@ class SelfAttentionBlock(nn.Module):
             dropout=dropout
         )
 
-    def forward(self, query, key=None, attn_mask=None, key_padding_mask=None):
+    def forward(self, query, attn_mask=None, key_padding_mask=None):
         # Self-attention: keys/values come from the query sequence itself
         return self.mab(
             query=query,

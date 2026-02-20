@@ -36,8 +36,6 @@ class Decoder(nn.Module):
             layers.append(l)
 
         self.layers = nn.ModuleList(layers)
-        self.post_dropout = nn.Dropout(layer_dropout) if layer_dropout > 0 else nn.Identity()
-
         self.output_proj = nn.Linear(proj_dim, 1)
         self.num_heads = num_heads
 
@@ -65,7 +63,6 @@ class Decoder(nn.Module):
         for mab in self.layers:
             
             out = mab(query=out, key=key, attn_mask=attn_mask)
-            # out = self.post_dropout(out)
 
             if query_mask is not None:
                 out = out * query_mask[..., None]

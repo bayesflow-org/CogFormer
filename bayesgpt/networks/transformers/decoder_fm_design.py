@@ -7,6 +7,7 @@ from .attention_layers import (
     mixed_attention_layers,
     custom_attention_layers
 )
+from .self_attention_block import SelfAttentionBlock
 from bayesgpt.utils.tensor_utils import broadcast_right
 
 
@@ -20,8 +21,7 @@ class Decoder(nn.Module):
             num_layers: int = 3,
             num_heads: int = 4,
             layer_norm: bool = False,
-            dropout: float = 0.0,
-            layer_dropout: float = 0.0,
+            dropout: float = 0.05,
             layer_design: str = None,
             layer_kwargs: dict = None,
     ):
@@ -63,15 +63,15 @@ class Decoder(nn.Module):
                         **layer_kwargs
                     )
         else:
-            self.layers = cross_attention_layers(
-                        query_dim=proj_dim,
-                        key_dim=seed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        layer_norm=layer_norm,
-                        dropout=dropout,
-                    )
-        self.post_dropout = nn.Dropout(layer_dropout) if layer_dropout > 0 else nn.Identity()
+            self.layers = mixed_attention_layers(
+                query_dim=proj_dim,
+                key_dim=seed_dim,
+                num_heads=num_heads,
+                num_layers=num_layers,
+                layer_norm=layer_norm,
+                dropout=dropout,
+                **layer_kwargs
+            )
 
         self.output_proj = nn.Linear(proj_dim, 1)
         self.num_heads = num_heads
@@ -86,20 +86,25 @@ class Decoder(nn.Module):
             query_block = query_mask == 0
 
             #  (B*H, Tq, Tk) - repeat batch mask across heads
-            attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
-            attn_mask = attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
+            cross_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
+            cross_attn_mask = cross_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
+
+            self_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, query_dim)
+            self_attn_mask = self_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
         else:
-            attn_mask = None
+            cross_attn_mask = None
+            self_attn_mask = None
 
         out = torch.cat([theta_t, query, t], dim=-1)
 
         out = self.input_proj(out)
 
         # Run input through cross-attention layers
-        for mab in self.layers:
-
-            out = mab(query=out, key=key, attn_mask=attn_mask)
-            # out = self.post_dropout(out)
+        for layer in self.layers:
+            if isinstance(layer, SelfAttentionBlock):
+                out = layer(query=out, attn_mask=self_attn_mask)
+            else:
+                out = layer(query=out, key=key, attn_mask=cross_attn_mask)
 
             if query_mask is not None:
                 out = out * query_mask[..., None]

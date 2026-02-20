@@ -50,7 +50,6 @@ class BayesGPTvI(nn.Module):
             num_heads=decoder_num_heads,
             layer_norm=layer_norm,
             dropout=dropout,
-            layer_dropout=layer_dropout,
             layer_design=decoder_layer_design,
             layer_kwargs=decoder_layer_kwargs,
         )
