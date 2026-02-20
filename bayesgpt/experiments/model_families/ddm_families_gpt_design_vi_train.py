@@ -17,9 +17,10 @@ from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
-from bayesgpt.networks.transformers.gpt import BayesGPTv1
+from bayesgpt.networks.transformers.gpt import BayesGPTvI
 from bayesgpt.networks.loss import nll_loss
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.utils.plot_utils import bayesgpt_vi_colors
 
 
@@ -213,7 +214,7 @@ class BayesGPTTrainer:
 
         # Log recovery plot
         colors = bayesgpt_vi_colors()
-        recovery_fig = adaptive_recovery(
+        recovery = adaptive_recovery(
             true_set, pred_set,
             design_config=design_config,
             intrinsic_params=params,
@@ -225,19 +226,34 @@ class BayesGPTTrainer:
             interaction_color=colors["interaction"],
         )
 
-        figures_dir = Path("./bayesgpt/experiments/figures/vi/recovery")
-        figures_dir.mkdir(parents=True, exist_ok=True)
+        recovery_dir = Path("./bayesgpt/experiments/figures/vi/test_recovery")
+        recovery_dir.mkdir(parents=True, exist_ok=True)
 
-        recovery_fig.savefig(figures_dir / fig_path, bbox_inches="tight")
+        recovery.savefig(recovery_dir / fig_path, bbox_inches="tight")
+
+        posterior = adaptive_posterior(
+            samples=pred_set[0],
+            design_config=design_config,
+            intrinsic_params=self.model_family.intrinsic_params,
+            max_num_categories=args.max_num_categories,
+            unfold=False,
+        )
+
+        posterior_dir = Path("./bayesgpt/experiments/figures/vi/test_posterior")
+        posterior_dir.mkdir(parents=True, exist_ok=True)
+
+        posterior.savefig(posterior_dir / Path("ddm_benchmark_test_posterior.pdf"), bbox_inches="tight")
 
         if self.use_wandb:
             wandb.log(
                 {
-                    "val/recovery": wandb.Image(recovery_fig),
+                    "val/recovery": wandb.Image(recovery),
+                    "val/posterior": wandb.Image(posterior),
                 },
                 step=global_step,
             )
-            plt.close(recovery_fig)
+            plt.close(recovery)
+            plt.close(posterior.fig)
 
         self.gpt.train()
 
@@ -252,13 +268,13 @@ def parse_args():
     parser.add_argument("--use_wandb", action="store_true", help="use wandb")
 
     # Network dimensions
-    parser.add_argument("--encoder_num_layers", type=int, default=2, help="number of encoder layers")
-    parser.add_argument("--decoder_num_layers", type=int, default=2, help="number of decoder layers")
-    parser.add_argument("--encoder_num_heads", type=int, default=2, help="number of encoder heads")
-    parser.add_argument("--decoder_num_heads", type=int, default=2, help="number of decoder heads")
-    parser.add_argument("--projection_dim", type=int, default=32, help="dimension of projection dims")
-    parser.add_argument("--num_seeds", type=int, default=4, help="number of seeds")
-    parser.add_argument("--seed_dim", type=int, default=16, help="dimension of seeds")
+    parser.add_argument("--encoder_num_layers", type=int, default=4, help="number of encoder layers")
+    parser.add_argument("--decoder_num_layers", type=int, default=4, help="number of decoder layers")
+    parser.add_argument("--encoder_num_heads", type=int, default=4, help="number of encoder heads")
+    parser.add_argument("--decoder_num_heads", type=int, default=4, help="number of decoder heads")
+    parser.add_argument("--projection_dim", type=int, default=64, help="dimension of projection dims")
+    parser.add_argument("--num_seeds", type=int, default=8, help="number of seeds")
+    parser.add_argument("--seed_dim", type=int, default=32, help="dimension of seeds")
 
     # Hyperparameters
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
@@ -271,7 +287,7 @@ def parse_args():
     parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
-    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=500, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
     return parser.parse_args()
 
@@ -368,6 +384,7 @@ if __name__ == "__main__":
         "proj_dim": args.projection_dim,
         "dropout": args.dropout,
         "layer_dropout": args.layer_dropout,
+        "decoder_layer_design": "mixed_attention"
     }
 
     logging.info(
@@ -397,7 +414,7 @@ if __name__ == "__main__":
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
-    bayesgpt = BayesGPTv1(**bayesgpt_config).to(device).train()
+    bayesgpt = BayesGPTvI(**bayesgpt_config).to(device).train()
 
     # Pass to trainer
     trainer = BayesGPTTrainer(
@@ -409,7 +426,7 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
-        f"bayesgpt_vi_iclr"
+        f"bayesgpt_vi_design"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
@@ -422,7 +439,7 @@ if __name__ == "__main__":
     )
 
     fig_path = (
-        f"bayesgpt_vi_iclr"
+        f"bayesgpt_vi_design"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
@@ -432,7 +449,7 @@ if __name__ == "__main__":
         f"_b{train_config['batch_size']}"
         f"_e{train_config['epochs']}"
         f"_t{train_config['steps_per_epoch']}"
-        f"_test_recovery.pdf"
+        f"_test.pdf"
     )
 
     # Train

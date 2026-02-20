@@ -6,7 +6,7 @@ from ..encoder_design import Encoder
 from ..decoder_vi_design import Decoder
 
 
-class BayesGPT(nn.Module):
+class BayesGPTvI(nn.Module):
 
     def __init__(
         self,
