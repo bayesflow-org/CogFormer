@@ -131,7 +131,7 @@ def mixed_attention_layers(
 
     return nn.ModuleList(layers)
 
-def patterned_attention_layers(
+def custom_attention_layers(
     pattern: tuple = (1, 0, 0),
     query_dim: int = 128,
     key_dim: int = 128,
