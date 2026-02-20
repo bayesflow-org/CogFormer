@@ -127,6 +127,7 @@ def mixed_attention_layers(
             l = cross_attention_block if mab_first else self_attention_block
         else:
             l = self_attention_block if mab_first else cross_attention_block
+        layers.append(l)
 
     return nn.ModuleList(layers)
 
