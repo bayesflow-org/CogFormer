@@ -26,12 +26,12 @@ def cross_attention_layers(
 
 
 def self_attention_layers(
-    query_dim: int = 128,
     key_dim: int = 128,
     num_layers: int = 3,
     num_heads: int = 4,
     layer_norm: bool = True,
     dropout: float = 0.1,
+    query_dim: int = 128,
     skip_first: bool = False,
     skip_last: bool = False
 ):
