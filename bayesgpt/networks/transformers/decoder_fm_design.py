@@ -78,22 +78,23 @@ class Decoder(nn.Module):
 
     def velocity(self, theta_t, query, key, t, query_mask=None):
 
+        query_block = None
         # Ensure parameter mask is batched
         if query_mask is not None:
-            batch_size, query_dim = query_mask.shape
-            key_dim = key.shape[1]
+            # batch_size, query_dim = query_mask.shape
+            # key_dim = key.shape[1]
 
-            query_block = query_mask == 0
+            query_block = query_mask <= 0
 
-            #  (B*H, Tq, Tk) - repeat batch mask across heads
-            cross_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
-            cross_attn_mask = cross_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
-
-            self_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, query_dim)
-            self_attn_mask = self_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
-        else:
-            cross_attn_mask = None
-            self_attn_mask = None
+        #     #  (B*H, Tq, Tk) - repeat batch mask across heads
+        #     cross_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
+        #     cross_attn_mask = cross_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
+        #
+        #     self_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, query_dim)
+        #     self_attn_mask = self_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
+        # else:
+        #     cross_attn_mask = None
+        #     self_attn_mask = None
 
         out = torch.cat([theta_t, query, t], dim=-1)
 
@@ -102,9 +103,9 @@ class Decoder(nn.Module):
         # Run input through cross-attention layers
         for layer in self.layers:
             if isinstance(layer, SelfAttentionBlock):
-                out = layer(query=out, attn_mask=self_attn_mask)
+                out = layer(query=out, attn_mask=None)
             else:
-                out = layer(query=out, key=key, attn_mask=cross_attn_mask)
+                out = layer(query=out, key=key, attn_mask=None)
 
             if query_mask is not None:
                 out = out * query_mask[..., None]

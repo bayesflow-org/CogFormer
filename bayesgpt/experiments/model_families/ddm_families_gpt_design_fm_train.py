@@ -205,7 +205,6 @@ class BayesGPTTrainer:
             steps=fm_sample_steps,
             num_samples=fm_num_samples
         )
-        print(pred_set[0])
         pred_set = pred_set.reshape(config["batch_size"], fm_num_samples, n_rows, n_cols)
         if self.debug:
             print(pred_set[0])
@@ -236,7 +235,10 @@ class BayesGPTTrainer:
             design_config=design_config,
             intrinsic_params=params,
             max_num_categories=max_num_categories,
-            unfold=False,
+            intercept_color=colors["intercept"],
+            main_effect_color=colors["main_effect"],
+            interaction_color=colors["interaction"],
+            unfold=False
         )
 
         posterior_dir = Path("./bayesgpt/experiments/figures/fm/test_posterior")
@@ -288,8 +290,8 @@ def parse_args():
     parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
-    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
-    parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
+    parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
+    parser.add_argument("--steps_per_epoch", type=int, default=10, help="number of steps per epoch")
 
     # Inference (for FM only)
     parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
