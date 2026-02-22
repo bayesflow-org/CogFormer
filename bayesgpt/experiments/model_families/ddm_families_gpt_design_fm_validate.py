@@ -11,7 +11,7 @@ from bayesgpt.simulators.benchmarks import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
-from bayesgpt.networks.transformers.gpt import BayesGPT
+from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
@@ -248,6 +248,8 @@ def main(data_dir=None):
         proj_dim=args.proj_dim,
         dropout=args.dropout,
         layer_dropout=args.layer_dropout,
+        decoder_layer_design="mixed_attention",
+        decoder_layer_kwargs={"mab_first": True},
     ).to(device)
 
     ckpt_path = Path(args.checkpoint)
