@@ -395,7 +395,7 @@ if __name__ == "__main__":
         "layer_dropout": args.layer_dropout,
         "decoder_layer_design": "self_attention",
         "decoder_layer_kwargs": {
-            "skip_first": True
+            "skip_first": False
         }
     }
 
@@ -439,7 +439,7 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
-        f"bayesgpt_fm_design_sab1"
+        f"bayesgpt_fm_design_sab0"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
@@ -452,7 +452,7 @@ if __name__ == "__main__":
     )
 
     fig_path = (
-        f"bayesgpt_fm_design_sab1"
+        f"bayesgpt_fm_design_sab0"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
