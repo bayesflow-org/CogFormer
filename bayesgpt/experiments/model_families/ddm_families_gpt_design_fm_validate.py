@@ -14,6 +14,7 @@ from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
@@ -365,14 +366,33 @@ def main(data_dir=None):
             interaction_color=colors["interaction"],
         )
 
-        figpath = outdir / f"ddm_families_{cfg_name}_fm_recovery_L.pdf"
+        figpath = outdir / f"ddm_families_{cfg_name}_fm_mixed_m_recovery.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
         logging.info(f"[saved] {figpath}")
 
+        coverage = adaptive_coverage(
+            true=true_set,
+            pred=pred_set,
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=model_family_config["max_num_categories"],
+            parameter_mask=params_mask,
+            variable_names=variable_names,
+            intercept_color=colors["intercept"],
+            main_effect_color=colors["main_effect"],
+            interaction_color=colors["interaction"],
+        )
+
+        coverage_path = outdir / f"ddm_families_{cfg_name}_fm_mixed_m_coverage.pdf"
+        coverage.savefig(coverage_path, bbox_inches="tight")
+        plt.close(fig)
+
+        logging.info(f"[saved] {coverage_path}")
+
         for i in range(10):
-            postfig = adaptive_posterior(
+            posterior = adaptive_posterior(
                 samples=pred_set[i],
                 design_config=design_config,
                 intrinsic_params=intrinsic_params,
@@ -382,9 +402,9 @@ def main(data_dir=None):
                 main_effect_color=colors["main_effect"],
                 interaction_color=colors["interaction"]
             )
-            figpath = outdir / f"ddm_families_{cfg_name}_fm_posterior{i}_S.pdf"
-            postfig.savefig(figpath, bbox_inches="tight")
-            plt.close(postfig.fig)
+            posterior_path = outdir / f"ddm_families_{cfg_name}_fm_mixed_m_posterior{i}.pdf"
+            posterior.savefig(posterior_path, bbox_inches="tight")
+            plt.close(posterior.fig)
 
     logging.info("Done.")
 
