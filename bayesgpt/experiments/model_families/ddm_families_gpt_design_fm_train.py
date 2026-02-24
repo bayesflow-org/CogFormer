@@ -94,7 +94,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 5 == 0:
+            if (epoch + 1) % 50 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -393,14 +393,15 @@ if __name__ == "__main__":
         "proj_dim": args.projection_dim,
         "dropout": args.dropout,
         "layer_dropout": args.layer_dropout,
-        "decoder_layer_design": "mixed_attention",
+        "decoder_layer_design": "self_attention",
         "decoder_layer_kwargs": {
-            "mab_first": True
+            "skip_first": True
         }
     }
 
     logging.info(
         f"Training with "
+        f"{bayesgpt_config['decoder_layer_design']} over "
         f"{train_config['epochs']} epochs, "
         f"{train_config['steps_per_epoch']} steps per epoch, and "
         f"{train_config['batch_size']} batches of dataset per step."
@@ -438,7 +439,7 @@ if __name__ == "__main__":
 
     # Define checkpoint path
     checkpoint_path = (
-        f"bayesgpt_fm_design"
+        f"bayesgpt_fm_design_sab1"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
@@ -451,7 +452,7 @@ if __name__ == "__main__":
     )
 
     fig_path = (
-        f"bayesgpt_fm_design"
+        f"bayesgpt_fm_design_sab1"
         f"_l{bayesgpt_config['decoder_num_layers']}"
         f"_h{bayesgpt_config['decoder_num_heads']}"
         f"_p{bayesgpt_config['proj_dim']}"
