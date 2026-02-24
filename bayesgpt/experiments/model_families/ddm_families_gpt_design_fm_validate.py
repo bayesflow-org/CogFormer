@@ -249,8 +249,8 @@ def main(data_dir=None):
         proj_dim=args.proj_dim,
         dropout=args.dropout,
         layer_dropout=args.layer_dropout,
-        decoder_layer_design="mixed_attention",
-        decoder_layer_kwargs={"mab_first": True},
+        decoder_layer_design="self_attention",
+        decoder_layer_kwargs={"skip_first": True},
     ).to(device)
 
     ckpt_path = Path(args.checkpoint)
