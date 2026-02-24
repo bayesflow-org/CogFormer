@@ -1,18 +1,310 @@
 import numpy as np
+from scipy.stats import beta
 import matplotlib.pyplot as plt
+from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
+
+
+def compute_empirical_coverage(
+    estimates: np.ndarray,
+    targets: np.ndarray,
+    widths: np.ndarray,
+    prob: float = 0.95,
+    interval_type: str = "central",
+) -> dict:
+    """
+    Compute empirical coverage statistics for given interval widths.
+
+    Parameters
+    ----------
+    estimates : np.ndarray of shape (num_datasets, num_post_draws, num_params)
+        The posterior draws obtained from num_datasets
+    targets : np.ndarray of shape (num_datasets, num_params)
+        The true parameter values used for generating num_datasets
+    widths : np.ndarray
+        Array of interval widths to compute coverage for (values between 0 and 1)
+    prob : float, optional, default: 0.95
+        Confidence level for coverage confidence intervals
+    interval_type : str, optional, default: "central"
+        Type of credible interval. Either "central" or "leftmost"
+
+    Returns
+    -------
+    dict
+        Dictionary containing coverage statistics for each width and parameter
+    """
+    num_datasets, num_draws, num_params = estimates.shape
+    num_widths = len(widths)
+
+    # Initialize output arrays
+    coverage_estimates = np.zeros((num_widths, num_params))
+    coverage_lower = np.zeros((num_widths, num_params))
+    coverage_upper = np.zeros((num_widths, num_params))
+    width_represented = np.zeros((num_widths, num_params))
+
+    for w_idx, width in enumerate(widths):
+        # Number of ranks to cover for this width
+        n_ranks_covered = round((num_draws + 1) * width)
+
+        if interval_type == "central":
+            # Central interval: center around median
+            low_rank = round(num_draws / 2 - n_ranks_covered / 2)
+            high_rank = low_rank + n_ranks_covered - 1
+        elif interval_type == "leftmost":
+            # Leftmost interval: start from minimum
+            low_rank = 0
+            high_rank = n_ranks_covered - 1
+        else:
+            raise ValueError("interval_type must be 'central' or 'leftmost'")
+
+        # Ensure ranks are within valid bounds
+        low_rank = max(0, low_rank)
+        high_rank = min(num_draws - 1, high_rank)
+
+        # Actual width represented by these ranks
+        actual_width = (high_rank - low_rank + 1) / (num_draws + 1)
+
+        for p_idx in range(num_params):
+            # Sort posterior samples for each dataset and parameter
+            sorted_samples = np.sort(estimates[:, :, p_idx], axis=1)
+
+            # Check if true value falls within credible interval
+            is_covered = (targets[:, p_idx] >= sorted_samples[:, low_rank]) & (
+                targets[:, p_idx] <= sorted_samples[:, high_rank]
+            )
+
+            # Compute coverage estimate
+            num_covered = np.sum(is_covered)
+            coverage_est = num_covered / num_datasets
+
+            # Compute confidence intervals using beta distribution
+            # Using Bayesian credible interval for binomial proportion
+            alpha_post = num_covered + 1
+            beta_post = num_datasets - num_covered + 1
+
+            # Special handling for boundary cases
+            if actual_width == 0 or actual_width == 1:
+                # No variability possible
+                ci_low = actual_width
+                ci_high = actual_width
+            else:
+                ci_low = beta.ppf((1 - prob) / 2, alpha_post, beta_post)
+                ci_high = beta.ppf((1 + prob) / 2, alpha_post, beta_post)
+
+            coverage_estimates[w_idx, p_idx] = coverage_est
+            coverage_lower[w_idx, p_idx] = ci_low
+            coverage_upper[w_idx, p_idx] = ci_high
+            width_represented[w_idx, p_idx] = actual_width
+
+    return {
+        "coverage_estimates": coverage_estimates,
+        "coverage_lower": coverage_lower,
+        "coverage_upper": coverage_upper,
+        "width_represented": width_represented,
+        "widths": widths,
+    }
 
 
 def adaptive_coverage(
     true: np.ndarray,
     pred: np.ndarray,
     design_config: dict,
-    parameter_masks: np.ndarray,
     variable_names: list,
-    intercept_color: str,
-    main_effect_color: str,
-    interaction_color: str,
-    figsize: tuple,
+    parameter_masks: np.ndarray = None,
+    intercept_color: str = "#4e2a84",
+    main_effect_color: str = "#6969ff",
+    interaction_color: str = "#ff6969",
+    figsize: tuple | None = None,
     title_fontsize: int = 20,
     label_fontsize: int = 14,
-):
-    raise NotImplementedError
+    tick_fontsize: int = 11,
+    legend_fontsize: int = 12,
+    legend_location: str = "lower right",
+    prob: float = 0.95,
+    interval_type: str = "central",
+    difference: bool = False,
+) -> plt.Figure:
+    """
+    Adaptive (masked) empirical coverage plot over a regressor-by-parameter grid.
+    """
+
+    batch_size, num_draws, num_rows, num_cols = pred.shape
+
+    if figsize is None:
+        figsize = (3.2 * num_cols, 2.9 * num_rows)
+
+    fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize, squeeze=False)
+
+    widths = np.arange(0, num_draws + 2) / (num_draws + 1)
+
+    regressor_keys = list(design_config.keys())
+
+    for r in range(num_rows):
+        # Match adaptive_recovery styling: intercept row vs regressor rows
+        if r > 0:
+            regressor_id = min(r, len(regressor_keys) - 1)
+            regressor_key = regressor_keys[regressor_id]
+            ylabel = fr"${regressor_key}$"
+            tint = interaction_color if ":" in regressor_key else main_effect_color
+        else:
+            ylabel = r"$1$"
+            tint = intercept_color
+
+        for c in range(num_cols):
+            ax = axarr[r, c]
+
+            # Masked cell -> N/A tile
+            if parameter_masks[r, c] != 1.0:
+                ax.set_facecolor(tint)
+                ax.patch.set_alpha(0.05)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                for sp in ax.spines.values():
+                    sp.set_visible(False)
+                ax.text(
+                    0.5,
+                    0.5,
+                    "N/A",
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="center",
+                    fontsize=18,
+                    weight="bold",
+                    alpha=0.7,
+                    color=tint,
+                )
+                ax.set_xlabel("Interval width" if r == num_rows - 1 else "", fontsize=label_fontsize)
+                continue
+
+            # Build per-cell arrays in the shape expected by compute_empirical_coverage
+            estimates_cell = pred[:,:,r,c][..., None] # (batch, draws, 1)
+            targets_cell = true[:, r, c][:, None]  # (batch, 1)
+
+            cov_data = compute_empirical_coverage(
+                estimates=estimates_cell,
+                targets=targets_cell,
+                widths=widths,
+                prob=prob,
+                interval_type=interval_type,
+            )
+
+            # For this cell, there's only one "param" dimension => index 0
+            width_rep = cov_data["width_represented"][:, 0]
+            cov_est = cov_data["coverage_estimates"][:, 0]
+            cov_low = cov_data["coverage_lower"][:, 0]
+            cov_high = cov_data["coverage_upper"][:, 0]
+
+            if difference:
+                diff_est = cov_est - width_rep
+                diff_low = cov_low - width_rep
+                diff_high = cov_high - width_rep
+
+                ax.fill_between(
+                    width_rep,
+                    diff_low,
+                    diff_high,
+                    color="grey",
+                    alpha=0.33,
+                    label=f"{int(prob*100)}% Credible Interval",
+                )
+                ax.axhline(0.0, color="black", linestyle="dashed", label="Ideal Coverage")
+                ax.plot(width_rep, diff_est, color=tint, alpha=1.0, label="Coverage Difference")
+                ax.set_ylim(-0.55, 0.55)
+            else:
+                ax.fill_between(
+                    width_rep,
+                    cov_low,
+                    cov_high,
+                    color="grey",
+                    alpha=0.33,
+                    label=f"{int(prob*100)}% Credible Interval",
+                )
+                ax.plot([0, 1], [0, 1], color="black", linestyle="dashed", label="Ideal Coverage")
+                ax.plot(width_rep, cov_est, color=tint, alpha=1.0, label="Empirical Coverage")
+                ax.set_ylim(-0.02, 1.02)
+
+            # Labels/titles
+            ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
+            ax.set_xlabel("Interval width" if r == num_rows - 1 else "", fontsize=label_fontsize)
+
+            if variable_names is not None and r == 0:
+                ax.set_title(variable_names[c], fontsize=title_fontsize)
+
+            ax.tick_params(axis="both", labelsize=tick_fontsize)
+            ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
+
+            if r == 0 and c == 0:
+                ax.legend(fontsize=legend_fontsize, loc=legend_location)
+
+    fig.tight_layout()
+    return fig
+
+if __name__ == "__main__":
+    from bayesgpt.simulators.context_manager import ContextManager
+
+    debug = True
+    color = bayesgpt_cm_colors()
+
+    if debug:
+        design_config = {
+            "1": ["v", "a", "z", "tau"],
+            "u_1": ["v", "a", "tau"],
+            "u_2": ["v", "a", "z"],
+            "u_1:u_2": ["v", "a"],
+        }
+
+        intrinsic_params = design_config["1"]
+        variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
+
+        num_params = len(intrinsic_params)
+        num_regressors = len(design_config.keys()) - 1
+        num_categories = 3
+
+        # This must match ContextManager's row layout:
+        # rows = 1 (intercept) + num_regressors * (num_categories - 1)
+        num_rows = 1 + num_regressors * (num_categories - 1)
+        num_cols = num_params
+
+        batch_size = 200
+        num_draws = 256  # posterior samples per dataset
+
+        # Build the same parameter mask used by adaptive_recovery
+        cm = ContextManager()
+        parameter_mask = cm.build_parameter_mask(
+            design_config=design_config,
+            max_num_categories=num_categories,
+            intrinsic_params=intrinsic_params,
+            keep_intercept=True,
+        )
+        if parameter_mask.ndim == 3:
+            parameter_mask = parameter_mask[0]
+
+        # True values (batch, rows, cols)
+        true = np.random.normal(0.0, 1.0, size=(batch_size, num_rows, num_cols))
+
+        # Posterior draws (batch, draws, rows, cols)
+        # Make draws roughly calibrated around truth (so the plot looks sensible)
+        sigma = 0.5
+        pred = true[:, None, :, :] + np.random.normal(0.0, sigma, size=(batch_size, num_draws, num_rows, num_cols))
+
+        print("true:", true.shape)
+        print("pred:", pred.shape)
+        print("mask:", parameter_mask.shape)
+
+        fig = adaptive_coverage(
+            true=true,
+            pred=pred,
+            design_config=design_config,
+            parameter_masks=parameter_mask,
+            variable_names=variable_names,
+            intercept_color=color["intercept"],
+            main_effect_color=color["main_effect"],
+            interaction_color=color["interaction"],
+            prob=0.95,
+            interval_type="central",
+            difference=False,
+            title_fontsize=18,
+            label_fontsize=14,
+        )
+
+        fig.savefig("test_adaptive_coverage.pdf")
+        print("Saved test_adaptive_coverage.pdf")
