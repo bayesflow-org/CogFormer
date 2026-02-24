@@ -109,7 +109,9 @@ def adaptive_coverage(
     pred: np.ndarray,
     design_config: dict,
     variable_names: list,
-    parameter_masks: np.ndarray = None,
+    intrinsic_params: list = None,
+    parameter_mask: np.ndarray = None,
+    max_num_categories: int = 2,
     intercept_color: str = "#4e2a84",
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
@@ -126,6 +128,17 @@ def adaptive_coverage(
     """
     Adaptive (masked) empirical coverage plot over a regressor-by-parameter grid.
     """
+
+    if parameter_mask is None:
+        context_manager = ContextManager()
+        parameter_mask = context_manager.build_parameter_mask(
+            design_config=design_config,
+            max_num_categories=max_num_categories,
+            intrinsic_params=intrinsic_params,
+            keep_intercept=True
+        )
+    elif parameter_mask.ndim == 3:
+        parameter_mask = parameter_mask[0]
 
     batch_size, num_draws, num_rows, num_cols = pred.shape
 
@@ -153,7 +166,7 @@ def adaptive_coverage(
             ax = axarr[r, c]
 
             # Masked cell -> N/A tile
-            if parameter_masks[r, c] != 1.0:
+            if parameter_mask[r, c] != 1.0:
                 ax.set_facecolor(tint)
                 ax.patch.set_alpha(0.05)
                 ax.set_xticks([])
