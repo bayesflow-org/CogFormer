@@ -13,26 +13,40 @@ class ContextManager:
         self.intrinsic_params = intrinsic_params
 
     def build_design_config(
-        self,
-        intrinsic_params: list[str],
-        regressed_params: list[str] = None,
-        num_regressors: int = 2,
-        keep_intercept: bool = False,
-        add_interaction: bool = False,
+            self,
+            intrinsic_params: list[str],
+            regressed_params: list[str] = None,
+            num_regressors: int = 2,
+            keep_intercept: bool = False,
+            add_interaction: bool = False,
     ):
 
-        config = {}
+        config: dict[str, list[str]] = {}
+
+        # Choose which intrinsics are eligible to be regressed
+        if regressed_params is None:
+            regressed = list(intrinsic_params)
+        else:
+            regressed_set = set(regressed_params)
+            regressed = [p for p in intrinsic_params if p in regressed_set]
 
         # Intercept first
         if keep_intercept:
-            names = intrinsic_params
-            config["1"] = names
+            # Enforce invariant: no slopes without intercept.
+            # So the intercept must cover (at least) the regressed parameters.
+            config["1"] = list(regressed)
 
         # Then main effect
-        main_keys = []
+        main_keys: list[str] = []
         for r in range(num_regressors):
-            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
-            config[key] = regressed_params
+            key = f"u_{r + 1}" if keep_intercept else f"u_{r}"
+
+            if keep_intercept:
+                # Slopes can only appear if intercept exists for that intrinsic
+                config[key] = list(config["1"])
+            else:
+                config[key] = list(regressed)
+
             main_keys.append(key)
 
         # Optionally, interaction effect
@@ -48,35 +62,75 @@ class ContextManager:
         return config
 
     def build_random_design_config(
-        self,
-        intrinsic_params: list[str],
-        num_regressors: int,
-        free_intrinsics: list[str] | set[str] | None = None,
-        fixed_intrinsics: list[str] | set[str] | None = None,
-        keep_intercept: bool = False,
-        free_prob: float = 0.5,
-        intercept_prob: float = 0.5,
-        add_interaction: bool = False,
+            self,
+            intrinsic_params: list[str],
+            num_regressors: int,
+            free_intrinsics: list[str] | set[str] | None = None,
+            fixed_intrinsics: list[str] | set[str] | None = None,
+            keep_intercept: bool = False,
+            free_prob: float = 0.5,
+            intercept_prob: float = 0.5,
+            add_interaction: bool = False,
     ) -> dict[str, list[str]]:
         """
         Randomly build a design_config mapping regressors and optional intercept
         to subsets of intrinsic parameters.
+
+        Notes
+        -----
+        - The intercept row (key "1") is randomized when `keep_intercept=True`.
+        - Slopes (main effects and interactions) are only allowed for intrinsic
+          parameters which have an intercept entry.
+        - Fixed intrinsics (if provided) are always included in the intercept and
+          never appear in slope terms.
         """
-        # Set up mandatory and intercept only params based on free and fixed intrinsics
+        # Normalize inputs
+        free_set = None if free_intrinsics is None else set(free_intrinsics)
+        fixed_set: set[str] = set() if fixed_intrinsics is None else set(fixed_intrinsics)
+
         config = {}
 
-        # Intercept first
+        # --- Intercept ---
+        # Randomize intercept membership for free intrinsics, but always include fixed intrinsics
+        intercept_names: list[str] = []
         if keep_intercept:
-            names = intrinsic_params
-            config["1"] = names
+            for p in intrinsic_params:
+                if free_set is not None and p in free_set:
+                    # (1) free intrinsics always get intercepts
+                    intercept_names.append(p)
+                    continue
+
+                if p in fixed_set:
+                    # (2) fixed intrinsics sometimes get intercepts
+                    if np.random.rand() < intercept_prob:
+                        intercept_names.append(p)
+                    continue
+
+                # If free_set is provided, exclude non-free / non-fixed intrinsics entirely
+                if free_set is not None:
+                    continue
+
+                # Otherwise treat as "free-ish": random intercept
+                if np.random.rand() < intercept_prob:
+                    intercept_names.append(p)
+
+            config["1"] = intercept_names
+
+        # Helper: slopes only allowed when intercept exists for the intrinsic
+        allowed_slope_params = set(intercept_names) if keep_intercept else set(intrinsic_params)
+        # Never allow slopes for fixed intrinsics
+        allowed_slope_params -= fixed_set
+        # If free_intrinsics is provided, restrict slopes to that set as well
+        if free_set is not None:
+            allowed_slope_params &= free_set
 
         # Main effect
         main_keys = []
         for r in range(num_regressors):
-            key = f"u_{r+1}" if keep_intercept else f"u_{r}"
+            key = f"u_{r + 1}" if keep_intercept else f"u_{r}"
             names = []
             for param in intrinsic_params:
-                if (param not in fixed_intrinsics) and (np.random.rand() < free_prob):
+                if (param in allowed_slope_params) and (np.random.rand() < free_prob):
                     names.append(param)
             config[key] = names
             main_keys.append(key)
@@ -94,12 +148,12 @@ class ContextManager:
         return config
 
     def build_parameter_mask(
-        self,
-        design_config: dict[str, list[str]],
-        intrinsic_params: list[str],
-        fixed_params: list[str] = None,
-        max_num_categories: int = 3,
-        keep_intercept: bool = False
+            self,
+            design_config: dict[str, list[str]],
+            intrinsic_params: list[str],
+            fixed_params: list[str] = None,
+            max_num_categories: int = 3,
+            keep_intercept: bool = False
     ) -> np.ndarray:
         """
         Convert a design_config dict into a binary parameter mask mapping
@@ -123,13 +177,11 @@ class ContextManager:
         if has_intercept:
             for name in design_config.get("1", []):
                 if name in intrinsic_params:
-                    if fixed_params is None:
-                        j = intrinsic_params.index(name)
-                        mask[row_idx, j] = 1.0
-                    else:
-                        if name not in fixed_params:
-                            j = intrinsic_params.index(name)
-                            mask[row_idx, j] = 1.0
+                    # Always allow intercepts, even for fixed parameters.
+                    # Fixedness should be expressed via the prior (fixed intercept, zero slopes),
+                    # not by deleting the intercept entry from the mask.
+                    j = intrinsic_params.index(name)
+                    mask[row_idx, j] = 1.0
 
             row_idx = 1
 
@@ -140,10 +192,53 @@ class ContextManager:
             for intrinsic in design_config[key]:
                 if intrinsic in intrinsic_params:
                     param_index = intrinsic_params.index(intrinsic)
+                    if fixed_params is not None and intrinsic in fixed_params:
+                        continue
                     for r in rows:
                         mask[r, param_index] = 1.0
 
         return mask
+
+    def build_random_parameter_mask(
+        self,
+        intrinsic_params: list[str],
+        num_regressors: int = 2,
+        # max_num_regressors: int = 5,
+        max_num_categories: int = 4,
+        free_intrinsics: list[str] | set[str] | None = None,
+        fixed_intrinsics: list[str] | set[str] | None = None,
+        free_prob: float = 0.5,     # Probability of a param being free
+        intercept_prob: float = 0.5,
+        keep_intercept: bool = False,
+        add_interaction: bool = False,
+    ) -> tuple:
+        """
+        Randomly generate both a design_config and its corresponding parameter mask.
+
+        free_intrinsics: both intercept and slopes are sampled
+        fixed_intrinsics: only intercept is sampled, slopes are not
+        frozen_intrinsics: neither intercept nor slope are sampled
+        """
+        design_config = self.build_random_design_config(
+            intrinsic_params=intrinsic_params,
+            num_regressors=num_regressors,
+            free_prob=free_prob,
+            intercept_prob=intercept_prob,
+            keep_intercept=keep_intercept,
+            free_intrinsics=free_intrinsics,
+            fixed_intrinsics=fixed_intrinsics,
+            add_interaction=add_interaction
+        )
+
+        parameter_mask = self.build_parameter_mask(
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            # max_num_regressors=max_num_regressors,
+            max_num_categories=max_num_categories,
+            keep_intercept=keep_intercept,
+        )
+
+        return parameter_mask, design_config
 
     def build_intrinsic_priors(
         self,
@@ -185,45 +280,6 @@ class ContextManager:
                 }
 
         return priors
-
-    def build_random_parameter_mask(
-        self,
-        intrinsic_params: list[str],
-        num_regressors: int = 2,
-        # max_num_regressors: int = 5,
-        max_num_categories: int = 4,
-        free_intrinsics: list[str] | set[str] | None = None,
-        fixed_intrinsics: list[str] | set[str] | None = None,
-        free_prob: float = 0.5,     # Probability of a param being free
-        keep_intercept: bool = False,
-        add_interaction: bool = False,
-    ) -> tuple:
-        """
-        Randomly generate both a design_config and its corresponding parameter mask.
-
-        free_intrinsics: both intercept and slopes are sampled
-        fixed_intrinsics: only intercept is sampled, slopes are not
-        frozen_intrinsics: neither intercept nor slope are sampled
-        """
-        design_config = self.build_random_design_config(
-            intrinsic_params=intrinsic_params,
-            num_regressors=num_regressors,
-            free_prob=free_prob,
-            keep_intercept=keep_intercept,
-            free_intrinsics=free_intrinsics,
-            fixed_intrinsics=fixed_intrinsics,
-            add_interaction=add_interaction
-        )
-
-        parameter_mask = self.build_parameter_mask(
-            design_config=design_config,
-            intrinsic_params=intrinsic_params,
-            # max_num_regressors=max_num_regressors,
-            max_num_categories=max_num_categories,
-            keep_intercept=keep_intercept,
-        )
-
-        return parameter_mask, design_config
 
     def build_discrete_mask(
             self,

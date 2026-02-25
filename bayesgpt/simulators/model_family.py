@@ -8,7 +8,6 @@ from .model import Model
 from .context_manager import ContextManager
 
 from ..utils.simulator_utils import shifted_softplus, softplus, inspect
-from ..viz import visualize_matrix, visualize_matrices, visualize_design_configs
 
 
 class NestedModelFamily:
@@ -182,11 +181,22 @@ class NestedModelFamily:
             link_fun=link_fun,
             default_link_fun=None
         )
+
         # Compose per-trial intrinsic values
         predictor = design_matrix @ parameter_matrix
         regressed_parameters = np.empty_like(predictor, dtype=np.float32)
         for j, name in enumerate(self.intrinsic_params):
             regressed_parameters[:, j] = link_funs[name](predictor[:, j]).astype(np.float32, copy=False)
+
+        # Post-link fix: fixed intrinsics with NO intercept are fixed at 0.0 (simulator-space)
+        fixed_set = set(kwargs.get("fixed_intrinsics") or [])
+        if keep_intercept and fixed_set:
+            intercept_set = set(design_config.get("1", []))
+            no_intercept_fixed = fixed_set - intercept_set
+            if no_intercept_fixed:
+                for j, name in enumerate(self.intrinsic_params):
+                    if name in no_intercept_fixed:
+                        regressed_parameters[:, j] = 0.0
 
         # Package for model
         params = {
