@@ -205,6 +205,8 @@ class BayesGPTTrainer:
         recovery_dir.mkdir(parents=True, exist_ok=True)
         posterior_dir = Path("./bayesgpt/experiments/figures/fm/test_posterior")
         posterior_dir.mkdir(parents=True, exist_ok=True)
+        coverage_dir = Path("./bayesgpt/experiments/figures/fm/coverage")
+        coverage_dir.mkdir(parents=True, exist_ok=True)
 
         self.gpt.eval()
 
@@ -299,16 +301,21 @@ class BayesGPTTrainer:
                 interaction_color=colors["interaction"]
             )
 
+            out_coverage = coverage_dir / Path(f"ddm_benchmark_test_coverage_{tag}.pdf")
+            coverage.savefig(out_coverage, bbox_inches="tight")
+
             if self.use_wandb:
                 wandb.log(
                     {
                         f"val/recovery_{tag}": wandb.Image(recovery),
                         f"val/posterior_{tag}": wandb.Image(posterior.fig),
+                        f"val/coverage_{tag}": wandb.Image(coverage),
                     },
                     step=global_step,
                 )
                 plt.close(recovery)
                 plt.close(posterior.fig)
+                plt.close(coverage)
 
         self.gpt.train()
 
