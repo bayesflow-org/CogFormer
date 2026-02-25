@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import beta
 import matplotlib.pyplot as plt
+from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
 
 
@@ -252,7 +253,6 @@ def adaptive_coverage(
     return fig
 
 if __name__ == "__main__":
-    from bayesgpt.simulators.context_manager import ContextManager
 
     debug = True
     color = bayesgpt_cm_colors()
