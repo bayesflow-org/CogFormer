@@ -188,7 +188,12 @@ class BayesGPTTrainer:
             "u_2": ["v", "a", "tau"],
             "u_1:u_2": ["v", "a"],
         }
-        config_2 = {"1": ["v", "a", "tau"]}
+        config_2 = {
+            "1": ["v", "a", "tau"],
+            "u_1": [],
+            "u_2": [],
+            "u_1:u_2": []
+        }
 
         scenarios = [
             ("interaction", config_1),
