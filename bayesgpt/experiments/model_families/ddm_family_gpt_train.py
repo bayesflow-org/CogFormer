@@ -20,6 +20,7 @@ from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
+from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
@@ -138,7 +139,7 @@ class BayesGPTTrainer:
         # Generate training samples
         train_samples = self.model_family.batch_sample(
             **config["model_family_config"],
-            **config["train_sample_config"],
+            **train_sample_config,
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
             link_fun=ddm_link_fun()
@@ -179,112 +180,135 @@ class BayesGPTTrainer:
 
         return loss, current_lr
 
-
     def val_step(self, config, global_step, fig_path):
-        # Generate training samples
-        design_config = {
-            '1': ["v", "a", "tau", "s_v", "s_tau"],
+        # Two validation scenarios
+        config_1 = {
+            "1": ["v", "a", "tau", "s_v", "s_tau"],
             "u_1": ["v", "a", "tau", "s_v"],
             "u_2": ["v", "a", "tau"],
             "u_1:u_2": ["v", "a"],
         }
+        config_2 = {"1": ["v", "a", "tau"]}
 
-        test_samples = self.model_family.batch_sample(
-            **config["model_family_config"],
-            **config["val_sample_config"],
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-            design_config=design_config,
-            link_fun=ddm_link_fun()
-        )
-
-        # Adapt
-        adapted = self.adapter.adapt(
-            test_samples,
-            intrinsic_params=self.model_family.intrinsic_params
-        )
-
-        self.gpt.eval()
-        pred_velocity, target_velocity = self.gpt(
-            adapted["param_matrices"][..., None],
-            adapted['input_data'],
-            adapted['param_indices'],
-            adapted['regressor_indices'],
-            adapted['param_masks']
-        )
-        if self.debug:
-            print(pred_velocity.shape, target_velocity.shape)
-
-        true_set = adapted["param_matrices"].detach().cpu().numpy()
+        scenarios = [
+            ("interaction", config_1),
+            ("fixed", config_2),
+        ]
 
         params = ["v", "a", "tau", "s_v", "s_tau"]
         param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
-        params_mask = adapted["param_masks"].detach().cpu().numpy()
-        n_cols = len(params)
-        n_rows = true_set.shape[1] // n_cols
-        true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
 
-        fm_sample_steps = config["fm_sample_steps"]
-        fm_num_samples = config["fm_num_samples"]
-        pred_set = self.gpt.sample(
-            adapted['input_data'],
-            adapted['param_indices'],
-            adapted['regressor_indices'],
-            adapted['param_masks'],
-            steps=fm_sample_steps,
-            num_samples=fm_num_samples
-        )
-        pred_set = pred_set.reshape(config["batch_size"], fm_num_samples, n_rows, n_cols)
-        if self.debug:
-            print(pred_set[0])
-
-        params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
-
-        # Log recovery plot
         colors = bayesgpt_fm_colors()
-        recovery = adaptive_recovery(
-            true_set, pred_set,
-            design_config=design_config,
-            intrinsic_params=params,
-            max_num_categories=config["model_family_config"]["max_num_categories"],
-            parameter_mask=params_mask,
-            variable_names=param_names,
-            intercept_color=colors["intercept"],
-            main_effect_color=colors["main_effect"],
-            interaction_color=colors["interaction"],
-        )
+        max_num_categories = config["model_family_config"]["max_num_categories"]
 
         recovery_dir = Path("./bayesgpt/experiments/figures/fm/recovery")
         recovery_dir.mkdir(parents=True, exist_ok=True)
-
-        recovery.savefig(recovery_dir / fig_path, bbox_inches="tight")
-
-        posterior = adaptive_posterior(
-            samples=pred_set[0],
-            design_config=design_config,
-            intrinsic_params=params,
-            max_num_categories=max_num_categories,
-            intercept_color=colors["intercept"],
-            main_effect_color=colors["main_effect"],
-            interaction_color=colors["interaction"],
-            unfold=False
-        )
-
         posterior_dir = Path("./bayesgpt/experiments/figures/fm/test_posterior")
         posterior_dir.mkdir(parents=True, exist_ok=True)
 
-        posterior.savefig(posterior_dir / Path("ddm_benchmark_test_posterior.pdf"), bbox_inches="tight")
+        self.gpt.eval()
 
-        if self.use_wandb:
-            wandb.log(
-                {
-                    "val/recovery": wandb.Image(recovery),
-                    "val/posterior": wandb.Image(posterior.fig),
-                },
-                step=global_step,
+        for tag, design_config in scenarios:
+            # Sample
+            test_samples = self.model_family.batch_sample(
+                **config["model_family_config"],
+                **config["val_sample_config"],
+                batch_size=config["batch_size"],
+                flatten_param_outputs=True,
+                design_config=design_config,
+                link_fun=ddm_link_fun(),
             )
-            plt.close(recovery)
-            plt.close(posterior.fig)
+
+            # Adapt
+            adapted = self.adapter.adapt(
+                test_samples,
+                intrinsic_params=self.model_family.intrinsic_params
+            )
+
+            # Forward
+            pred_velocity, target_velocity = self.gpt(
+                adapted["param_matrices"][..., None],
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+            )
+
+            true_set = adapted["param_matrices"].detach().cpu().numpy()
+            params_mask = adapted["param_masks"].detach().cpu().numpy()
+
+            n_cols = len(params)
+            n_rows = true_set.shape[1] // n_cols
+            true_set = true_set.reshape(config["batch_size"], n_rows, n_cols)
+
+            fm_sample_steps = config["fm_sample_steps"]
+            fm_num_samples = config["fm_num_samples"]
+            pred_set = self.gpt.sample(
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+                steps=fm_sample_steps,
+                num_samples=fm_num_samples,
+            )
+            pred_set = pred_set.reshape(config["batch_size"], fm_num_samples, n_rows, n_cols)
+
+            # Mask for plotting (same as before: take first batch element)
+            params_mask = params_mask.reshape((config["batch_size"], n_rows, n_cols))[0]
+
+            # Recovery plot
+            recovery = adaptive_recovery(
+                true_set, pred_set,
+                design_config=design_config,
+                intrinsic_params=params,
+                max_num_categories=max_num_categories,
+                parameter_mask=params_mask,
+                variable_names=param_names,
+                intercept_color=colors["intercept"],
+                main_effect_color=colors["main_effect"],
+                interaction_color=colors["interaction"],
+            )
+
+            out_recovery = recovery_dir / Path(fig_path).with_stem(f"{Path(fig_path).stem}_{tag}")
+            recovery.savefig(out_recovery, bbox_inches="tight")
+
+            # Posterior plot
+            posterior = adaptive_posterior(
+                samples=pred_set[0],
+                design_config=design_config,
+                intrinsic_params=params,
+                max_num_categories=max_num_categories,
+                intercept_color=colors["intercept"],
+                main_effect_color=colors["main_effect"],
+                interaction_color=colors["interaction"],
+                unfold=False,
+            )
+
+            out_posterior = posterior_dir / Path(f"ddm_benchmark_test_posterior_{tag}.pdf")
+            posterior.savefig(out_posterior, bbox_inches="tight")
+
+            coverage = adaptive_coverage(
+                true=true_set,
+                pred=pred_set,
+                design_config=design_config,
+                intrinsic_params=params,
+                variable_names=param_names,
+                max_num_categories=max_num_categories,
+                intercept_color=colors["intercept"],
+                main_effect_color=colors["main_effect"],
+                interaction_color=colors["interaction"]
+            )
+
+            if self.use_wandb:
+                wandb.log(
+                    {
+                        f"val/recovery_{tag}": wandb.Image(recovery),
+                        f"val/posterior_{tag}": wandb.Image(posterior.fig),
+                    },
+                    step=global_step,
+                )
+                plt.close(recovery)
+                plt.close(posterior.fig)
 
         self.gpt.train()
 
@@ -356,7 +380,7 @@ if __name__ == "__main__":
     }
 
     val_params_kwargs = {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {}
     }
