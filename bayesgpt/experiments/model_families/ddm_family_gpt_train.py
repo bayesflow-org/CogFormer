@@ -387,7 +387,7 @@ if __name__ == "__main__":
 
     train_params_kwargs = {
         "free_intrinsics": ["v", "a", "tau"],
-        "fixed_intrinsics": [],
+        "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {}
     }
 

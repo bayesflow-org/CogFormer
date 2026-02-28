@@ -119,10 +119,10 @@ class ContextManager:
         # Helper: slopes only allowed when intercept exists for the intrinsic
         allowed_slope_params = set(intercept_names) if keep_intercept else set(intrinsic_params)
         # Never allow slopes for fixed intrinsics
-        allowed_slope_params -= fixed_set
-        # If free_intrinsics is provided, restrict slopes to that set as well
-        if free_set is not None:
-            allowed_slope_params &= free_set
+        # allowed_slope_params -= fixed_set
+        # # If free_intrinsics is provided, restrict slopes to that set as well
+        # if free_set is not None:
+        #     allowed_slope_params &= free_set
 
         # Main effect
         main_keys = []
@@ -243,21 +243,25 @@ class ContextManager:
     def build_intrinsic_priors(
         self,
         prior_fun: Callable | dict = None,
+        design_config: dict[str, list[str]] = None,
         free_intrinsics: list[str] | set[str] | None = None,
         fixed_intrinsics: list[str] | set[str] | None = None,
         fixed_values: dict[str, float] | None = None
     ):
+        print(prior_fun)
+        if design_config is not None:
+            free_intrinsics = design_config["1"]
+            fixed_intrinsics = list(set(list(prior_fun.keys())) - set(free_intrinsics))
+
+        print(free_intrinsics, fixed_intrinsics)
+
+
         priors = {}
 
         for k, spec in prior_fun.items():
-            # If the user provides a fixed value for a fixed intrinsic parameter,
-            # use that value. Otherwise, default to zero.
-            if k in fixed_intrinsics and k in fixed_values:
-                fixed_value = fixed_values[k]
-            else:
-                fixed_value = 0.0
 
             if k in free_intrinsics:
+                print(f"{k} is free")
                 # SciPy priors
                 if hasattr(spec, "rvs"):
                     # print("Identified SciPy priors")
@@ -273,7 +277,15 @@ class ContextManager:
                         "intercept": spec,
                         "slope": lambda: np.random.normal(0.0, 1.0)
                     }
-            else:
+            elif k in fixed_intrinsics:
+                print(f"{k} is fixed")
+                # If the user provides a fixed value for a fixed intrinsic parameter,
+                # use that value. Otherwise, default to zero.
+                if k in fixed_values:
+                    fixed_value = fixed_values[k]
+                else:
+                    print("I'm here")
+                    fixed_value = 0.0
                 priors[k] = {
                     "intercept": lambda v=fixed_value: v,
                     "slope": lambda: 0.0
@@ -565,8 +577,8 @@ class ContextManager:
         """
         Sample parameter matrix based on the given parameter mask and the associated priors.
         This has shape (num_regressors, num_intrinsic_params).
-
         """
+        print(parameter_mask)
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
@@ -582,16 +594,15 @@ class ContextManager:
 
             for param_index, intrinsic_param in enumerate(intrinsic_params):
                 # Sample prior if parameter or regressor is not masked
-                if parameter_mask[design_index, param_index] != 1.0:
-                    continue
-
                 if parameter_mask[design_index, param_index] == 1.0:
                     if (design_index == 0) and has_intercept:
                         sampler = prior_fun[intrinsic_param]["intercept"]
+                        print(design_index, param_index, )
                     else:
                         sampler = prior_fun[intrinsic_param]["slope"]
 
                     parameter_matrix[design_index, param_index] = sampler()
+
         return parameter_matrix
 
 
