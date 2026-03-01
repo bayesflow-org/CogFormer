@@ -248,20 +248,15 @@ class ContextManager:
         fixed_intrinsics: list[str] | set[str] | None = None,
         fixed_values: dict[str, float] | None = None
     ):
-        print(prior_fun)
         if design_config is not None:
             free_intrinsics = design_config["1"]
             fixed_intrinsics = list(set(list(prior_fun.keys())) - set(free_intrinsics))
-
-        print(free_intrinsics, fixed_intrinsics)
-
 
         priors = {}
 
         for k, spec in prior_fun.items():
 
             if k in free_intrinsics:
-                print(f"{k} is free")
                 # SciPy priors
                 if hasattr(spec, "rvs"):
                     # print("Identified SciPy priors")
@@ -278,13 +273,11 @@ class ContextManager:
                         "slope": lambda: np.random.normal(0.0, 1.0)
                     }
             elif k in fixed_intrinsics:
-                print(f"{k} is fixed")
                 # If the user provides a fixed value for a fixed intrinsic parameter,
                 # use that value. Otherwise, default to zero.
                 if k in fixed_values:
                     fixed_value = fixed_values[k]
                 else:
-                    print("I'm here")
                     fixed_value = 0.0
                 priors[k] = {
                     "intercept": lambda v=fixed_value: v,

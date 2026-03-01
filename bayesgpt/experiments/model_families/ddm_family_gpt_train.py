@@ -95,7 +95,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 2 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -140,6 +140,7 @@ class BayesGPTTrainer:
         train_samples = self.model_family.batch_sample(
             **config["model_family_config"],
             **train_sample_config,
+            prior_fun=self.prior_fun,
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
             link_fun=ddm_link_fun()
