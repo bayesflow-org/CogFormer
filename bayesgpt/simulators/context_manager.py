@@ -571,7 +571,6 @@ class ContextManager:
         Sample parameter matrix based on the given parameter mask and the associated priors.
         This has shape (num_regressors, num_intrinsic_params).
         """
-        print(parameter_mask)
         num_regressors, num_intrinsic_params = parameter_mask.shape
         parameter_matrix = np.zeros((num_regressors, num_intrinsic_params))
 
@@ -590,7 +589,6 @@ class ContextManager:
                 if parameter_mask[design_index, param_index] == 1.0:
                     if (design_index == 0) and has_intercept:
                         sampler = prior_fun[intrinsic_param]["intercept"]
-                        print(design_index, param_index, )
                     else:
                         sampler = prior_fun[intrinsic_param]["slope"]
 
