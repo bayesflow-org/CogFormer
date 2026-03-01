@@ -108,38 +108,9 @@ class BayesGPTTrainer:
     def train_step(self, config, optimizer, scheduler):
         """Training step"""
 
-        required = ["v", "a", "tau"]
-        optional = ["s_v", "s_tau"]
-
-        free_intrinsics = list(required)
-        fixed_intrinsics = []
-
-        # For each optional intrinsic, choose: free vs fixed vs absent
-        # Tweak these probs to control coverage
-        p_free = 0.5
-        p_fixed = 0.5
-        for p in optional:
-            u = np.random.rand()
-            if u < p_free:
-                free_intrinsics.append(p)
-            elif u < p_free + p_fixed:
-                fixed_intrinsics.append(p)
-            # else: absent (neither free nor fixed)
-
-        sampled_mask_kwargs = {
-            "free_intrinsics": free_intrinsics,
-            "fixed_intrinsics": fixed_intrinsics,
-            "fixed_values": {},  # keep as-is unless you want nonzero fixed intercepts sometimes
-        }
-
-        # Use a local copy so we don't mutate the global config dict
-        train_sample_config = dict(config["train_sample_config"])
-        train_sample_config["mask_randomizer_kwargs"] = sampled_mask_kwargs
-
         # Generate training samples
         train_samples = self.model_family.batch_sample(
             **config["model_family_config"],
-            **train_sample_config,
             prior_fun=self.prior_fun,
             batch_size=config["batch_size"],
             flatten_param_outputs=True,
@@ -389,7 +360,7 @@ if __name__ == "__main__":
     train_params_kwargs = {
         "free_intrinsics": ["v", "a", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
-        "fixed_values": {}
+        "fixed_values": {"s_v": 0.0, "s_tau": 0.0}
     }
 
     val_params_kwargs = {
