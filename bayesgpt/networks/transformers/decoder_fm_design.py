@@ -96,6 +96,7 @@ class Decoder(nn.Module):
         #     cross_attn_mask = None
         #     self_attn_mask = None
 
+        # Study the effect of incorporating encoder outputs here
         out = torch.cat([theta_t, query, t], dim=-1)
 
         out = self.input_proj(out)
