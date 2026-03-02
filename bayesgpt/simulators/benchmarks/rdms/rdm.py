@@ -8,8 +8,10 @@ from bayesgpt.utils.simulator_utils import as_1d
 def sample_rdm_trial(
     v: np.ndarray,
     a: float,
-    decay: float,
     tau: float,
+    s_v: float,
+    s_tau: float,
+    decay: float = 0.0,
     dt: float = 0.001,
     sigma: float = 1.0,
     max_steps: int = 10000,
@@ -17,25 +19,36 @@ def sample_rdm_trial(
     # Infer number of alternatives
     num_alternatives = v.shape[0]
     c = sigma * np.sqrt(dt)
-    # exponentially collapsing threshold
+
+    # Inter-trial variability: sample drift and non-decision time for this trial
+    v_i = np.empty(num_alternatives, dtype=np.float64)
+    for k in range(num_alternatives):
+        v_i[k] = np.random.normal(v[k], s_v)
+    tau_i = tau + np.random.uniform(0, s_tau)
+
+    # Exponentially collapsing threshold (decay=0 means fixed threshold)
     t = np.arange(0, max_steps * dt, dt)
     threshold = a * np.exp(-decay * t)
+
     X = np.zeros(num_alternatives)
     for i_iter in range(max_steps):
         noise = np.random.randn(int(num_alternatives)).astype(np.float32) * c
         for i in range(num_alternatives):
-            X[i] += v[i] * dt + noise[i]
+            X[i] += v_i[i] * dt + noise[i]
             if X[i] >= threshold[i_iter]:
-                return np.array([tau + i_iter * dt, i], dtype=np.float32)
+                return np.array([tau_i + i_iter * dt, i], dtype=np.float32)
     # No decision within max_steps
     return np.array([-1.0, -1.0], dtype=np.float32)
+
 
 @njit(parallel=True)
 def simulate_rdm(
     v: np.ndarray,
     a: np.ndarray,
     tau: np.ndarray,
-    decay: np.ndarray,
+    s_v: np.ndarray,
+    s_tau: np.ndarray,
+    decay: float = 0.0,
     sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000
@@ -47,8 +60,10 @@ def simulate_rdm(
         sim_trial = sample_rdm_trial(
             v=v[i],
             a=a[i],
-            decay=decay[i],
             tau=tau[i],
+            s_v=s_v[i],
+            s_tau=s_tau[i],
+            decay=decay,
             sigma=sigma,
             dt=dt,
             max_steps=max_steps
@@ -75,9 +90,10 @@ class RDM(Model):
         - v_diff: added to accumulator specified by context['favored_idx']
     """
 
-    def __init__(self, dt: float = 1e-3, max_steps: int = 1e4):
+    def __init__(self, dt: float = 1e-3, max_steps: int = 1e4, decay: float = 0.0):
         self.dt = dt
         self.max_steps = max_steps
+        self.decay = decay  # Fixed decay parameter (0.0 = no collapsing bounds)
 
     def prepare_params(
         self,
@@ -95,7 +111,8 @@ class RDM(Model):
             v_diff : drift difference between accumulators
             a : threshold
             tau : non-decision time
-            decay : threshold decay rate
+            s_v : inter-trial drift variability (std dev)
+            s_tau : inter-trial non-decision time variability (uniform half-width)
 
         context : dict, optional
             num_alternatives : number of accumulators (default: 2)
@@ -113,7 +130,8 @@ class RDM(Model):
         v_diff = as_1d(params["v_diff"], num_obs)
         a      = as_1d(params["a"], num_obs)
         tau    = as_1d(params["tau"], num_obs)
-        decay  = as_1d(params["decay"], num_obs)
+        s_v    = as_1d(params["s_v"], num_obs)
+        s_tau  = as_1d(params["s_tau"], num_obs)
 
         if num_alternatives == 2:
             # Standard 2-alternative response coding:
@@ -140,7 +158,7 @@ class RDM(Model):
                 v[i, :] = v_base[i]
                 v[i, int(favored_idx[i])] = v_base[i] + v_diff[i]
 
-        return {"v": v, "a": a, "tau": tau, "decay": decay}
+        return {"v": v, "a": a, "tau": tau, "s_v": s_v, "s_tau": s_tau}
 
     @staticmethod
     def build_context(num_obs: int, num_alternatives: int = 2) -> dict[str, np.ndarray]:
@@ -157,7 +175,7 @@ class RDM(Model):
         return {"num_alternatives": 2}
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
-        results = simulate_rdm(**params, dt=self.dt, max_steps=self.max_steps)
+        results = simulate_rdm(**params, decay=self.decay, dt=self.dt, max_steps=self.max_steps)
         rts = results[:, 0][..., None]
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
