@@ -9,21 +9,29 @@ from bayesgpt.utils.simulator_utils import as_1d
 def simulate_cdm_trial(
     v: np.ndarray,
     a: float,
-    decay: float,
     tau: float,
+    s_v: float,
+    s_tau: float,
+    decay: float = 0.0,
     dt: float = 0.001,
     sigma: float = 1.0,
     max_steps: int = 10000,
 ) -> np.ndarray:
+    # Inter-trial variability
+    v_i = np.empty(2)
+    v_i[0] = np.random.normal(v[0], s_v)
+    v_i[1] = np.random.normal(v[1], s_v)
+    tau_i = tau + np.random.uniform(0, s_tau)
+
     c = np.sqrt(dt) * sigma
     # exponentially collapsing threshold
     t = np.arange(0, max_steps * dt, dt)
     threshold = a * np.exp(-decay * t)
     x = np.zeros(2)
     for i_iter in range(max_steps):
-        x += v * dt + c * np.random.randn(2)
+        x += v_i * dt + c * np.random.randn(2)
         if np.linalg.norm(x, 2) >= threshold[i_iter]:
-            return np.array([tau + i_iter * dt, np.arctan2(x[1], x[0]) / np.pi])
+            return np.array([tau_i + i_iter * dt, np.arctan2(x[1], x[0]) / np.pi])
     # No decision within max_steps
     return np.array([-1.0, -1.0])
 
@@ -32,7 +40,9 @@ def simulate_cdm(
     v: np.ndarray,
     a: np.ndarray,
     tau: np.ndarray,
-    decay: np.ndarray,
+    s_v: np.ndarray,
+    s_tau: np.ndarray,
+    decay: float = 0.0,
     sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000
@@ -44,8 +54,10 @@ def simulate_cdm(
         sim_trial = simulate_cdm_trial(
             v=v[i],
             a=a[i],
-            decay=decay[i],
             tau=tau[i],
+            s_v=s_v[i],
+            s_tau=s_tau[i],
+            decay=decay,
             dt=dt,
             sigma=sigma,
             max_steps=max_steps
@@ -56,10 +68,11 @@ def simulate_cdm(
 
 class CDM(Model):
 
-    def __init__(self, dt: float = 1e-3, max_steps: int = 1e4):
+    def __init__(self, dt: float = 1e-3, max_steps: int = 1e4, decay: float = 0.0):
         super().__init__()
         self.dt = dt
         self.max_steps = max_steps
+        self.decay = decay
 
     def prepare_params(
             self,
@@ -71,39 +84,23 @@ class CDM(Model):
         CDM expects:
           - v: (num_obs, 2) Cartesian drift per trial
           - a, tau, decay: (num_obs,)
-        Accepts either:
-          - (v_x, v_y), or
-          - (v, v_theta) [polar], or
-          - preformed v with shape (num_obs, 2).
-        Optionally uses context['theta'] (len == num_obs) to override v_theta.
+        Polar form: v (magnitude) and v_theta (angle in radians).
         """
         context = context or {}
 
-        v_angle  = as_1d(params["v_angle"],  num_obs, "v_angle")
-        v_length = as_1d(params["v_length"], num_obs, "v_length")
-        a        = as_1d(params["a"],        num_obs, "a")
-        tau      = as_1d(params["tau"],      num_obs, "tau")
-        decay    = as_1d(params["decay"],    num_obs, "decay")
-        s_v      = as_1d(params["s_v"],      num_obs, "s_v")
-        s_tau    = as_1d(params["s_tau"],     num_obs, "s_tau")
-        
+        v_theta  = as_1d(params["v_theta"], num_obs, "v_theta")
+        v        = as_1d(params["v"],       num_obs, "v")
+        a        = as_1d(params["a"],       num_obs, "a")
+        tau      = as_1d(params["tau"],     num_obs, "tau")
+        s_v      = as_1d(params["s_v"],     num_obs, "s_v")
+        s_tau    = as_1d(params["s_tau"],   num_obs, "s_tau")
+
         # Polar -> Cartesian
-        v_x = v_length * np.cos(v_angle)
-        v_y = v_length * np.sin(v_angle)
+        v_x = v * np.cos(v_theta)
+        v_y = v * np.sin(v_theta)
         v   = np.stack([v_x, v_y], axis=1)
 
-        # Inter-trial drift variability (isotropic)
-        if np.any(s_v > 0):
-            v = v + np.random.normal(0.0, s_v[:, None], size=(num_obs, 2))
-
-        # Inter-trial nondecision variability
-        if np.any(s_tau > 0):
-            low  = tau - 0.5 * s_tau
-            high = tau + 0.5 * s_tau
-            tau  = np.random.uniform(low, high)
-            tau  = np.maximum(tau, 0.0)
-
-        return {"v": v, "a": a, "tau": tau, "decay": decay}
+        return {"v": v, "a": a, "tau": tau, "s_v": s_v, "s_tau": s_tau}
 
     @staticmethod
     def build_context(num_obs: int, theta_mode: str = "random_uniform") -> dict[str, np.ndarray]:
@@ -127,7 +124,7 @@ class CDM(Model):
         return CDM.build_context(num_obs, theta_mode)
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
-        results = simulate_cdm(**params, dt=self.dt, max_steps=self.max_steps)
+        results = simulate_cdm(**params, decay=self.decay, dt=self.dt, max_steps=self.max_steps)
         rts = results[:, 0][..., None]
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}

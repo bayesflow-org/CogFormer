@@ -1,6 +1,6 @@
 import numpy as np
 from numba import njit
-from scipy import norm
+from scipy.stats import norm
 
 
 def cdm_priors():
