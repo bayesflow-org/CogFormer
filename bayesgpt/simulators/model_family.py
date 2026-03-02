@@ -486,6 +486,22 @@ class NestedModelFamily:
             default_link_fun=None,
         )
 
+        # Check if prior_fun is already in intrinsic format (dict of dicts with intercept/slope)
+        is_intrinsic_priors = True
+        for _, v in self.prior_fun.items():
+            if not isinstance(v, dict):
+                is_intrinsic_priors = False
+                break
+
+        # Convert to intrinsic priors format if needed
+        if is_intrinsic_priors:
+            intrinsic_prior_fun = self.prior_fun
+        else:
+            intrinsic_prior_fun = self.context_manager.build_intrinsic_priors(
+                prior_fun=self.prior_fun,
+                design_config=design_config,
+            )
+
         for _ in range(num_draws):
             X = self.context_manager.build_design_matrix(
                 design_config=design_config,
@@ -499,7 +515,7 @@ class NestedModelFamily:
 
             B = self.context_manager.sample_parameter_matrix(
                 parameter_mask=parameter_mask,
-                prior_fun=self.prior_fun,
+                prior_fun=intrinsic_prior_fun,
                 intrinsic_params=self.intrinsic_params,
                 keep_intercept=keep_intercept,
             )
