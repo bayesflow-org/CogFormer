@@ -194,14 +194,14 @@ class NestedModelFamily:
             regressed_parameters[:, j] = link_funs[name](predictor[:, j]).astype(np.float32, copy=False)
 
         # Post-link fix: fixed intrinsics with NO intercept are fixed at 0.0 (simulator-space)
-        fixed_set = set(kwargs.get("fixed_intrinsics") or [])
-        if keep_intercept and fixed_set:
-            intercept_set = set(design_config.get("1", []))
-            no_intercept_fixed = fixed_set - intercept_set
-            if no_intercept_fixed:
-                for j, name in enumerate(self.intrinsic_params):
-                    if name in no_intercept_fixed:
-                        regressed_parameters[:, j] = 0.0
+        # fixed_set = set(kwargs.get("fixed_intrinsics") or [])
+        # if keep_intercept and fixed_set:
+        #     intercept_set = set(design_config.get("1", []))
+        #     no_intercept_fixed = fixed_set - intercept_set
+        #     if no_intercept_fixed:
+        #         for j, name in enumerate(self.intrinsic_params):
+        #             if name in no_intercept_fixed:
+        #                 regressed_parameters[:, j] = 0.0
 
         # Package for model
         params = {

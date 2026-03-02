@@ -21,7 +21,7 @@ def simulate_ddm_trial(
     max_steps: int = 10000,
 ):
     v_i = np.random.normal(v, s_v)
-    tau_i = tau + np.random.uniform(-s_tau * tau, s_tau * tau)
+    tau_i = tau + np.random.uniform(0, s_tau)
 
     # initialize
     a0 = a if a > 1e-6 else 1e-6
