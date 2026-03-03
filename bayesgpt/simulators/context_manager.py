@@ -248,6 +248,9 @@ class ContextManager:
         fixed_intrinsics: list[str] | set[str] | None = None,
         fixed_values: dict[str, float] | None = None
     ):
+        if fixed_values is None:
+            fixed_values = {}
+
         if design_config is not None:
             free_intrinsics = design_config["1"]
             fixed_intrinsics = list(set(list(prior_fun.keys())) - set(free_intrinsics))
