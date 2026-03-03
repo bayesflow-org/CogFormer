@@ -21,6 +21,7 @@ from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
+from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
@@ -169,6 +170,8 @@ class BayesGPTTrainer:
         posterior_dir.mkdir(parents=True, exist_ok=True)
         coverage_dir = Path("./bayesgpt/experiments/figures/fm/cdm/coverage")
         coverage_dir.mkdir(parents=True, exist_ok=True)
+        metrics_dir = Path("./bayesgpt/experiments/figures/fm/cdm/metrics")
+        metrics_dir.mkdir(parents=True, exist_ok=True)
 
         self.gpt.eval()
 
@@ -260,18 +263,35 @@ class BayesGPTTrainer:
             out_coverage = coverage_dir / Path(f"cdm_benchmark_test_coverage_{tag}.pdf")
             coverage.savefig(out_coverage, bbox_inches="tight")
 
+            metrics_fig = plot_adaptive_metrics(
+                true=true_set,
+                pred=pred_set,
+                design_config=design_config,
+                intrinsic_params=params,
+                max_num_categories=max_num_categories,
+                parameter_mask=params_mask,
+                variable_names=param_names,
+                intercept_color=colors["intercept"],
+                main_effect_color=colors["main_effect"],
+                interaction_color=colors["interaction"],
+            )
+            out_metrics = metrics_dir / Path(f"cdm_benchmark_test_metrics_{tag}.pdf")
+            metrics_fig.savefig(out_metrics, bbox_inches="tight")
+
             if self.use_wandb:
                 wandb.log(
                     {
                         f"val/recovery_{tag}": wandb.Image(recovery),
                         f"val/posterior_{tag}": wandb.Image(posterior.fig),
                         f"val/coverage_{tag}": wandb.Image(coverage),
+                        f"val/metrics_{tag}": wandb.Image(metrics_fig),
                     },
                     step=global_step,
                 )
                 plt.close(recovery)
                 plt.close(posterior.fig)
                 plt.close(coverage)
+                plt.close(metrics_fig)
 
         self.gpt.train()
 
