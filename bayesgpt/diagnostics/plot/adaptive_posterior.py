@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import matplotlib.pyplot as plt
 
 from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
 from bayesgpt.simulators.context_manager import ContextManager
@@ -174,8 +175,8 @@ def adaptive_posterior(
     intrinsic_params: list[str],
     max_num_categories: int,
     variable_names: list[str] = None,
-    targets: np.ndarray = None,   # (still unused; consider removing)
-    priors: np.ndarray = None,    # now USED if show_prior=True
+    targets: np.ndarray = None,
+    priors: np.ndarray = None,
     parameter_mask: np.ndarray = None,
     col_labels: list[str] | None = None,
     intercept_color: str = "#4e2a84",
@@ -189,6 +190,7 @@ def adaptive_posterior(
     show_prior: bool = False,
     prior_color: str = "0.3",
     prior_alpha: float = 0.12,
+    target_color: str = "black",
 ):
     """
     Pairplot of posterior samples with adaptive "patching" consistent with adaptive_recovery.
@@ -223,6 +225,27 @@ def adaptive_posterior(
         unfold=unfold,
         col_labels=col_labels,
     )
+
+    # Build targets lookup: col_name -> scalar value for one dataset
+    targets_dict = None
+    if targets is not None:
+        t = np.asarray(targets)
+        t_flat = t.reshape(-1) if t.ndim == 2 else t
+        names_all = unfolded_names(
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=max_num_categories,
+            col_labels=col_labels,
+        )
+        mask_flat = parameter_mask.reshape(-1)
+        if unfold:
+            targets_dict = {names_all[i]: t_flat[i] for i in range(len(names_all))}
+        else:
+            targets_dict = {
+                names_all[i]: t_flat[i]
+                for i in range(len(names_all))
+                if float(mask_flat[i]) == 1.0
+            }
 
     df_prior = None
     if show_prior and priors is not None:
@@ -266,6 +289,12 @@ def adaptive_posterior(
 
         sns.histplot(x=x_post, kde=True, bins=num_bins, stat="density", color=c, alpha=0.9)
 
+        if targets_dict is not None and name in targets_dict:
+            plt.gca().axvline(
+                targets_dict[name], color=target_color,
+                linestyle="--", linewidth=1.5, label="Ground Truth",
+            )
+
     def _lower_kde(x, y, **kwargs):
         xname = getattr(x, "name", "")
         yname = getattr(y, "name", "")
@@ -288,6 +317,12 @@ def adaptive_posterior(
         c = pick_pair_color(xname, yname, colors)
         sns.kdeplot(x=post["x"], y=post["y"], fill=True, color=c, alpha=0.35)
 
+        if targets_dict is not None and xname in targets_dict and yname in targets_dict:
+            plt.gca().scatter(
+                targets_dict[xname], targets_dict[yname],
+                marker="x", color=target_color, s=80, linewidths=1.5, zorder=5,
+            )
+
     def _upper_scatter(x, y, **kwargs):
         tmp = pd.DataFrame({"x": x, "y": y}).dropna()
         if tmp.shape[0] < 2:
@@ -295,6 +330,14 @@ def adaptive_posterior(
 
         c = pick_pair_color(getattr(x, "name", ""), getattr(y, "name", ""), colors)
         sns.scatterplot(x=tmp["x"], y=tmp["y"], linewidth=0, alpha=0.25, color=c)
+
+        xname = getattr(x, "name", "")
+        yname = getattr(y, "name", "")
+        if targets_dict is not None and xname in targets_dict and yname in targets_dict:
+            plt.gca().scatter(
+                targets_dict[xname], targets_dict[yname],
+                marker="x", color=target_color, s=80, linewidths=1.5, zorder=5,
+            )
 
     g.map_diag(_diag_hist)
     g.map_lower(_lower_kde)
@@ -306,12 +349,18 @@ def adaptive_posterior(
         patch_pairgrid_axes(g, patched_cols=patched_cols, patch_label="N/A")
 
     if add_legend:
+        from matplotlib.lines import Line2D
         handles = [
             Patch(facecolor=colors["intercept"], edgecolor="none", label="Intercept"),
             Patch(facecolor=colors["main"], edgecolor="none", label="Main effect"),
             Patch(facecolor=colors["interaction"], edgecolor="none", label="Interaction"),
         ]
-        g.legend(handles=handles, loc="upper right", frameon=False)
+        if targets_dict is not None:
+            handles.append(
+                Line2D([0], [0], marker="x", color=target_color, linestyle="--",
+                       linewidth=1.5, markersize=8, label="Ground Truth")
+            )
+        g.figure.legend(handles=handles, loc="upper right", frameon=False)
 
     return g
 
