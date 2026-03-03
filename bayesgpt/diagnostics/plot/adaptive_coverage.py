@@ -152,6 +152,8 @@ def adaptive_coverage(
 
     regressor_keys = list(design_config.keys())
 
+    legend_handles = None
+
     for r in range(num_rows):
         # Match adaptive_recovery styling: intercept row vs regressor rows
         if r > 0:
@@ -170,7 +172,13 @@ def adaptive_coverage(
             if parameter_mask[r, c] != 1.0:
                 ax.set_facecolor(tint)
                 ax.patch.set_alpha(0.05)
-                ax.set_xticks([])
+                if r == num_rows - 1:
+                    # Invisible placeholder ticks so xlabel aligns with active cells
+                    ax.set_xticks([0.0, 0.5, 1.0])
+                    ax.set_xticklabels(['0.0', '0.5', '1.0'])
+                    ax.tick_params(axis='x', length=0, labelcolor='none', labelsize=tick_fontsize)
+                else:
+                    ax.set_xticks([])
                 ax.set_yticks([])
                 for sp in ax.spines.values():
                     sp.set_visible(False)
@@ -246,10 +254,21 @@ def adaptive_coverage(
             ax.tick_params(axis="both", labelsize=tick_fontsize)
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
 
-            if r == 0 and c == 0:
-                ax.legend(fontsize=legend_fontsize, loc=legend_location)
+            if legend_handles is None:
+                legend_handles, legend_labels = ax.get_legend_handles_labels()
 
     fig.tight_layout()
+    if legend_handles is not None:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="lower center",
+            ncol=len(legend_handles),
+            fontsize=legend_fontsize,
+            bbox_to_anchor=(0.5, 0),
+            bbox_transform=fig.transFigure,
+        )
+        fig.subplots_adjust(bottom=0.1)
     return fig
 
 if __name__ == "__main__":

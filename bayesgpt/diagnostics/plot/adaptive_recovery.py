@@ -96,7 +96,12 @@ def adaptive_recovery(
             else:
                 ax.set_facecolor(color)
                 ax.patch.set_alpha(0.05)
-                ax.set_xticks([])
+                if r == num_rows - 1:
+                    ax.set_xticks([0.0, 0.5, 1.0])
+                    ax.set_xticklabels(['0.0', '0.5', '1.0'])
+                    ax.tick_params(axis='x', length=0, labelcolor='none')
+                else:
+                    ax.set_xticks([])
                 ax.set_yticks([])
                 for sp in ax.spines.values():
                     sp.set_visible(False)

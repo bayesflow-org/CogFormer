@@ -14,23 +14,22 @@ def effect_type_from_unfolded_name(name: str) -> str:
     Determine effect type from unfolded column name.
 
     Expected naming scheme from unfolded_names():
-      - "1:<param>"                 -> intercept
-      - "<u_k>|c<id>:<param>"        -> main
-      - "<u_k:u_j>|c<id>:<param>"    -> interaction
+      - "<param>"                          -> intercept
+      - "<param> -- $<u_k>$ | $c_<id>$"   -> main
+      - "<param> -- $<u_k:u_j>$ | $c_<id>$" -> interaction
 
     Returns
     -------
     effect_type : {"intercept", "main", "interaction"}
     """
-    if not isinstance(name, str) or ":" not in name:
+    if not isinstance(name, str) or " -- " not in name:
         return "intercept"
 
-    row_label = name.split(":", 1)[0]  # "1" or "u_1|c1" or "u_1:u_2|c1"
-    if row_label == "1":
-        return "intercept"
-
-    reg_key = row_label.split("|", 1)[0]  # "u_1" or "u_1:u_2"
-    return "interaction" if ":" in reg_key else "main"
+    regressor_part = name.split(" -- ", 1)[1]
+    if " | " in regressor_part:
+        regressor_part = regressor_part.split(" | ")[0]
+    regressor_clean = regressor_part.replace("$", "")
+    return "interaction" if ":" in regressor_clean else "main"
 
 
 def pick_pair_color(x_name: str, y_name: str, colors: dict[str, str]) -> str:
@@ -74,15 +73,14 @@ def unfolded_names(
     names = []
     for r in range(num_rows):
         if r == 0:
-            row_label = "1"
+            for c in range(num_cols):
+                names.append(col_labels[c])
         else:
             category_id = (r - 1) % (max_num_categories - 1) + 1
             regressor_id = (r - 1) // (max_num_categories - 1) + 1
             regressor_key = regressor_keys[regressor_id]
-            row_label = f"{regressor_key}|c{category_id}"
-
-        for c in range(num_cols):
-            names.append(f"{row_label}:{col_labels[c]}")
+            for c in range(num_cols):
+                names.append(f"{col_labels[c]} -- ${regressor_key}$ | $c_{{{category_id}}}$")
 
     return names
 
@@ -175,6 +173,7 @@ def adaptive_posterior(
     design_config: dict,
     intrinsic_params: list[str],
     max_num_categories: int,
+    variable_names: list[str] = None,
     targets: np.ndarray = None,   # (still unused; consider removing)
     priors: np.ndarray = None,    # now USED if show_prior=True
     parameter_mask: np.ndarray = None,
@@ -201,6 +200,9 @@ def adaptive_posterior(
     show_prior : bool
         If True and `priors` is provided, draws prior samples behind posterior.
     """
+    if col_labels is None and variable_names is not None:
+        col_labels = variable_names
+
     if parameter_mask is None:
         cm = ContextManager()
         parameter_mask = cm.build_parameter_mask(
