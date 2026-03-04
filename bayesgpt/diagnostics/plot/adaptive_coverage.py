@@ -36,6 +36,9 @@ def compute_empirical_coverage(
     num_datasets, num_draws, num_params = estimates.shape
     num_widths = len(widths)
 
+    # Sort once — rank order is independent of width
+    sorted_samples = np.sort(estimates, axis=1)  # (num_datasets, num_draws, num_params)
+
     # Initialize output arrays
     coverage_estimates = np.zeros((num_widths, num_params))
     coverage_lower = np.zeros((num_widths, num_params))
@@ -64,37 +67,29 @@ def compute_empirical_coverage(
         # Actual width represented by these ranks
         actual_width = (high_rank - low_rank + 1) / (num_draws + 1)
 
-        for p_idx in range(num_params):
-            # Sort posterior samples for each dataset and parameter
-            sorted_samples = np.sort(estimates[:, :, p_idx], axis=1)
+        # Vectorized over all params: (num_datasets, num_params)
+        is_covered = (
+            (targets >= sorted_samples[:, low_rank, :]) &
+            (targets <= sorted_samples[:, high_rank, :])
+        )
+        num_covered = np.sum(is_covered, axis=0)  # (num_params,)
+        coverage_est = num_covered / num_datasets
 
-            # Check if true value falls within credible interval
-            is_covered = (targets[:, p_idx] >= sorted_samples[:, low_rank]) & (
-                targets[:, p_idx] <= sorted_samples[:, high_rank]
-            )
+        alpha_post = num_covered + 1
+        beta_post = num_datasets - num_covered + 1
 
-            # Compute coverage estimate
-            num_covered = np.sum(is_covered)
-            coverage_est = num_covered / num_datasets
+        if actual_width == 0 or actual_width == 1:
+            # No variability possible at boundary
+            ci_low = np.full(num_params, actual_width)
+            ci_high = np.full(num_params, actual_width)
+        else:
+            ci_low = beta.ppf((1 - prob) / 2, alpha_post, beta_post)
+            ci_high = beta.ppf((1 + prob) / 2, alpha_post, beta_post)
 
-            # Compute confidence intervals using beta distribution
-            # Using Bayesian credible interval for binomial proportion
-            alpha_post = num_covered + 1
-            beta_post = num_datasets - num_covered + 1
-
-            # Special handling for boundary cases
-            if actual_width == 0 or actual_width == 1:
-                # No variability possible
-                ci_low = actual_width
-                ci_high = actual_width
-            else:
-                ci_low = beta.ppf((1 - prob) / 2, alpha_post, beta_post)
-                ci_high = beta.ppf((1 + prob) / 2, alpha_post, beta_post)
-
-            coverage_estimates[w_idx, p_idx] = coverage_est
-            coverage_lower[w_idx, p_idx] = ci_low
-            coverage_upper[w_idx, p_idx] = ci_high
-            width_represented[w_idx, p_idx] = actual_width
+        coverage_estimates[w_idx] = coverage_est
+        coverage_lower[w_idx] = ci_low
+        coverage_upper[w_idx] = ci_high
+        width_represented[w_idx] = actual_width
 
     return {
         "coverage_estimates": coverage_estimates,
@@ -157,9 +152,10 @@ def adaptive_coverage(
     for r in range(num_rows):
         # Match adaptive_recovery styling: intercept row vs regressor rows
         if r > 0:
-            regressor_id = min(r, len(regressor_keys) - 1)
+            category_id = (r - 1) % (max_num_categories - 1) + 1
+            regressor_id = (r - 1) // (max_num_categories - 1) + 1
             regressor_key = regressor_keys[regressor_id]
-            ylabel = fr"${regressor_key}$"
+            ylabel = fr"${regressor_key}$" + (fr"$ | c_{category_id}$" if max_num_categories > 2 else "")
             tint = interaction_color if ":" in regressor_key else main_effect_color
         else:
             ylabel = r"$1$"
@@ -251,8 +247,13 @@ def adaptive_coverage(
             if variable_names is not None and r == 0:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
 
+            ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
+            ax.set_xticks(ticks)
+            ax.set_yticks(ticks if not difference else [-0.5, -0.25, 0.0, 0.25, 0.5])
             ax.tick_params(axis="both", labelsize=tick_fontsize)
-            ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+            ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.35)
 
             if legend_handles is None:
                 legend_handles, legend_labels = ax.get_legend_handles_labels()
@@ -326,8 +327,9 @@ if __name__ == "__main__":
             true=true,
             pred=pred,
             design_config=design_config,
-            parameter_masks=parameter_mask,
+            parameter_mask=parameter_mask,
             variable_names=variable_names,
+            max_num_categories=num_categories,
             intercept_color=color["intercept"],
             main_effect_color=color["main_effect"],
             interaction_color=color["interaction"],
