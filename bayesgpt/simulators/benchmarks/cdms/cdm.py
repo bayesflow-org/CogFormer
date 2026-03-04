@@ -18,9 +18,7 @@ def simulate_cdm_trial(
     max_steps: int = 10000,
 ) -> np.ndarray:
     # Inter-trial variability
-    v_i = np.empty(2)
-    v_i[0] = np.random.normal(v[0], s_v)
-    v_i[1] = np.random.normal(v[1], s_v)
+    v_i = v + s_v * np.random.randn(2)
     tau_i = tau + np.random.uniform(0, s_tau)
 
     c = np.sqrt(dt) * sigma
@@ -31,9 +29,9 @@ def simulate_cdm_trial(
     for i_iter in range(max_steps):
         x += v_i * dt + c * np.random.randn(2)
         if np.linalg.norm(x, 2) >= threshold[i_iter]:
-            return np.array([tau_i + i_iter * dt, np.arctan2(x[1], x[0]) / np.pi])
+            return np.array([tau_i + i_iter * dt, np.arctan2(x[1], x[0])])
     # No decision within max_steps
-    return np.array([-1.0, -1.0])
+    return np.array([-4.0, -4.0])
 
 @njit(parallel=True)
 def simulate_cdm(
