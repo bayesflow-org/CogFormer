@@ -10,13 +10,13 @@ def cdm_link_fun():
         "s_v": shifted_softplus,
         "s_tau": shifted_softplus
     }
-
-def cdm_link_fun2():
-    return {
-        "v": exponential,
-        "v_theta": scaled_sigmoid,
-        "a": exponential,
-        "tau": exponential,
-        "s_v": exponential,
-        "s_tau": exponential
-    }
+#
+# def cdm_link_fun2():
+#     return {
+#         "v": exponential,
+#         "v_theta": scaled_sigmoid,
+#         "a": exponential,
+#         "tau": exponential,
+#         "s_v": exponential,
+#         "s_tau": exponential
+#     }
