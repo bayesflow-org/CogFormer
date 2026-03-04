@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Rectangle
+import seaborn as sns
 
 from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.diagnostics.metric.adaptive_metrics import (
@@ -149,36 +150,36 @@ def adaptive_metrics(
             )
 
     # ------------------------------------------------------------------
-    # Colormap specs  (name, centre_at_zero)
+    # Colormap specs  (seaborn palette name)
     # ------------------------------------------------------------------
     metric_specs = [
-        (rmse_col,              "YlOrRd", False),   # lower = better
-        ("Posterior Contraction", "YlGn",  False),   # higher = better
-        ("Calibration Error",   "YlOrRd", False),   # lower = better
-        ("Log Gamma",           "RdYlGn", True),    # diverging: >0 good
+        (rmse_col,                "mako"),
+        ("Posterior Contraction", "rocket"),
+        ("Calibration Error",     "crest"),
+        ("Log Gamma",             "flare"),
     ]
 
+    cell_size = 1.0  # inches per cell
     if figsize is None:
-        figsize = (3.2 * num_cols * 4, 2.5 * num_rows)
+        figsize = (
+            4 * num_cols * cell_size + 2.0,
+            num_rows * cell_size + 2.5,
+        )
 
     fig, axes = plt.subplots(1, 4, figsize=figsize)
 
-    for ax, (metric_name, cmap_name, diverging) in zip(axes, metric_specs):
+    for ax, (metric_name, palette) in zip(axes, metric_specs):
         grid = grids[metric_name]
         active = parameter_mask == 1.0
 
-        if diverging:
-            abs_max = np.nanmax(np.abs(grid))
-            norm = mcolors.TwoSlopeNorm(vmin=-abs_max, vcenter=0, vmax=abs_max)
-            cmap = plt.get_cmap(cmap_name)
-        else:
-            norm = mcolors.Normalize(vmin=np.nanmin(grid), vmax=np.nanmax(grid))
-            cmap = plt.get_cmap(cmap_name)
+        norm = mcolors.Normalize(vmin=np.nanmin(grid), vmax=np.nanmax(grid))
+        cmap = sns.color_palette(palette, as_cmap=True)
 
         # Masked array — matplotlib leaves NaN cells transparent
         masked = np.ma.masked_where(~active, grid)
-        im = ax.imshow(masked, cmap=cmap, norm=norm, aspect="auto")
-        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        im = ax.imshow(masked, cmap=cmap, norm=norm, aspect="equal")
+        plt.colorbar(im, ax=ax, orientation="horizontal", location="bottom",
+                     fraction=0.046, pad=0.08, aspect=20)
 
         # Annotate active cells with numeric values
         for r in range(num_rows):
