@@ -20,10 +20,10 @@ def adaptive_c2st(
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
     figsize: tuple | None = None,
-    title_fontsize: int = 16,
-    label_fontsize: int = 13,
-    tick_fontsize: int = 11,
-    annot_fontsize: int = 9,
+    title_fontsize: int = 18,
+    label_fontsize: int = 15,
+    tick_fontsize: int = 13,
+    annot_fontsize: int = 11,
     fmt: str = ".3f",
     n_splits: int = 5,
     hidden_layer_sizes: tuple = (32,),
@@ -124,30 +124,32 @@ def adaptive_c2st(
                 random_state=random_state,
             )
 
+    cell_size = 1.0  # inches per cell
     if figsize is None:
-        figsize = (3.2 * num_cols, 2.5 * num_rows)
+        figsize = (num_cols * cell_size + 2.0, num_rows * cell_size + 2.5)
 
     fig, ax = plt.subplots(figsize=figsize)
 
     active = parameter_mask == 1.0
-    # Colormap: green (0.5, indistinguishable) → red (1.0, fully separable)
-    norm = mcolors.Normalize(vmin=0.5, vmax=1.0)
-    cmap = plt.get_cmap("RdYlGn_r")
+    norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
+    cmap = plt.get_cmap("viridis")
 
     masked = np.ma.masked_where(~active, grid)
-    im = ax.imshow(masked, cmap=cmap, norm=norm, aspect="auto")
-    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="C2ST Accuracy")
+    ax.imshow(masked, cmap=cmap, norm=norm, aspect="equal")
 
     # Annotate active cells
     for r in range(num_rows):
         for c in range(num_cols):
             if active[r, c]:
+                rgba = cmap(norm(grid[r, c]))
+                luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+                text_color = "white" if luminance < 0.5 else "black"
                 ax.text(
                     c, r,
                     format(grid[r, c], fmt),
                     ha="center", va="center",
                     fontsize=annot_fontsize,
-                    color="black",
+                    color=text_color,
                 )
 
     # N/A tiles for inactive cells

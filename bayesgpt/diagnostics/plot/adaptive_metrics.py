@@ -33,10 +33,10 @@ def adaptive_metrics(
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
     figsize: tuple | None = None,
-    title_fontsize: int = 16,
-    label_fontsize: int = 13,
-    tick_fontsize: int = 11,
-    annot_fontsize: int = 9,
+    title_fontsize: int = 18,
+    label_fontsize: int = 15,
+    tick_fontsize: int = 13,
+    annot_fontsize: int = 11,
     fmt: str = ".3f",
 ) -> plt.Figure:
     """
@@ -153,10 +153,10 @@ def adaptive_metrics(
     # Colormap specs  (seaborn palette name)
     # ------------------------------------------------------------------
     metric_specs = [
-        (rmse_col,                "mako"),
-        ("Posterior Contraction", "rocket"),
-        ("Calibration Error",     "crest"),
-        ("Log Gamma",             "flare"),
+        (rmse_col,                "mako",   0.0, 1.0),
+        ("Posterior Contraction", "rocket", 0.0, 1.0),
+        ("Calibration Error",     "crest",  0.0, 1.0),
+        ("Log Gamma",             "flare",  None, None),
     ]
 
     cell_size = 1.0  # inches per cell
@@ -168,29 +168,34 @@ def adaptive_metrics(
 
     fig, axes = plt.subplots(1, 4, figsize=figsize)
 
-    for ax, (metric_name, palette) in zip(axes, metric_specs):
+    for ax, (metric_name, palette, vmin, vmax) in zip(axes, metric_specs):
         grid = grids[metric_name]
         active = parameter_mask == 1.0
 
-        norm = mcolors.Normalize(vmin=np.nanmin(grid), vmax=np.nanmax(grid))
+        if vmin is None:
+            vmin = np.nanmin(grid)
+        if vmax is None:
+            vmax = np.nanmax(grid)
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
         cmap = sns.color_palette(palette, as_cmap=True)
 
         # Masked array — matplotlib leaves NaN cells transparent
         masked = np.ma.masked_where(~active, grid)
-        im = ax.imshow(masked, cmap=cmap, norm=norm, aspect="equal")
-        plt.colorbar(im, ax=ax, orientation="horizontal", location="bottom",
-                     fraction=0.046, pad=0.08, aspect=20)
+        ax.imshow(masked, cmap=cmap, norm=norm, aspect="equal")
 
         # Annotate active cells with numeric values
         for r in range(num_rows):
             for c in range(num_cols):
                 if active[r, c]:
+                    rgba = cmap(norm(grid[r, c]))
+                    luminance = 0.299 * rgba[0] + 0.587 * rgba[1] + 0.114 * rgba[2]
+                    text_color = "white" if luminance < 0.5 else "black"
                     ax.text(
                         c, r,
                         format(grid[r, c], fmt),
                         ha="center", va="center",
                         fontsize=annot_fontsize,
-                        color="black",
+                        color=text_color,
                     )
 
         # Render inactive cells as tinted N/A tiles
