@@ -24,8 +24,8 @@ def get_benchmark_design_configs():
 
     regressed = {
         "1": intrinsic_params,
-        "u_1": ["v_theta", "a"],
-        "u_2": ["v_theta", "a"],
+        "u_1": ["v", "a"],
+        "u_2": ["v", "a"],
         "u_1:u_2": []
     }
 
@@ -38,8 +38,8 @@ def get_benchmark_design_configs():
 
     fixed_regressed = {
         "1": free_params,
-        "u_1": ["v_theta", "a"],
-        "u_2": ["v_theta", "a"],
+        "u_1": ["v", "a"],
+        "u_2": ["v", "a"],
         "u_1:u_2": []
     }
 
