@@ -8,7 +8,7 @@ def cdm_link_fun():
         "a": shifted_softplus,
         "tau": shifted_softplus,
         "s_v": shifted_softplus,
-        "s_tau": sigmoid
+        "s_tau": shifted_softplus
     }
 
 def cdm_link_fun2():
@@ -18,5 +18,5 @@ def cdm_link_fun2():
         "a": exponential,
         "tau": exponential,
         "s_v": exponential,
-        "s_tau": sigmoid
+        "s_tau": exponential
     }
