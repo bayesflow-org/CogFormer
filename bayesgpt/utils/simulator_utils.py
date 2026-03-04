@@ -32,6 +32,17 @@ def shifted_softplus(x: np.ndarray):
     sp = np.maximum(x, 0) + np.log1p(np.exp(-np.abs(x)))
     return sp
 
+def scaled_sigmoid(
+    x: float | np.ndarray,
+    lower_bound: float | np.ndarray,
+    upper_bound: float | np.ndarray
+) -> float:
+    """
+    Apply a sigmoid transformation and rescale to a bounded interval.
+    """
+    return lower_bound + (upper_bound - lower_bound) / (1.0 + np.exp(-x))
+
+
 
 def as_1d(x, n: int, allow_scalar: bool = True) -> np.ndarray:
     """Return a 1D array of length n. Broadcast scalars if allowed; else validate."""
