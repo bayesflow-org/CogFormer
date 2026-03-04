@@ -102,7 +102,7 @@ class BayesGPTTrainer:
             scheduler.step()
             pbar.close()
 
-        checkpoint_dir = Path("./bayesgpt/experiments/checkpoints/fm/")
+        checkpoint_dir = Path("./bayesgpt/experiments/checkpoints/fm/ddm/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.gpt.state_dict(), checkpoint_dir / checkpoint_path)
 

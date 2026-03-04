@@ -137,7 +137,7 @@ def main():
 
     for cfg_name, design_config in benchmark.items():
         bf_data_path = Path(args.bf_data_dir) / f"cdm_{cfg_name}_data.npz"
-        gpt_pred_path = Path(args.gpt_pred_dir) / cfg_name / f"cdm_families_{cfg_name}_gpt_pred.npz"
+        gpt_pred_path = Path(args.gpt_pred_dir) / f"cdm_families_{cfg_name}_gpt_pred.npz"
 
         if not bf_data_path.exists():
             logging.warning(f"No BF data for '{cfg_name}' at {bf_data_path}, skipping.")

@@ -15,6 +15,7 @@ from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
+from bayesgpt.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
@@ -142,6 +143,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT checkpoint")
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/fm/rdm/", help="Output directory")
+    p.add_argument("--pred_dir", type=str, default="./bayesgpt/experiments/data/", help="Directory to save GPT pred npz files")
     p.add_argument("--data_dir", type=str, default=None, help="Directory with BayesFlow validation data")
 
     # Validation settings
@@ -252,8 +254,8 @@ def main():
         proj_dim=args.proj_dim,
         dropout=args.dropout,
         layer_dropout=args.layer_dropout,
-        decoder_layer_design="self_attention",
-        decoder_layer_kwargs={"skip_first": True},
+        decoder_layer_design="mixed_attention",
+        decoder_layer_kwargs={"mab_first": True},
     ).to(device)
 
     ckpt_path = Path(args.checkpoint)
@@ -357,7 +359,9 @@ def main():
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         params_mask = params_mask.reshape((args.batch_size, n_rows, n_cols))[0]
 
-        pred_path = outdir / f"rdm_families_{cfg_name}_gpt_pred.npz"
+        pred_dir = Path(args.pred_dir)
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        pred_path = pred_dir / f"rdm_families_{cfg_name}_gpt_pred.npz"
         np.savez(pred_path, pred_set=pred_set, true_set=true_set, params_mask=params_mask)
         logging.info(f"[saved] {pred_path}")
 
@@ -374,7 +378,7 @@ def main():
             interaction_color=colors["interaction"],
         )
 
-        figpath = outdir / f"rdm_families_{cfg_name}_fm_mixed_m_recovery.pdf"
+        figpath = outdir / f"rdm_family_{cfg_name}_fm_mixed_recovery.pdf"
         fig.savefig(figpath, bbox_inches="tight")
         plt.close(fig)
 
@@ -393,11 +397,29 @@ def main():
             interaction_color=colors["interaction"],
         )
 
-        coverage_path = outdir / f"rdm_families_{cfg_name}_fm_mixed_m_coverage.pdf"
+        coverage_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_coverage.pdf"
         coverage.savefig(coverage_path, bbox_inches="tight")
         plt.close(coverage)
 
         logging.info(f"[saved] {coverage_path}")
+
+        ecdf = adaptive_ecdf(
+            true=true_set,
+            pred=pred_set,
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=model_family_config["max_num_categories"],
+            parameter_mask=params_mask,
+            variable_names=variable_names,
+            intercept_color=colors["intercept"],
+            main_effect_color=colors["main_effect"],
+            interaction_color=colors["interaction"],
+            difference=True,
+        )
+        ecdf_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_ecdf.pdf"
+        ecdf.savefig(ecdf_path, bbox_inches="tight")
+        plt.close(ecdf)
+        logging.info(f"[saved] {ecdf_path}")
 
         metrics_fig = plot_adaptive_metrics(
             true=true_set,
@@ -411,7 +433,7 @@ def main():
             main_effect_color=colors["main_effect"],
             interaction_color=colors["interaction"],
         )
-        metrics_fig_path = outdir / f"rdm_families_{cfg_name}_fm_mixed_m_metrics.pdf"
+        metrics_fig_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_metrics.pdf"
         metrics_fig.savefig(metrics_fig_path, bbox_inches="tight")
         plt.close(metrics_fig)
         logging.info(f"[saved] {metrics_fig_path}")
@@ -425,7 +447,7 @@ def main():
             parameter_mask=params_mask,
             variable_names=variable_names,
         )
-        metrics_csv_path = outdir / f"rdm_families_{cfg_name}_fm_mixed_m_metrics.csv"
+        metrics_csv_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_metrics.csv"
         metrics_df.to_csv(metrics_csv_path)
         logging.info(f"[saved] {metrics_csv_path}")
 
@@ -440,7 +462,7 @@ def main():
                 main_effect_color=colors["main_effect"],
                 interaction_color=colors["interaction"]
             )
-            posterior_path = outdir / f"rdm_families_{cfg_name}_fm_mixed_m_posterior{i}.pdf"
+            posterior_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_posterior_{i}.pdf"
             posterior.savefig(posterior_path, bbox_inches="tight")
             plt.close(posterior.fig)
 

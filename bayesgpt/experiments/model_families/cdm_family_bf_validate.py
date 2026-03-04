@@ -60,8 +60,8 @@ CASE_CONFIGS = {
         "squeeze_outputs": False,
         "param_names": [
             r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
-            r"$u_{1, v_\theta}$", r"$u_{1, a}$",
-            r"$u_{2, v_\theta}$", r"$u_{2, a}$",
+            r"$u_{1, v}$", r"$u_{1, a}$",
+            r"$u_{2, v}$", r"$u_{2, a}$",
         ],
     },
     "fixed_regressed": {
@@ -78,8 +78,8 @@ CASE_CONFIGS = {
         "squeeze_outputs": False,
         "param_names": [
             r"$v$", r"$v_\theta$", r"$a$", r"$\tau$",
-            r"$u_{1, v_\theta}$", r"$u_{1, a}$",
-            r"$u_{2, v_\theta}$", r"$u_{2, a}$",
+            r"$u_{1, v}$", r"$u_{1, a}$",
+            r"$u_{2, v}$", r"$u_{2, a}$",
         ],
     },
     "interaction": {
