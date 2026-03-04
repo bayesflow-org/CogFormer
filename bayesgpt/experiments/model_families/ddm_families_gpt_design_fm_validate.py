@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
@@ -223,7 +223,7 @@ def main(data_dir=None):
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors2(),# ddm_baseline_priors(),
+        prior_fun=ddm_priors(),
         mask_randomizer_kwargs={  # default; per-config we’ll override
             "free_intrinsics": intrinsic_params,
             "fixed_intrinsics": [],

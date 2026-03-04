@@ -12,7 +12,7 @@ from pathlib import Path
 
 from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
@@ -24,7 +24,7 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
     def __init__(self):
         self.model_family = NestedModelFamily(
             model=DDM(),
-            prior_fun=ddm_priors2(),
+            prior_fun=ddm_priors(),
             regressed_params=["v", "a"],
             mask_randomizer_kwargs=dict(
                 free_intrinsics=["v", "a", "tau"],

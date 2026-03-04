@@ -131,6 +131,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True, help="Path to trained BayesGPT checkpoint")
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/fm/cdm/", help="Output directory")
+    p.add_argument("--data_dir", type=str, default=None, help="Directory with BayesFlow validation data")
 
     # Validation settings
     p.add_argument("--batch_size", type=int, default=200)
@@ -194,7 +195,7 @@ def test(case="fixed"):
 
 
 @torch.no_grad()
-def main(data_dir=None):
+def main():
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -276,8 +277,8 @@ def main(data_dir=None):
             "fixed_config": True,
         }
 
-        if data_dir is not None:
-            data_path = Path(data_dir + f"/cdm_{cfg_name}_data.npz")
+        if args.data_dir is not None:
+            data_path = Path(args.data_dir) / f"cdm_{cfg_name}_data.npz"
             test_samples = load_validation_data(data_path=data_path)
 
             design_matrices = test_samples["design_matrices"]
@@ -290,11 +291,12 @@ def main(data_dir=None):
                 dm[:, :, 0] = design_matrices.squeeze(axis=-1)
                 test_samples["design_matrices"] = dm
 
+            if test_samples["param_matrices"].shape[-1] < num_rows * num_params:
+                batch_size = test_samples["param_matrices"].shape[0]
                 pmat = np.zeros((batch_size, num_rows * num_params))
                 pmask = np.zeros((batch_size, num_rows * num_params))
-
-                pmat[:, :num_params] = test_samples["param_matrices"]
-                pmask[:, :num_params] = test_samples["param_masks"]
+                pmat[:, :test_samples["param_matrices"].shape[-1]] = test_samples["param_matrices"]
+                pmask[:, :test_samples["param_masks"].shape[-1]] = test_samples["param_masks"]
                 test_samples["param_matrices"] = pmat
                 test_samples["param_masks"] = pmask
 
@@ -338,6 +340,10 @@ def main(data_dir=None):
 
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         params_mask = params_mask.reshape((args.batch_size, n_rows, n_cols))[0]
+
+        pred_path = outdir / f"cdm_families_{cfg_name}_gpt_pred.npz"
+        np.savez(pred_path, pred_set=pred_set, true_set=true_set, params_mask=params_mask)
+        logging.info(f"[saved] {pred_path}")
 
         fig = adaptive_recovery(
             true=true_set,
@@ -429,7 +435,7 @@ if __name__ == "__main__":
     debug = False
 
     if not debug:
-        main(data_dir="bayesgpt/experiments/data")
+        main()
     else:
         test()
 

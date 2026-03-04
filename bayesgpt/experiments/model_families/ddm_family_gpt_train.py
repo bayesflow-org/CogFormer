@@ -14,7 +14,7 @@ np.set_printoptions(suppress=True)
 
 from bayesgpt.simulators import NestedModelFamily
 from bayesgpt.simulators.benchmarks import DDM
-from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors2
+from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
@@ -480,7 +480,7 @@ if __name__ == "__main__":
     model_family = NestedModelFamily(
         model=DDM(),
         name="DDM",
-        prior_fun=ddm_priors2(),
+        prior_fun=ddm_priors(),
         mask_randomizer_kwargs=train_params_kwargs
     )
     adapter = Adapter()
