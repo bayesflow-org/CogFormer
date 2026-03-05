@@ -29,13 +29,14 @@ def simulate_ddm_trial(
 
     x = z * a0
     t = tau_i
+    c = sigma * np.sqrt(dt)
 
     for _ in range(max_steps):
         t += dt
-        bound = a0 * np.exp(-d * t)
+        bound = a0 if d == 0.0 else a0 * np.exp(-d * t)
         if bound < 1e-3:
             bound = 1e-3
-        x += v_i * dt + sigma * np.sqrt(dt) * np.random.normal()
+        x += v_i * dt + c * np.random.normal()
         if x >= bound:
             return np.array([t, 1.0], dtype=np.float32)
         if x <= -bound:
@@ -47,10 +48,10 @@ def simulate_ddm_trial(
 def simulate_ddm(
     v: np.ndarray,
     a: np.ndarray,
+    z: np.ndarray,
     tau: np.ndarray,
     s_v: np.ndarray,
     s_tau: np.ndarray,
-    z: float = 0.5,
     sigma: float = 1.0,
     dt: float = 0.001,
     max_steps: int = 10000,
@@ -66,7 +67,7 @@ def simulate_ddm(
             tau=tau[i],
             s_tau=s_tau[i],
             s_v=s_v[i],
-            z=z,
+            z=z[i],
             sigma=sigma,
             dt=dt,
             max_steps=max_steps,
@@ -82,7 +83,7 @@ class DDM(Model):
         self.max_steps = max_steps
 
     def simulate(self, params: dict[str, np.ndarray], context=None):
-        results = simulate_ddm(**params, z=0.5, sigma=1.0, dt=self.dt, max_steps=self.max_steps)
+        results = simulate_ddm(**params, sigma=1.0, dt=self.dt, max_steps=self.max_steps)
         rts = results[:, 0][..., None]
         choices = results[:, 1][..., None]
         return {"rts": rts, "choices": choices}
