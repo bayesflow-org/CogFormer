@@ -314,6 +314,8 @@ def parse_args():
     parser.add_argument("--projection_dim", type=int, default=256, help="dimension of projection dims")
     parser.add_argument("--num_seeds", type=int, default=32, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
+    parser.add_argument("--time_embedding_dim", type=int, default=16, help="dimension of sinusoidal time embedding")
+    parser.add_argument("--pos_embedding_dim", type=int, default=16, help="dimension of sinusoidal positional embedding")
 
     # Hyperparameters
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
@@ -428,7 +430,9 @@ if __name__ == "__main__":
         "decoder_layer_design": "mixed_attention",
         "decoder_layer_kwargs": {
             "mab_first": True
-        }
+        },
+        "time_embedding_dim": args.time_embedding_dim,
+        "pos_embedding_dim": args.pos_embedding_dim,
     }
 
     logging.info(
