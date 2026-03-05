@@ -22,13 +22,12 @@ def simulate_cdm_trial(
     tau_i = tau + np.random.uniform(0, s_tau)
 
     c = np.sqrt(dt) * sigma
-    # exponentially collapsing threshold
-    t = np.arange(0, max_steps * dt, dt)
-    threshold = a * np.exp(-decay * t)
     x = np.zeros(2)
     for i_iter in range(max_steps):
         x += v_i * dt + c * np.random.randn(2)
-        if np.linalg.norm(x, 2) >= threshold[i_iter]:
+        # Compute threshold inline (no array allocation); fast path when decay=0
+        threshold_sq = a * a if decay == 0.0 else (a * np.exp(-decay * i_iter * dt)) ** 2
+        if x[0] * x[0] + x[1] * x[1] >= threshold_sq:
             return np.array([tau_i + i_iter * dt, np.arctan2(x[1], x[0])])
     # No decision within max_steps
     return np.array([-4.0, -4.0])

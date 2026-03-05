@@ -26,16 +26,13 @@ def sample_rdm_trial(
         v_i[k] = np.random.normal(v[k], s_v)
     tau_i = tau + np.random.uniform(0, s_tau)
 
-    # Exponentially collapsing threshold (decay=0 means fixed threshold)
-    t = np.arange(0, max_steps * dt, dt)
-    threshold = a * np.exp(-decay * t)
-
     X = np.zeros(num_alternatives)
     for i_iter in range(max_steps):
-        noise = np.random.randn(int(num_alternatives)).astype(np.float32) * c
+        # Compute threshold inline (no array allocation); fast path when decay=0
+        threshold = a if decay == 0.0 else a * np.exp(-decay * i_iter * dt)
         for i in range(num_alternatives):
-            X[i] += v_i[i] * dt + noise[i]
-            if X[i] >= threshold[i_iter]:
+            X[i] += v_i[i] * dt + np.random.normal(0.0, c)
+            if X[i] >= threshold:
                 return np.array([tau_i + i_iter * dt, i], dtype=np.float32)
     # No decision within max_steps
     return np.array([-1.0, -1.0], dtype=np.float32)
