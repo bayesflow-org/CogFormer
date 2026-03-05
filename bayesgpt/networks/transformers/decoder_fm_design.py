@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 
@@ -11,11 +13,33 @@ from .self_attention_block import SelfAttentionBlock
 from bayesgpt.utils.tensor_utils import broadcast_right
 
 
+class SinusoidalEmbedding(nn.Module):
+    """Fixed sinusoidal embedding for a scalar input.
+
+    Maps (..., 1) → (..., dim) using sin/cos at geometrically spaced frequencies.
+    No learned parameters; negligible compute overhead.
+    """
+    def __init__(self, dim: int):
+        super().__init__()
+        assert dim % 2 == 0, "SinusoidalEmbedding dim must be even"
+        self.dim = dim
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (..., 1)
+        half = self.dim // 2
+        freqs = torch.exp(
+            -math.log(10000) * torch.arange(half, device=x.device, dtype=x.dtype)
+            / max(half - 1, 1)
+        )
+        args = x * freqs  # (..., half)
+        return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)  # (..., dim)
+
+
 class Decoder(nn.Module):
 
     def __init__(
             self,
-            input_dim: int,
+            input_dim: int = 2,
             seed_dim: int = 128,
             proj_dim: int = 64,
             num_layers: int = 3,
@@ -24,11 +48,17 @@ class Decoder(nn.Module):
             dropout: float = 0.05,
             layer_design: str = None,
             layer_kwargs: dict = None,
+            time_embedding_dim: int = 16,
+            pos_embedding_dim: int = 16,
     ):
         super().__init__()
         assert num_layers >= 1, "num_layers must be >= 1"
 
-        self.input_proj = nn.Linear(input_dim + 1 + 1, proj_dim)
+        self.time_embedding = SinusoidalEmbedding(time_embedding_dim)
+        self.pos_embedding = SinusoidalEmbedding(pos_embedding_dim)
+
+        # input: theta_t (1) + param_embedding (pos_embedding_dim) + reg_embedding (pos_embedding_dim) + t_embedding (time_embedding_dim)
+        self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim, proj_dim)
 
         if layer_design is not None:
             match layer_design:
@@ -78,33 +108,21 @@ class Decoder(nn.Module):
 
     def velocity(self, theta_t, query, key, t, query_mask=None):
 
-        query_block = None
-        # Ensure parameter mask is batched
-        if query_mask is not None:
-            # batch_size, query_dim = query_mask.shape
-            # key_dim = key.shape[1]
+        # key_padding_mask for self-attention: True = inactive token, should be ignored
+        key_padding_mask = (query_mask <= 0) if query_mask is not None else None
 
-            query_block = query_mask <= 0
+        # Sinusoidal embeddings for positional indices and time
+        param_embedding = self.pos_embedding(query[..., :1])   # (B, T, pos_embedding_dim)
+        regressor_embedding = self.pos_embedding(query[..., 1:])     # (B, T, pos_embedding_dim)
+        time_embedding = self.time_embedding(t)                      # (B, T, time_embedding_dim)
 
-        #     #  (B*H, Tq, Tk) - repeat batch mask across heads
-        #     cross_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, key_dim)
-        #     cross_attn_mask = cross_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
-        #
-        #     self_attn_mask_bt = query_block.unsqueeze(-1).expand(batch_size, query_dim, query_dim)
-        #     self_attn_mask = self_attn_mask_bt.repeat_interleave(self.num_heads, dim=0)
-        # else:
-        #     cross_attn_mask = None
-        #     self_attn_mask = None
-
-        # Study the effect of incorporating encoder outputs here
-        out = torch.cat([theta_t, query, t], dim=-1)
-
+        out = torch.cat([theta_t, param_embedding, regressor_embedding, time_embedding], dim=-1)
         out = self.input_proj(out)
 
-        # Run input through cross-attention layers
+        # Run through attention layers
         for layer in self.layers:
             if isinstance(layer, SelfAttentionBlock):
-                out = layer(query=out, attn_mask=None)
+                out = layer(query=out, key_padding_mask=key_padding_mask)
             else:
                 out = layer(query=out, key=key, attn_mask=None)
 

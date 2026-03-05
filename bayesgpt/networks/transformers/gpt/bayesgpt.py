@@ -30,6 +30,8 @@ class BayesGPT(nn.Module):
             decoder_layer_design: str = None,
             encoder_layer_kwargs: dict = None,
             decoder_layer_kwargs: dict = None,
+            time_embedding_dim: int = 16,
+            pos_embedding_dim: int = 16,
     ):
         super().__init__()
 
@@ -56,6 +58,8 @@ class BayesGPT(nn.Module):
             dropout=dropout,
             layer_design=decoder_layer_design,
             layer_kwargs=decoder_layer_kwargs,
+            time_embedding_dim=time_embedding_dim,
+            pos_embedding_dim=pos_embedding_dim,
         )
 
     def forward(self, params, input_data, param_indices, regressor_indices, params_mask=None):
@@ -76,34 +80,38 @@ class BayesGPT(nn.Module):
     @torch.no_grad()
     def sample(self, input_data, param_indices, regressor_indices, params_mask, steps=1000, num_samples=100):
 
-        theta_t = torch.randn((num_samples, *param_indices.shape), device=input_data.device)
+        batch_size = input_data.shape[0]
+        num_tokens = param_indices.shape[1]
 
-        samples = torch.zeros_like(theta_t, device=theta_t.device)
+        encoder_tokens = self.encoder(input_data)                                    # (batch_size, num_seeds, seed_dim)
+        pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)       # (batch_size, num_tokens, 2)
 
-        encoder_tokens = self.encoder(input_data)
-        pos_embeddings = torch.cat([param_indices, regressor_indices], dim=-1)
+        # Expand encoder outputs and position embeddings across samples
+        encoder_tokens = encoder_tokens.repeat_interleave(num_samples, dim=0)        # (batch_size*num_samples, num_seeds, seed_dim)
+        pos_embeddings = pos_embeddings.repeat_interleave(num_samples, dim=0)        # (batch_size*num_samples, num_tokens, 2)
+        if params_mask is not None:
+            params_mask_expanded = params_mask.repeat_interleave(num_samples, dim=0) # (batch_size*num_samples, num_tokens)
+        else:
+            params_mask_expanded = None
 
-        for sample_id in tqdm(range(num_samples), desc="Sampling", unit="sample"):
+        # Initialize all trajectories from noise
+        theta_t = torch.randn((batch_size * num_samples, num_tokens, 1), device=input_data.device)
+        t = torch.zeros((batch_size * num_samples, num_tokens, 1), device=input_data.device)
 
-            t = torch.zeros_like(theta_t[sample_id], device=theta_t.device)
+        for _ in tqdm(range(steps), desc="Sampling", unit="step"):
+            dt = 1 / steps
+            v = self.decoder.velocity(
+                theta_t=theta_t,
+                query=pos_embeddings,
+                key=encoder_tokens,
+                t=t,
+                query_mask=params_mask_expanded,
+            )
+            theta_t = theta_t + v * dt
+            t = t + dt
 
-            for _ in range(steps):
-                dt = 1 / steps
-
-                v = self.decoder.velocity(
-                    theta_t=theta_t[sample_id],
-                    query=pos_embeddings,
-                    key=encoder_tokens,
-                    t=t,
-                    query_mask=params_mask
-                )
-
-                theta_t[sample_id] = theta_t[sample_id] + v * dt
-                t = t + dt
-
-            samples[sample_id] = theta_t[sample_id]
-
-        samples = torch.swapaxes(samples, 0, 1).cpu().numpy()
+        # Reshape: (batch_size*num_samples, num_tokens, 1) → (batch_size, num_samples, num_tokens, 1)
+        samples = theta_t.reshape(batch_size, num_samples, num_tokens, 1).cpu().numpy()
         return samples
 
     def compute_loss(self, pred_velocity, target_velocity, param_masks) -> torch.Tensor:

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class MultiheadAttentionBlock(nn.Module):
@@ -11,7 +10,8 @@ class MultiheadAttentionBlock(nn.Module):
         query_dim:  feature dim of Q input  (B, T_q, dim_Q)
         key_dim:  feature dim of K input  (B, T_k, dim_K)
         num_heads: number of attention heads
-        layer_norm: whether to use LayerNorm before/after the FFN residual
+        layer_norm: whether to use pre-LayerNorm (pre-LN transformer style)
+        ffn_dim: inner dim of the 2-layer FFN; defaults to 4 * query_dim
     """
     def __init__(
         self,
@@ -21,11 +21,18 @@ class MultiheadAttentionBlock(nn.Module):
         layer_norm: bool = False,
         dropout: float = 0.0,
         output_dim: int = None,
+        ffn_dim: int = None,
     ):
         super().__init__()
 
         if key_dim is None:
             key_dim = query_dim
+
+        if output_dim is None:
+            output_dim = query_dim
+
+        if ffn_dim is None:
+            ffn_dim = 4 * query_dim
 
         # Built-in MHA; batch_first=True to accept (B, T, C)
         self.attn = nn.MultiheadAttention(
@@ -37,12 +44,16 @@ class MultiheadAttentionBlock(nn.Module):
             batch_first=True,
         )
 
+        # Pre-LN norms (applied before each sublayer)
         self.layer_norm_0 = nn.LayerNorm(query_dim) if layer_norm else None
         self.layer_norm_1 = nn.LayerNorm(query_dim) if layer_norm else None
 
-        if output_dim is None:
-            output_dim = query_dim
-        self.fc_o = nn.Linear(query_dim, output_dim)
+        # 2-layer FFN with 4x expansion
+        self.ffn = nn.Sequential(
+            nn.Linear(query_dim, ffn_dim),
+            nn.GELU(),
+            nn.Linear(ffn_dim, output_dim),
+        )
 
     def forward(self,
         query: torch.Tensor,
@@ -57,23 +68,20 @@ class MultiheadAttentionBlock(nn.Module):
         key_padding_mask: optional (B, T_k), True for PAD positions
         """
 
+        # Pre-LN attention sublayer
+        normed = self.layer_norm_0(query) if self.layer_norm_0 is not None else query
         attn_out, _ = self.attn(
-            query=query,
+            query=normed,
             key=key,
             value=key,
             attn_mask=attn_mask,
             key_padding_mask=key_padding_mask,
             need_weights=False,
         )
-
-        # 3) First residual (q + attention), optional LayerNorm
         out = query + attn_out
-        if self.layer_norm_0 is not None:
-            out = self.layer_norm_0(out)
 
-        # 4) Simple FFN + residual (match original: ReLU then linear)
-        out = out + F.gelu(self.fc_o(out))
-        if self.layer_norm_1 is not None:
-            out = self.layer_norm_1(out)
+        # Pre-LN FFN sublayer
+        normed = self.layer_norm_1(out) if self.layer_norm_1 is not None else out
+        out = out + self.ffn(normed)
 
         return out
