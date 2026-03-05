@@ -163,6 +163,8 @@ def parse_args():
     p.add_argument("--proj_dim", type=int, default=256)
     p.add_argument("--dropout", type=float, default=0.05)
     p.add_argument("--layer_dropout", type=float, default=0.05)
+    p.add_argument("--time_embedding_dim", type=int, default=32)
+    p.add_argument("--pos_embedding_dim", type=int, default=32)
 
     return p.parse_args()
 
@@ -251,6 +253,8 @@ def main(data_dir=None):
         layer_dropout=args.layer_dropout,
         decoder_layer_design="self_attention",
         decoder_layer_kwargs={"skip_first": True},
+        time_embedding_dim=args.time_embedding_dim,
+        pos_embedding_dim=args.pos_embedding_dim,
     ).to(device)
 
     ckpt_path = Path(args.checkpoint)

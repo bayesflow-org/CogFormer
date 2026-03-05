@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 
 from .attention_layers import (
-    cross_attention_layers,
     self_attention_layers,
     mixed_attention_layers,
     custom_attention_layers
@@ -48,11 +47,14 @@ class Decoder(nn.Module):
             dropout: float = 0.05,
             layer_design: str = None,
             layer_kwargs: dict = None,
-            time_embedding_dim: int = 16,
-            pos_embedding_dim: int = 16,
+            time_embedding_dim: int = 32,
+            pos_embedding_dim: int = 32,
     ):
         super().__init__()
         assert num_layers >= 1, "num_layers must be >= 1"
+
+        if layer_kwargs is None:
+            layer_kwargs = {}
 
         self.time_embedding = SinusoidalEmbedding(time_embedding_dim)
         self.pos_embedding = SinusoidalEmbedding(pos_embedding_dim)

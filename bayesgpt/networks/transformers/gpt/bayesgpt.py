@@ -30,8 +30,8 @@ class BayesGPT(nn.Module):
             decoder_layer_design: str = None,
             encoder_layer_kwargs: dict = None,
             decoder_layer_kwargs: dict = None,
-            time_embedding_dim: int = 16,
-            pos_embedding_dim: int = 16,
+            time_embedding_dim: int = 32,
+            pos_embedding_dim: int = 32,
     ):
         super().__init__()
 

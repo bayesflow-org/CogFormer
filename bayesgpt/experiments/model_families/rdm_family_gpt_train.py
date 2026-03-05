@@ -96,7 +96,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 250 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -335,8 +335,8 @@ def parse_args():
     parser.add_argument("--projection_dim", type=int, default=256, help="dimension of projection dims")
     parser.add_argument("--num_seeds", type=int, default=32, help="number of seeds")
     parser.add_argument("--seed_dim", type=int, default=64, help="dimension of seeds")
-    parser.add_argument("--time_embedding_dim", type=int, default=16, help="dimension of sinusoidal time embedding")
-    parser.add_argument("--pos_embedding_dim", type=int, default=16, help="dimension of sinusoidal positional embedding")
+    parser.add_argument("--time_embedding_dim", type=int, default=32, help="dimension of sinusoidal time embedding")
+    parser.add_argument("--pos_embedding_dim", type=int, default=32, help="dimension of sinusoidal positional embedding")
 
     # Hyperparameters
     parser.add_argument("--lr", type=float, default=1e-4, help="learning rate")
