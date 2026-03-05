@@ -69,7 +69,7 @@ def load_validation_data(data_path: Path):
     return test_samples
 
 def get_benchmark_design_configs():
-    free_params = ["v", "a", "tau"]
+    free_params = ["v", "a", "z", "tau"]
     fixed_params = ["s_v", "s_tau"]
     intrinsic_params = free_params + fixed_params
 
@@ -82,8 +82,8 @@ def get_benchmark_design_configs():
 
     regressed = {
         "1": intrinsic_params,
-        "u_1": ["v", "a"],
-        "u_2": ["v", "a"],
+        "u_1": ["v", "a", "z"],
+        "u_2": ["v", "a", "z"],
         "u_1:u_2": []
     }
 
@@ -96,16 +96,16 @@ def get_benchmark_design_configs():
 
     fixed_regressed = {
         "1": free_params,
-        "u_1": ["v", "a"],
-        "u_2": ["v", "a"],
+        "u_1": ["v", "a", "z"],
+        "u_2": ["v", "a", "z"],
         "u_1:u_2": []
     }
 
     interaction = {
         "1": intrinsic_params,
-        "u_1": ["v", "a", "tau", "s_v"],
-        "u_2": ["v", "a", "tau"],
-        "u_1:u_2": ["v", "a"]
+        "u_1": ["v", "a", "z", "tau", "s_v"],
+        "u_2": ["v", "a", "z", "tau"],
+        "u_1:u_2": ["v", "a", "z"]
     }
 
     benchmarks = {}
@@ -213,8 +213,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Intrinsics / display names
-    intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
-    variable_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+    intrinsic_params = ["v", "a", "z", "tau", "s_v", "s_tau"]
+    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
 
     # Rebuild model-family exactly like training
     model_family_config = {
@@ -229,7 +229,7 @@ def main():
         model=DDM(),
         name="DDM",
         prior_fun=ddm_priors(),
-        mask_randomizer_kwargs={  # default; per-config we’ll override
+        mask_randomizer_kwargs={
             "free_intrinsics": intrinsic_params,
             "fixed_intrinsics": [],
             "fixed_values": {},

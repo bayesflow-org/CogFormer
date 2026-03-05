@@ -25,7 +25,7 @@ from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 CASE_CONFIGS = {
     "intercept_only": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
         "regressed_params": None,
@@ -36,10 +36,10 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
-        "param_names": [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
+        "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
     },
     "fixed": {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "z", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {"s_v": 0, "s_tau": 0},
         "regressed_params": None,
@@ -50,13 +50,13 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": False,
         "squeeze_outputs": True,
-        "param_names": [r"$v$", r"$a$", r"$\tau$"],
+        "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$"],
     },
     "regressed": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
-        "regressed_params": ["v", "a"],
+        "regressed_params": ["v", "a", "z"],
         "min_num_regressors": 2,
         "max_num_regressors": 2,
         "max_num_categories": 2,
@@ -65,16 +65,16 @@ CASE_CONFIGS = {
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
         "param_names": [
-            r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
-            r"$u_{1, v}$", r"$u_{1, a}$",
-            r"$u_{2, v}$", r"$u_{2, a}$",
+            r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$",
+            r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, z}$",
+            r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$",
         ],
     },
     "fixed_regressed": {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "z", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {"s_v": 0, "s_tau": 0},
-        "regressed_params": ["v", "a"],
+        "regressed_params": ["v", "a", "z"],
         "min_num_regressors": 2,
         "max_num_regressors": 2,
         "max_num_categories": 2,
@@ -83,13 +83,13 @@ CASE_CONFIGS = {
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
         "param_names": [
-            r"$v$", r"$a$", r"$\tau$",
-            r"$u_{1, v}$", r"$u_{1, a}$",
-            r"$u_{2, v}$", r"$u_{2, a}$",
+            r"$v$", r"$a$", r"$z$", r"$\tau$",
+            r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, z}$",
+            r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$",
         ],
     },
     "interaction": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
         "regressed_params": None,
@@ -98,37 +98,37 @@ CASE_CONFIGS = {
         "max_num_categories": 2,
         "fixed_config": False,
         "design_config": {
-            "1": ["v", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau", "s_v"],
-            "u_2": ["v", "a", "tau"],
-            "u_1:u_2": ["v", "a"],
+            "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "a", "z", "tau", "s_v"],
+            "u_2": ["v", "a", "z", "tau"],
+            "u_1:u_2": ["v", "a", "z"],
         },
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
         "param_names": [
-            r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
-            r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, \tau}$", r"$u_{1, s_v}$",
-            r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
-            r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$",
+            r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$",
+            r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, z}$", r"$u_{1, \tau}$", r"$u_{1, s_v}$",
+            r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$", r"$u_{2, \tau}$",
+            r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, z}$",
         ],
     },
 }
 
 
 def get_benchmark_design_configs():
-    free_params = ["v", "a", "tau"]
+    free_params = ["v", "a", "z", "tau"]
     fixed_params = ["s_v", "s_tau"]
     intrinsic_params = free_params + fixed_params
 
     intercept_only = {"1": intrinsic_params, "u_1": [], "u_2": [], "u_1:u_2": []}
-    regressed = {"1": intrinsic_params, "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []}
+    regressed = {"1": intrinsic_params, "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []}
     fixed = {"1": free_params, "u_1": [], "u_2": [], "u_1:u_2": []}
-    fixed_regressed = {"1": free_params, "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []}
+    fixed_regressed = {"1": free_params, "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []}
     interaction = {
         "1": intrinsic_params,
-        "u_1": ["v", "a", "tau", "s_v"],
-        "u_2": ["v", "a", "tau"],
-        "u_1:u_2": ["v", "a"],
+        "u_1": ["v", "a", "z", "tau", "s_v"],
+        "u_2": ["v", "a", "z", "tau"],
+        "u_1:u_2": ["v", "a", "z"],
     }
 
     names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
@@ -320,8 +320,8 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     logging.info("Metric evaluation is now finished.")
 
     # --- Adaptive diagnostics ---
-    intrinsic_params_all = ["v", "a", "tau", "s_v", "s_tau"]
-    variable_names_all = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+    intrinsic_params_all = ["v", "a", "z", "tau", "s_v", "s_tau"]
+    variable_names_all = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
     design_config = get_benchmark_design_configs()[case]
     adaptive_colors = bayesgpt_fm_colors()
 

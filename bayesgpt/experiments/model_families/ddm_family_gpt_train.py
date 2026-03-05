@@ -156,13 +156,13 @@ class BayesGPTTrainer:
     def val_step(self, config, global_step, fig_path):
         # Two validation scenarios
         config_1 = {
-            "1": ["v", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau", "s_v"],
-            "u_2": ["v", "a", "tau"],
-            "u_1:u_2": ["v", "a"],
+            "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "a", "z", "tau", "s_v"],
+            "u_2": ["v", "a", "z", "tau"],
+            "u_1:u_2": ["v", "a", "z"],
         }
         config_2 = {
-            "1": ["v", "a", "tau"],
+            "1": ["v", "a", "z", "tau"],
             "u_1": [],
             "u_2": [],
             "u_1:u_2": []
@@ -173,8 +173,8 @@ class BayesGPTTrainer:
             ("fixed", config_2),
         ]
 
-        params = ["v", "a", "tau", "s_v", "s_tau"]
-        param_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+        params = ["v", "a", "z", "tau", "s_v", "s_tau"]
+        param_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
 
         colors = bayesgpt_fm_colors()
         max_num_categories = config["model_family_config"]["max_num_categories"]
@@ -378,13 +378,13 @@ if __name__ == "__main__":
     }
 
     train_params_kwargs = {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "z", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {"s_v": 0.0, "s_tau": 0.0}
     }
 
     val_params_kwargs = {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {}
     }

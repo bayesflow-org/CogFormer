@@ -12,7 +12,7 @@ from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 
 CASE_CONFIGS = {
     "intercept_only": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
         "regressed_params": None,
@@ -25,7 +25,7 @@ CASE_CONFIGS = {
         "squeeze_outputs": True,
     },
     "fixed": {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "z", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {"s_v": 0, "s_tau": 0},
         "regressed_params": None,
@@ -38,10 +38,10 @@ CASE_CONFIGS = {
         "squeeze_outputs": True,
     },
     "regressed": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
-        "regressed_params": ["v", "a"],
+        "regressed_params": ["v", "a", "z"],
         "min_num_regressors": 2,
         "max_num_regressors": 2,
         "max_num_categories": 2,
@@ -51,10 +51,10 @@ CASE_CONFIGS = {
         "squeeze_outputs": False,
     },
     "fixed_regressed": {
-        "free_intrinsics": ["v", "a", "tau"],
+        "free_intrinsics": ["v", "a", "z", "tau"],
         "fixed_intrinsics": ["s_v", "s_tau"],
         "fixed_values": {"s_v": 0, "s_tau": 0},
-        "regressed_params": ["v", "a"],
+        "regressed_params": ["v", "a", "z"],
         "min_num_regressors": 2,
         "max_num_regressors": 2,
         "max_num_categories": 2,
@@ -64,7 +64,7 @@ CASE_CONFIGS = {
         "squeeze_outputs": False,
     },
     "interaction": {
-        "free_intrinsics": ["v", "a", "tau", "s_v", "s_tau"],
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "fixed_intrinsics": [],
         "fixed_values": {},
         "regressed_params": None,
@@ -73,10 +73,10 @@ CASE_CONFIGS = {
         "max_num_categories": 2,
         "fixed_config": False,
         "design_config": {
-            "1": ["v", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau", "s_v"],
-            "u_2": ["v", "a", "tau"],
-            "u_1:u_2": ["v", "a"],
+            "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "a", "z", "tau", "s_v"],
+            "u_2": ["v", "a", "z", "tau"],
+            "u_1:u_2": ["v", "a", "z"],
         },
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
