@@ -34,8 +34,8 @@ def shifted_softplus(x: np.ndarray):
 
 def scaled_sigmoid(
     x: float | np.ndarray,
-    lower_bound: float | np.ndarray = -np.pi,
-    upper_bound: float | np.ndarray = np.pi,
+    lower_bound: float | np.ndarray = -1.0,
+    upper_bound: float | np.ndarray = 1.0,
 ) -> float:
     """
     Apply a sigmoid transformation and rescale to a bounded interval.
