@@ -25,9 +25,11 @@ def adaptive_c2st(
     tick_fontsize: int = 13,
     annot_fontsize: int = 11,
     fmt: str = ".3f",
+    mean_score: float | None = None,
     n_splits: int = 5,
-    hidden_layer_sizes: tuple = (32,),
-    max_iter: int = 200,
+    hidden_layer_sizes: tuple | str = "auto",
+    max_iter: int = 1000,
+    patience: int = 5,
     random_state: int = 0,
 ) -> plt.Figure:
     """
@@ -69,10 +71,12 @@ def adaptive_c2st(
         Format string for cell annotations (default ".3f").
     n_splits : int, optional, default: 5
         Number of stratified cross-validation folds.
-    hidden_layer_sizes : tuple, optional, default: (32,)
+    hidden_layer_sizes : tuple or "auto", optional, default: "auto"
         Hidden layer sizes for the MLP classifier.
-    max_iter : int, optional, default: 200
+    max_iter : int, optional, default: 1000
         Maximum training iterations per fold.
+    patience : int, optional, default: 5
+        Early-stopping patience.
     random_state : int, optional, default: 0
         Random seed for reproducibility.
 
@@ -121,6 +125,7 @@ def adaptive_c2st(
                 n_splits=n_splits,
                 hidden_layer_sizes=hidden_layer_sizes,
                 max_iter=max_iter,
+                patience=patience,
                 random_state=random_state,
             )
 
@@ -171,7 +176,8 @@ def adaptive_c2st(
                     color=tint, alpha=0.7, zorder=3,
                 )
 
-    ax.set_title("C2ST Accuracy", fontsize=title_fontsize)
+    title = "C2ST Accuracy" if mean_score is None else f"C2ST Accuracy\nMean: {mean_score:.3f}"
+    ax.set_title(title, fontsize=title_fontsize)
     ax.set_xticks(range(num_cols))
     ax.set_xticklabels(col_labels, fontsize=tick_fontsize)
     ax.set_yticks(range(num_rows))

@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from bayesgpt.diagnostics.metric.adaptive_c2st import adaptive_c2st as compute_adaptive_c2st
+from bayesgpt.diagnostics.metric.adaptive_c2st import compute_joint_c2st
 from bayesgpt.diagnostics.plot.adaptive_c2st import adaptive_c2st as plot_adaptive_c2st
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
@@ -168,6 +169,16 @@ def main():
         )
 
         # --- C2ST ---
+        joint_score = compute_joint_c2st(
+            pred_a=gpt_pred_set,
+            pred_b=bf_pred_reshaped,
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=args.max_num_categories,
+            parameter_mask=params_mask,
+        )
+        logging.info(f"[{cfg_name}] C2ST Mean Accuracy: {joint_score:.3f}")
+
         c2st_fig = plot_adaptive_c2st(
             pred_a=gpt_pred_set,
             pred_b=bf_pred_reshaped,
@@ -179,6 +190,7 @@ def main():
             intercept_color=colors["intercept"],
             main_effect_color=colors["main_effect"],
             interaction_color=colors["interaction"],
+            joint_score=joint_score,
         )
         c2st_fig_path = outdir / f"cdm_families_{cfg_name}_c2st.pdf"
         c2st_fig.savefig(c2st_fig_path, bbox_inches="tight")
@@ -194,6 +206,7 @@ def main():
             parameter_mask=params_mask,
             variable_names=variable_names,
         )
+        c2st_df.loc["_mean_accuracy_"] = {"C2ST Accuracy": joint_score}
         c2st_csv_path = outdir / f"cdm_families_{cfg_name}_c2st.csv"
         c2st_df.to_csv(c2st_csv_path)
         logging.info(f"[saved] {c2st_csv_path}")

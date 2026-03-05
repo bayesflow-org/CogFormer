@@ -6,12 +6,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from bayesgpt.diagnostics.metric.adaptive_c2st import adaptive_c2st as compute_adaptive_c2st
+from bayesgpt.diagnostics.metric.adaptive_c2st import compute_joint_c2st
 from bayesgpt.diagnostics.plot.adaptive_c2st import adaptive_c2st as plot_adaptive_c2st
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
 def get_benchmark_design_configs():
-    free_params = ["v", "a", "tau"]
+    free_params = ["v", "a", "z", "tau"]
     fixed_params = ["s_v", "s_tau"]
     intrinsic_params = free_params + fixed_params
 
@@ -24,8 +25,8 @@ def get_benchmark_design_configs():
 
     regressed = {
         "1": intrinsic_params,
-        "u_1": ["v", "a"],
-        "u_2": ["v", "a"],
+        "u_1": ["v", "a", "z"],
+        "u_2": ["v", "a", "z"],
         "u_1:u_2": []
     }
 
@@ -38,16 +39,16 @@ def get_benchmark_design_configs():
 
     fixed_regressed = {
         "1": free_params,
-        "u_1": ["v", "a"],
-        "u_2": ["v", "a"],
+        "u_1": ["v", "a", "z"],
+        "u_2": ["v", "a", "z"],
         "u_1:u_2": []
     }
 
     interaction = {
         "1": intrinsic_params,
-        "u_1": ["v", "a", "tau", "s_v"],
-        "u_2": ["v", "a", "tau"],
-        "u_1:u_2": ["v", "a"]
+        "u_1": ["v", "a", "z", "tau", "s_v"],
+        "u_2": ["v", "a", "z", "tau"],
+        "u_1:u_2": ["v", "a", "z"]
     }
 
     names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
@@ -129,8 +130,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    intrinsic_params = ["v", "a", "tau", "s_v", "s_tau"]
-    variable_names = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+    intrinsic_params = ["v", "a", "z", "tau", "s_v", "s_tau"]
+    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
 
     colors = bayesgpt_fm_colors()
     benchmark = get_benchmark_design_configs()
@@ -168,6 +169,16 @@ def main():
         )
 
         # --- C2ST ---
+        joint_score = compute_joint_c2st(
+            pred_a=gpt_pred_set,
+            pred_b=bf_pred_reshaped,
+            design_config=design_config,
+            intrinsic_params=intrinsic_params,
+            max_num_categories=args.max_num_categories,
+            parameter_mask=params_mask,
+        )
+        logging.info(f"[{cfg_name}] C2ST Mean Accuracy: {joint_score:.3f}")
+
         c2st_fig = plot_adaptive_c2st(
             pred_a=gpt_pred_set,
             pred_b=bf_pred_reshaped,
@@ -179,6 +190,7 @@ def main():
             intercept_color=colors["intercept"],
             main_effect_color=colors["main_effect"],
             interaction_color=colors["interaction"],
+            mean_score=joint_score,
         )
         c2st_fig_path = outdir / f"ddm_families_{cfg_name}_c2st.pdf"
         c2st_fig.savefig(c2st_fig_path, bbox_inches="tight")
@@ -194,6 +206,7 @@ def main():
             parameter_mask=params_mask,
             variable_names=variable_names,
         )
+        c2st_df.loc["_mean_accuracy_"] = {"C2ST Accuracy": joint_score}
         c2st_csv_path = outdir / f"ddm_families_{cfg_name}_c2st.csv"
         c2st_df.to_csv(c2st_csv_path)
         logging.info(f"[saved] {c2st_csv_path}")
