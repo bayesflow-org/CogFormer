@@ -14,7 +14,13 @@ from bayesgpt.simulators.model_family import NestedModelFamily
 from bayesgpt.simulators.benchmarks.ddms.ddm import DDM
 from bayesgpt.simulators.benchmarks.ddms.ddm_priors import ddm_priors
 from bayesgpt.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
-from bayesgpt.utils.plot_utils import bf_colors
+from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
+from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
+from bayesgpt.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
+from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
+from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
+from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
+from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
 CASE_CONFIGS = {
@@ -107,6 +113,45 @@ CASE_CONFIGS = {
         ],
     },
 }
+
+
+def get_benchmark_design_configs():
+    free_params = ["v", "a", "tau"]
+    fixed_params = ["s_v", "s_tau"]
+    intrinsic_params = free_params + fixed_params
+
+    intercept_only = {"1": intrinsic_params, "u_1": [], "u_2": [], "u_1:u_2": []}
+    regressed = {"1": intrinsic_params, "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []}
+    fixed = {"1": free_params, "u_1": [], "u_2": [], "u_1:u_2": []}
+    fixed_regressed = {"1": free_params, "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []}
+    interaction = {
+        "1": intrinsic_params,
+        "u_1": ["v", "a", "tau", "s_v"],
+        "u_2": ["v", "a", "tau"],
+        "u_1:u_2": ["v", "a"],
+    }
+
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
+    return {name: config for name, config in zip(names, configs)}
+
+
+def reshape_bf_to_gpt(bf_samples, design_config, intrinsic_params):
+    *leading, num_active = bf_samples.shape
+    num_rows = len(design_config)
+    num_cols = len(intrinsic_params)
+    col_idx = {p: j for j, p in enumerate(intrinsic_params)}
+    result = np.zeros((*leading, num_rows, num_cols))
+    flat_pos = 0
+    for row_i, active_params in enumerate(design_config.values()):
+        ordered = [p for p in intrinsic_params if p in active_params]
+        for p in ordered:
+            result[..., row_i, col_idx[p]] = bf_samples[..., flat_pos]
+            flat_pos += 1
+    assert flat_pos == num_active, (
+        f"Expected {num_active} active params but mapped {flat_pos}."
+    )
+    return result
 
 
 class DDMModelFamilyBF(bf.simulators.Simulator):
@@ -231,22 +276,6 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]
 
-    colors = bf_colors()
-
-    for i in range(10):
-        posterior = bf.diagnostics.plots.pairs_posterior(
-            estimates=pred_params,
-            targets=true_params,
-            dataset_id=i,
-            variable_names=param_names,
-            post_color=colors["intercept"],
-            place_legend_below=True,
-        )
-        posterior_path = figures_dir / f"ddm_families_bf_{case}_posterior{i}.pdf"
-        posterior.savefig(posterior_path)
-        plt.close(posterior)
-        logging.info(f"Saved posterior pairplot to {posterior_path}")
-
     rts = val_sims["rts"]
     choices = val_sims["choices"]
     design_matrices = val_sims["design_matrices"]
@@ -290,54 +319,111 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     metrics.to_csv(evals_dir / f"ddm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
-    recovery = bf.diagnostics.recovery(
-        estimates=pred_params,
-        targets=true_params,
-        variable_names=param_names,
-        figsize=(15, 12),
-        label_fontsize=14,
-        num_row=4,
-        num_col=5,
-        color=colors["intercept"],
-    )
-    recovery_path = figures_dir / f"ddm_families_bf_{case}_recovery.pdf"
-    recovery.savefig(recovery_path)
-    plt.close(recovery)
-    logging.info(f"Saved recovery plot to {recovery_path}")
+    # --- Adaptive diagnostics ---
+    intrinsic_params_all = ["v", "a", "tau", "s_v", "s_tau"]
+    variable_names_all = [r"$v$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
+    design_config = get_benchmark_design_configs()[case]
+    adaptive_colors = bayesgpt_fm_colors()
 
-    coverage = bf.diagnostics.plots.coverage(
-        estimates=pred_params,
-        targets=true_params,
-        variable_names=param_names,
-        difference=True,
-        figsize=(20, 16),
-        label_fontsize=14,
-        legend_fontsize=10,
-        num_row=4,
-        num_col=5,
-        color=colors["intercept"],
-    )
-    coverage_path = figures_dir / f"ddm_families_bf_{case}_coverage.pdf"
-    coverage.savefig(coverage_path)
-    plt.close(coverage)
-    logging.info(f"Saved coverage plot to {coverage_path}")
+    true_grid = reshape_bf_to_gpt(true_params, design_config, intrinsic_params_all)
+    pred_grid = reshape_bf_to_gpt(pred_params, design_config, intrinsic_params_all)
+    params_mask = reshape_bf_to_gpt(
+        np.ones((1, true_params.shape[-1])), design_config, intrinsic_params_all
+    )[0]
 
-    calibration_ecdf = bf.diagnostics.calibration_ecdf(
-        estimates=pred_params,
-        targets=true_params,
-        variable_names=param_names,
-        difference=True,
-        figsize=(20, 16),
-        label_fontsize=14,
-        legend_fontsize=10,
-        num_row=4,
-        num_col=5,
-        rank_ecdf_color=colors["intercept"],
+    recovery_fig = adaptive_recovery(
+        true=true_grid,
+        pred=pred_grid,
+        design_config=design_config,
+        intrinsic_params=intrinsic_params_all,
+        max_num_categories=2,
+        parameter_mask=params_mask,
+        variable_names=variable_names_all,
+        intercept_color=adaptive_colors["intercept"],
+        main_effect_color=adaptive_colors["main_effect"],
+        interaction_color=adaptive_colors["interaction"],
     )
-    ecdf_path = figures_dir / f"ddm_families_bf_{case}_ecdf.pdf"
-    calibration_ecdf.savefig(ecdf_path)
-    plt.close(calibration_ecdf)
-    logging.info(f"Saved ECDF plot to {ecdf_path}")
+    recovery_fig.savefig(figures_dir / f"ddm_family_{case}_bf_recovery.pdf", bbox_inches="tight")
+    plt.close(recovery_fig)
+    logging.info(f"Saved adaptive recovery to {figures_dir}")
+
+    coverage_fig = adaptive_coverage(
+        true=true_grid,
+        pred=pred_grid,
+        design_config=design_config,
+        intrinsic_params=intrinsic_params_all,
+        max_num_categories=2,
+        parameter_mask=params_mask,
+        variable_names=variable_names_all,
+        intercept_color=adaptive_colors["intercept"],
+        main_effect_color=adaptive_colors["main_effect"],
+        interaction_color=adaptive_colors["interaction"],
+    )
+    coverage_fig.savefig(figures_dir / f"ddm_family_{case}_bf_coverage.pdf", bbox_inches="tight")
+    plt.close(coverage_fig)
+    logging.info(f"Saved adaptive coverage to {figures_dir}")
+
+    ecdf_fig = adaptive_ecdf(
+        true=true_grid,
+        pred=pred_grid,
+        design_config=design_config,
+        intrinsic_params=intrinsic_params_all,
+        max_num_categories=2,
+        parameter_mask=params_mask,
+        variable_names=variable_names_all,
+        intercept_color=adaptive_colors["intercept"],
+        main_effect_color=adaptive_colors["main_effect"],
+        interaction_color=adaptive_colors["interaction"],
+        difference=True,
+    )
+    ecdf_fig.savefig(figures_dir / f"ddm_family_{case}_bf_ecdf.pdf", bbox_inches="tight")
+    plt.close(ecdf_fig)
+    logging.info(f"Saved adaptive ECDF to {figures_dir}")
+
+    metrics_fig = plot_adaptive_metrics(
+        true=true_grid,
+        pred=pred_grid,
+        design_config=design_config,
+        intrinsic_params=intrinsic_params_all,
+        max_num_categories=2,
+        parameter_mask=params_mask,
+        variable_names=variable_names_all,
+        intercept_color=adaptive_colors["intercept"],
+        main_effect_color=adaptive_colors["main_effect"],
+        interaction_color=adaptive_colors["interaction"],
+    )
+    metrics_fig.savefig(figures_dir / f"ddm_family_{case}_bf_metrics.pdf", bbox_inches="tight")
+    plt.close(metrics_fig)
+    logging.info(f"Saved adaptive metrics to {figures_dir}")
+
+    metrics_df = compute_adaptive_metrics(
+        true=true_grid,
+        pred=pred_grid,
+        design_config=design_config,
+        intrinsic_params=intrinsic_params_all,
+        max_num_categories=2,
+        parameter_mask=params_mask,
+        variable_names=variable_names_all,
+    )
+    metrics_df.to_csv(figures_dir / f"ddm_family_{case}_bf_metrics.csv")
+    logging.info(f"Saved adaptive metrics CSV to {figures_dir}")
+
+    for i in range(10):
+        posterior_fig = adaptive_posterior(
+            samples=pred_grid[i],
+            design_config=design_config,
+            intrinsic_params=intrinsic_params_all,
+            max_num_categories=2,
+            unfold=False,
+            intercept_color=adaptive_colors["intercept"],
+            main_effect_color=adaptive_colors["main_effect"],
+            interaction_color=adaptive_colors["interaction"],
+        )
+        posterior_fig.savefig(
+            figures_dir / f"ddm_family_{case}_bf_posterior_{i}.pdf", bbox_inches="tight"
+        )
+        plt.close(posterior_fig.fig)
+    logging.info(f"Saved adaptive posteriors to {figures_dir}")
 
 
 if __name__ == "__main__":
