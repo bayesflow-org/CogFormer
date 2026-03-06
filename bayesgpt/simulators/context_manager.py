@@ -9,8 +9,8 @@ class ContextManager:
     Utility class for constructing design configurations, parameter masks,
     design matrices, and sampled parameter matrices for NestedModelFamily.
     """
-    def __init__(self, intrinsic_params: list[str] = None):
-        self.intrinsic_params = intrinsic_params
+    def __init__(self):
+        pass
 
     def build_design_config(
             self,
@@ -39,7 +39,7 @@ class ContextManager:
         # Then main effect
         main_keys: list[str] = []
         for r in range(num_regressors):
-            key = f"u_{r + 1}" if keep_intercept else f"u_{r}"
+            key = f"u_{r + 1}"
 
             if keep_intercept:
                 # Slopes can only appear if intercept exists for that intrinsic
@@ -127,7 +127,7 @@ class ContextManager:
         # Main effect
         main_keys = []
         for r in range(num_regressors):
-            key = f"u_{r + 1}" if keep_intercept else f"u_{r}"
+            key = f"u_{r + 1}"
             names = []
             for param in intrinsic_params:
                 if (param in allowed_slope_params) and (np.random.rand() < free_prob):
@@ -252,7 +252,7 @@ class ContextManager:
             fixed_values = {}
 
         if design_config is not None:
-            free_intrinsics = design_config["1"]
+            free_intrinsics = design_config.get("1", [])
             fixed_intrinsics = list(set(list(prior_fun.keys())) - set(free_intrinsics))
 
         priors = {}
@@ -554,7 +554,7 @@ class ContextManager:
             if i == 0 and keep_intercept:
                 key = "1"
             else:
-                key = f"u_{i + 1}" if keep_intercept else f"u_{i}"
+                key = f"u_{i + 1}"
 
             config[key] = []
             for j in range(num_intrinsic_params):

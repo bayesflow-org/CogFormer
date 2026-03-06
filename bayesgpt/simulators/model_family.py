@@ -39,7 +39,7 @@ class NestedModelFamily:
 
     @property
     def parameter_names(self) -> list[str]:
-        return self.context_manager.parameter_names
+        return self.intrinsic_params
 
     def sample(
         self,
@@ -63,88 +63,64 @@ class NestedModelFamily:
         if prior_fun is None:
             prior_fun = self.prior_fun
 
-        is_intrinsic_priors = True
-        for _, v in prior_fun.items():
-            if not isinstance(v, dict):
-                is_intrinsic_priors = False
+        is_intrinsic_priors = all(isinstance(v, dict) for v in prior_fun.values())
+        kwargs = mask_randomizer_kwargs if mask_randomizer_kwargs is not None else (self.mask_randomizer_kwargs or {})
 
-        if mask_randomizer_kwargs is None:
-            kwargs = self.mask_randomizer_kwargs
-        else:
-            kwargs = mask_randomizer_kwargs
-        kwargs = kwargs or {}
-
-        # Create design config and parameter mask, either dynamically or based on user input
-        if design_config is None:
-            if fixed_config:
-                if self.regressed_params is not None:
-                    design_config = self.context_manager.build_design_config(
-                        intrinsic_params=self.intrinsic_params,
-                        regressed_params=self.regressed_params,
-                        num_regressors=num_regressors,
-                        keep_intercept=keep_intercept,
-                        add_interaction=add_interaction,
-                    )
-                else:
-                    design_config = self.context_manager.build_random_design_config(
-                        intrinsic_params=self.intrinsic_params,
-                        free_intrinsics=kwargs.get("free_intrinsics"),
-                        fixed_intrinsics=kwargs.get("fixed_intrinsics"),
-                        num_regressors=num_regressors,
-                        keep_intercept=keep_intercept,
-                        add_interaction=add_interaction,
-                    )
-                parameter_mask = self.context_manager.build_parameter_mask(
-                    design_config=design_config,
-                    intrinsic_params=self.intrinsic_params,
-                    fixed_params=kwargs.get("fixed_intrinsics"),
-                    max_num_categories=max_num_categories,
-                    keep_intercept=keep_intercept,
-                    # max_num_regressors=max_num_regressors,
-                )
-
-                if not is_intrinsic_priors:
-                    intrinsic_prior_fun = self.context_manager.build_intrinsic_priors(
-                        prior_fun=prior_fun,
-                        design_config=design_config,
-                        fixed_values=kwargs.get("fixed_values"),
-                    )
-            else:
-                parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
-                    intrinsic_params=self.intrinsic_params,
-                    num_regressors=num_regressors,
-                    # max_num_regressors=max_num_regressors,
-                    max_num_categories=max_num_categories,
-                    keep_intercept=keep_intercept,
-                    free_prob=free_prob,
-                    free_intrinsics=kwargs.get("free_intrinsics"),
-                    fixed_intrinsics=kwargs.get("fixed_intrinsics"),
-                    add_interaction=add_interaction,
-                )
-
-                if not is_intrinsic_priors:
-                    intrinsic_prior_fun = self.context_manager.build_intrinsic_priors(
-                        prior_fun=prior_fun,
-                        design_config=design_config,
-                        fixed_values=kwargs.get("fixed_values"),
-                    )
-
-        else:
+        # Resolve design_config and parameter_mask
+        if design_config is not None:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
                 fixed_params=kwargs.get("fixed_intrinsics"),
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
-                # max_num_regressors=max_num_regressors,
+            )
+        elif fixed_config:
+            if self.regressed_params is not None:
+                design_config = self.context_manager.build_design_config(
+                    intrinsic_params=self.intrinsic_params,
+                    regressed_params=self.regressed_params,
+                    num_regressors=num_regressors,
+                    keep_intercept=keep_intercept,
+                    add_interaction=add_interaction,
+                )
+            else:
+                design_config = self.context_manager.build_random_design_config(
+                    intrinsic_params=self.intrinsic_params,
+                    free_intrinsics=kwargs.get("free_intrinsics"),
+                    fixed_intrinsics=kwargs.get("fixed_intrinsics"),
+                    num_regressors=num_regressors,
+                    keep_intercept=keep_intercept,
+                    add_interaction=add_interaction,
+                )
+            parameter_mask = self.context_manager.build_parameter_mask(
+                design_config=design_config,
+                intrinsic_params=self.intrinsic_params,
+                fixed_params=kwargs.get("fixed_intrinsics"),
+                max_num_categories=max_num_categories,
+                keep_intercept=keep_intercept,
+            )
+        else:
+            parameter_mask, design_config = self.context_manager.build_random_parameter_mask(
+                intrinsic_params=self.intrinsic_params,
+                num_regressors=num_regressors,
+                max_num_categories=max_num_categories,
+                keep_intercept=keep_intercept,
+                free_prob=free_prob,
+                free_intrinsics=kwargs.get("free_intrinsics"),
+                fixed_intrinsics=kwargs.get("fixed_intrinsics"),
+                add_interaction=add_interaction,
             )
 
-            if not is_intrinsic_priors:
-                intrinsic_prior_fun = self.context_manager.build_intrinsic_priors(
-                    prior_fun=prior_fun,
-                    design_config=design_config,
-                    fixed_values=kwargs.get("fixed_values"),
-                )
+        # Resolve intrinsic priors (common to all branches)
+        if is_intrinsic_priors:
+            intrinsic_prior_fun = prior_fun
+        else:
+            intrinsic_prior_fun = self.context_manager.build_intrinsic_priors(
+                prior_fun=prior_fun,
+                design_config=design_config,
+                fixed_values=kwargs.get("fixed_values"),
+            )
 
         # Partition regressor keys
         regressor_keys = [k for k in design_config.keys() if k != "1"]
@@ -168,7 +144,6 @@ class NestedModelFamily:
             context=context,
             discrete_prob=discrete_prob,
             keep_intercept=keep_intercept,
-            # max_num_regressors=max_num_regressors,
             max_num_categories=max_num_categories,
         )
 
@@ -192,16 +167,6 @@ class NestedModelFamily:
         regressed_parameters = np.empty_like(predictor, dtype=np.float32)
         for j, name in enumerate(self.intrinsic_params):
             regressed_parameters[:, j] = link_funs[name](predictor[:, j]).astype(np.float32, copy=False)
-
-        # Post-link fix: fixed intrinsics with NO intercept are fixed at 0.0 (simulator-space)
-        # fixed_set = set(kwargs.get("fixed_intrinsics") or [])
-        # if keep_intercept and fixed_set:
-        #     intercept_set = set(design_config.get("1", []))
-        #     no_intercept_fixed = fixed_set - intercept_set
-        #     if no_intercept_fixed:
-        #         for j, name in enumerate(self.intrinsic_params):
-        #             if name in no_intercept_fixed:
-        #                 regressed_parameters[:, j] = 0.0
 
         # Package for model
         params = {
