@@ -195,7 +195,6 @@ def adaptive_ecdf(
                 )
                 ax.axhline(0.0, color="black", linestyle="dashed", label="Ideal (Uniform)")
                 ax.plot(ranks_sorted, ecdf_y - ranks_sorted, color=tint, alpha=1.0, label="ECDF Difference")
-                ax.set_ylim(-0.55, 0.55)
             else:
                 ax.fill_between(
                     band_x,
