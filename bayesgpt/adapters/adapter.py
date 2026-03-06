@@ -150,6 +150,7 @@ class Adapter:
         intrinsic_params: list[str],
         device: str | torch.device = torch.device("cuda"),
         additional_tokens: np.ndarray | None = None,
+        num_params: int | None = None,
     ) -> dict:
         # Fetch inputs from samples and adapt
         design_matrices = samples["design_matrices"]
@@ -161,16 +162,21 @@ class Adapter:
         input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
         input_data = Adapter.to_torch_tensor(input_data).to(torch.float32)
 
+        # Use explicit num_params if provided (ModelClass), otherwise infer from intrinsic_params
+        index_params = (
+            [None] * num_params if num_params is not None else intrinsic_params
+        )
+
         # Build indices
         parameter_indices = [Adapter.build_parameter_indices(
-            intrinsic_params,
+            index_params,
             num_regressors=samples["max_num_regressors"],
             num_categories=samples["max_num_categories"],
         ) for _ in range(batch_size)]
         parameter_indices = Adapter.to_torch_tensor(np.array(parameter_indices)).to(torch.float32)
 
         regressor_indices = [Adapter.build_regressor_indices(
-            intrinsic_params,
+            index_params,
             num_regressors=samples["max_num_regressors"],
             num_categories=samples["max_num_categories"],
         ) for _ in range(batch_size)]

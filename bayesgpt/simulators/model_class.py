@@ -201,5 +201,6 @@ class ModelClass:
             "num_regressors": num_regressors_array,
             "max_num_regressors": max_num_regressors,
             "max_num_categories": max_num_categories,
+            "max_num_params": self.max_num_params,
             "num_models": self.num_models,
         }
