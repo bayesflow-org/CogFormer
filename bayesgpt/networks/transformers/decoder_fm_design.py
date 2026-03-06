@@ -49,6 +49,7 @@ class Decoder(nn.Module):
             layer_kwargs: dict = None,
             time_embedding_dim: int = 32,
             pos_embedding_dim: int = 32,
+            model_embed_dim: int = 0,
     ):
         super().__init__()
         assert num_layers >= 1, "num_layers must be >= 1"
@@ -59,8 +60,9 @@ class Decoder(nn.Module):
         self.time_embedding = SinusoidalEmbedding(time_embedding_dim)
         self.pos_embedding = SinusoidalEmbedding(pos_embedding_dim)
 
-        # input: theta_t (1) + param_embedding (pos_embedding_dim) + reg_embedding (pos_embedding_dim) + t_embedding (time_embedding_dim)
-        self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim, proj_dim)
+        # input: theta_t (1) + param_embedding (pos_embedding_dim) + reg_embedding (pos_embedding_dim)
+        #        + t_embedding (time_embedding_dim) [+ model_embedding (model_embed_dim)]
+        self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim + model_embed_dim, proj_dim)
 
         if layer_design is not None:
             match layer_design:
@@ -108,17 +110,20 @@ class Decoder(nn.Module):
         self.output_proj = nn.Linear(proj_dim, 1)
         self.num_heads = num_heads
 
-    def velocity(self, theta_t, query, key, t, query_mask=None):
+    def velocity(self, theta_t, query, key, t, query_mask=None, model_embedding=None):
 
         # key_padding_mask for self-attention: True = inactive token, should be ignored
         key_padding_mask = (query_mask <= 0) if query_mask is not None else None
 
         # Sinusoidal embeddings for positional indices and time
-        param_embedding = self.pos_embedding(query[..., :1])   # (B, T, pos_embedding_dim)
+        param_embedding = self.pos_embedding(query[..., :1])         # (B, T, pos_embedding_dim)
         regressor_embedding = self.pos_embedding(query[..., 1:])     # (B, T, pos_embedding_dim)
         time_embedding = self.time_embedding(t)                      # (B, T, time_embedding_dim)
 
-        out = torch.cat([theta_t, param_embedding, regressor_embedding, time_embedding], dim=-1)
+        components = [theta_t, param_embedding, regressor_embedding, time_embedding]
+        if model_embedding is not None:
+            components.append(model_embedding)                       # (B, T, model_embed_dim)
+        out = torch.cat(components, dim=-1)
         out = self.input_proj(out)
 
         # Run through attention layers
@@ -133,7 +138,7 @@ class Decoder(nn.Module):
 
         return self.output_proj(out)
 
-    def forward(self, theta, query, key, query_mask=None):
+    def forward(self, theta, query, key, query_mask=None, model_embedding=None):
         """Returns predicted and target velocity (potentially masked)."""
 
         # Generate time
@@ -147,7 +152,7 @@ class Decoder(nn.Module):
         theta_t = t * theta + (1 - t) * z
 
         # Predict velocity v at theta_t
-        pred_velocity = self.velocity(theta_t, query, key, t, query_mask)
+        pred_velocity = self.velocity(theta_t, query, key, t, query_mask, model_embedding)
         target_velocity = theta - z
 
         if query_mask is not None:

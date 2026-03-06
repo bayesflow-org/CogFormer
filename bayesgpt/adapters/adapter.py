@@ -201,13 +201,20 @@ class Adapter:
         param_masks = Adapter.to_torch_tensor(samples["param_masks"]).to(torch.float32)
         param_matrices = Adapter.to_torch_tensor(samples["param_matrices"]).to(torch.float32)
 
+        raw_ids = samples.get("model_ids", None)
+        model_ids = (
+            Adapter.to_torch_tensor(np.asarray(raw_ids, dtype=np.int64))
+            if raw_ids is not None else None
+        )
+
         out = {
             "input_data": input_data,
             "param_indices": parameter_indices,
             "regressor_indices": regressor_indices,
             "param_masks": param_masks,
             "param_matrices": param_matrices,
-            "token_embeddings": token_embeddings
+            "token_embeddings": token_embeddings,
+            "model_ids": model_ids,
         }
 
         return Adapter.to_device(out, device)
