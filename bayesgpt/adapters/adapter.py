@@ -5,7 +5,7 @@ from typing import Iterable
 
 
 class Adapter:
-    """Utilities for dtype conversion, 2D normalization, and safe concatenation."""
+    """Utilities for dtype conversion and safe array manipulation."""
 
     @staticmethod
     def asarray(x) -> np.ndarray:
@@ -13,7 +13,6 @@ class Adapter:
 
     @staticmethod
     def pad(x: np.ndarray, to_shape: tuple[int, ...], pad_value: float = 0.0) -> np.ndarray:
-
         if x.shape == to_shape:
             return x
 
@@ -21,12 +20,9 @@ class Adapter:
             raise ValueError(f"ndim mismatch: {x.ndim} vs target {len(to_shape)}")
 
         pads = []
-
         for curr, targ in zip(x.shape, to_shape):
-
             if targ < curr:
                 raise ValueError(f"Cannot pad to smaller size: {x.shape} -> {to_shape}")
-
             pads.append((0, targ - curr))
 
         return np.pad(x, pads, mode="constant", constant_values=pad_value)
@@ -39,9 +35,7 @@ class Adapter:
         pad: bool = False,
         pad_value: float = 0.0,
     ) -> np.ndarray:
-        """
-        Concatenate arrays along axis. If pad=True, pad other dims to max size.
-        """
+        """Concatenate arrays along axis. If pad=True, pad other dims to max size."""
         arrs = [Adapter.asarray(a) for a in arrays]
 
         if not arrs:
@@ -70,63 +64,36 @@ class Adapter:
         return out
 
     @staticmethod
-    def stack(x: dict[str: np.ndarray] | list[np.ndarray], axis=-1) -> np.ndarray:
-        if isinstance(x, dict):
-            shapes = [v.shape[0] for v in x.values()]
-        else:
-            shapes = [v.shape[0] for v in x]
-
-        assert len(set(shapes)) == 1, "Arrays must have the same shape."
-        return Adapter.concatenate(list(x.values()) if isinstance(x, dict) else x, axis=axis)
+    def stack(x: dict[str, np.ndarray] | list[np.ndarray], axis=-1) -> np.ndarray:
+        arrays = list(x.values()) if isinstance(x, dict) else x
+        batch_sizes = [a.shape[0] for a in arrays]
+        if len(set(batch_sizes)) != 1:
+            raise ValueError(f"All arrays must have the same batch size; got {batch_sizes}.")
+        return Adapter.concatenate(arrays, axis=axis)
 
     @staticmethod
     def build_parameter_indices(
-        intrinsic_params: list[str],
+        num_params: int,
         num_regressors: int,
         num_categories: int,
     ) -> np.ndarray:
-        # Get number of intrinsic params
-        num_intrinsic_params = len(intrinsic_params)
+        """Build per-token parameter position indices. Shape: (num_tokens, 1)."""
         num_total_regressors = num_regressors * (num_regressors + 1) // 2
         num_tiles = num_total_regressors * (num_categories - 1) + 1
-        indices = np.tile(np.linspace(0.0, 1.0, num_intrinsic_params), num_tiles)[..., None]
+        indices = np.tile(np.linspace(0.0, 1.0, num_params), num_tiles)[..., None]
         return indices
 
     @staticmethod
     def build_regressor_indices(
-        intrinsic_params: list[str],
+        num_params: int,
         num_regressors: int,
         num_categories: int,
-    ):
-        num_intrinsic_params = len(intrinsic_params)
+    ) -> np.ndarray:
+        """Build per-token regressor position indices. Shape: (num_tokens, 1)."""
         num_total_regressors = num_regressors * (num_regressors + 1) // 2
         num_indices = num_total_regressors * (num_categories - 1) + 1
-        indices = np.repeat(np.linspace(0.0, 1.0, num_indices), num_intrinsic_params)[..., None]
+        indices = np.repeat(np.linspace(0.0, 1.0, num_indices), num_params)[..., None]
         return indices
-
-    @staticmethod
-    def build_token_embeddings(
-        regressor_indices: np.ndarray | torch.Tensor,
-        parameter_indices: np.ndarray | torch.Tensor,
-        additional_tokens: np.ndarray
-    ):
-        regressor_indices = np.atleast_2d(regressor_indices)
-        parameter_indices = np.atleast_2d(parameter_indices)
-        additional_tokens = np.atleast_2d(additional_tokens)
-
-        # Check if dimensions of indices align
-        num_tokens = regressor_indices.shape[0]
-        assert (
-            parameter_indices.shape[0] == num_tokens and
-            additional_tokens.shape[0] == num_tokens
-        ), "All inputs must have the same number of tokens."
-
-        embeddings = np.concatenate(
-            (regressor_indices, parameter_indices, additional_tokens),
-            axis=-1
-        )
-
-        return embeddings
 
     @staticmethod
     def to_torch_tensor(x: np.ndarray, copy: bool = False) -> torch.Tensor:
@@ -149,60 +116,42 @@ class Adapter:
         samples: dict,
         intrinsic_params: list[str],
         device: str | torch.device = torch.device("cuda"),
-        additional_tokens: np.ndarray | None = None,
         num_params: int | None = None,
     ) -> dict:
-        # Fetch inputs from samples and adapt
         design_matrices = samples["design_matrices"]
         rts = samples["sim_data"]["rts"]
         choices = samples["sim_data"]["choices"]
 
-        batch_size, max_num_obs, max_num_cols = design_matrices.shape
+        batch_size = design_matrices.shape[0]
 
         input_data = Adapter.stack([design_matrices, rts, choices], axis=-1)
         input_data = Adapter.to_torch_tensor(input_data).to(torch.float32)
 
-        # Use explicit num_params if provided (ModelClass), otherwise infer from intrinsic_params
-        index_params = (
-            [None] * num_params if num_params is not None else intrinsic_params
-        )
+        # num_params overrides intrinsic_params length when called from a ModelClass pipeline
+        n_params = num_params if num_params is not None else len(intrinsic_params)
 
-        # Build indices
-        parameter_indices = [Adapter.build_parameter_indices(
-            index_params,
-            num_regressors=samples["max_num_regressors"],
-            num_categories=samples["max_num_categories"],
-        ) for _ in range(batch_size)]
-        parameter_indices = Adapter.to_torch_tensor(np.array(parameter_indices)).to(torch.float32)
-
-        regressor_indices = [Adapter.build_regressor_indices(
-            index_params,
-            num_regressors=samples["max_num_regressors"],
-            num_categories=samples["max_num_categories"],
-        ) for _ in range(batch_size)]
-        regressor_indices = Adapter.to_torch_tensor(np.array(regressor_indices)).to(torch.float32)
-
-        # Build tokens
-        num_tokens = parameter_indices[0].shape[0]
-        if additional_tokens is None:
-            additional_tokens = np.zeros((batch_size, num_tokens, 1))
-        else:
-            additional_tokens = np.asarray(additional_tokens)
-            if additional_tokens.ndim == 2:
-                additional_tokens = additional_tokens[..., None]
-
-        token_embeddings_list = []
-        for b in range(batch_size):
-            embeddings = Adapter.build_token_embeddings(
-                regressor_indices=regressor_indices[b],
-                parameter_indices=parameter_indices[b],
-                additional_tokens=additional_tokens[b]
+        # Build indices once and tile across batch (identical per element)
+        parameter_indices = Adapter.to_torch_tensor(
+            np.tile(
+                Adapter.build_parameter_indices(
+                    num_params=n_params,
+                    num_regressors=samples["max_num_regressors"],
+                    num_categories=samples["max_num_categories"],
+                ),
+                (batch_size, 1, 1),
             )
-            token_embeddings_list.append(embeddings)
+        ).to(torch.float32)
 
-        token_embeddings = np.stack(token_embeddings_list, axis=0)
-        token_embeddings = Adapter.to_torch_tensor(token_embeddings).to(torch.float32)
-
+        regressor_indices = Adapter.to_torch_tensor(
+            np.tile(
+                Adapter.build_regressor_indices(
+                    num_params=n_params,
+                    num_regressors=samples["max_num_regressors"],
+                    num_categories=samples["max_num_categories"],
+                ),
+                (batch_size, 1, 1),
+            )
+        ).to(torch.float32)
 
         param_masks = Adapter.to_torch_tensor(samples["param_masks"]).to(torch.float32)
         param_matrices = Adapter.to_torch_tensor(samples["param_matrices"]).to(torch.float32)
@@ -219,68 +168,7 @@ class Adapter:
             "regressor_indices": regressor_indices,
             "param_masks": param_masks,
             "param_matrices": param_matrices,
-            "token_embeddings": token_embeddings,
             "model_ids": model_ids,
         }
 
-        return Adapter.to_device(out, device)
-
-    def build_inference_condition(
-        self,
-        context_manager,
-        design_config: dict,
-        intrinsic_params: list[str],
-        max_num_regressors: int,
-        max_num_categories: int,
-        keep_intercept: bool,
-        device: str | torch.device = torch.device("cuda"),
-        additional_tokens: np.ndarray | None = None,
-    ):
-        param_mask = context_manager.build_parameter_mask(
-            design_config=design_config,
-            intrinsic_params=intrinsic_params,
-            max_num_categories=max_num_categories,
-            keep_intercept=keep_intercept,
-        )
-        param_mask = Adapter.to_torch_tensor(param_mask.flatten()[None, :]).to(torch.float32)
-
-        # Build indices (fixed by max sizes)
-        parameter_indices = Adapter.build_parameter_indices(
-            intrinsic_params,
-            num_regressors=max_num_regressors,
-            num_categories=max_num_categories,
-        )
-        regressor_indices = Adapter.build_regressor_indices(
-            intrinsic_params,
-            num_regressors=max_num_regressors,
-            num_categories=max_num_categories,
-        )
-
-        parameter_indices = Adapter.to_torch_tensor(parameter_indices[None, ...]).to(torch.float32)
-        regressor_indices = Adapter.to_torch_tensor(regressor_indices[None, ...]).to(torch.float32)
-
-        # Tokens
-        num_tokens = parameter_indices.shape[1]
-        if additional_tokens is None:
-            additional_tokens = np.zeros((1, num_tokens, 1), dtype=np.float32)
-        else:
-            additional_tokens = np.asarray(additional_tokens, dtype=np.float32)
-            if additional_tokens.ndim == 2:
-                additional_tokens = additional_tokens[None, ..., None]
-            elif additional_tokens.ndim == 3:
-                additional_tokens = additional_tokens[None, ...]
-
-        token_embeddings = Adapter.build_token_embeddings(
-            regressor_indices=regressor_indices[0].cpu().numpy(),
-            parameter_indices=parameter_indices[0].cpu().numpy(),
-            additional_tokens=additional_tokens[0],
-        )
-        token_embeddings = Adapter.to_torch_tensor(token_embeddings[None, ...]).to(torch.float32)
-
-        out = {
-            "param_indices": parameter_indices,
-            "regressor_indices": regressor_indices,
-            "param_masks": param_mask,
-            "token_embeddings": token_embeddings,
-        }
         return Adapter.to_device(out, device)
