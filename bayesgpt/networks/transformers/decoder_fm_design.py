@@ -1,5 +1,3 @@
-import math
-
 import torch
 import torch.nn as nn
 
@@ -10,28 +8,8 @@ from .attention_layers import (
 )
 from .self_attention_block import SelfAttentionBlock
 from bayesgpt.utils.tensor_utils import broadcast_right
-
-
-class SinusoidalEmbedding(nn.Module):
-    """Fixed sinusoidal embedding for a scalar input.
-
-    Maps (..., 1) → (..., dim) using sin/cos at geometrically spaced frequencies.
-    No learned parameters; negligible compute overhead.
-    """
-    def __init__(self, dim: int):
-        super().__init__()
-        assert dim % 2 == 0, "SinusoidalEmbedding dim must be even"
-        self.dim = dim
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # x: (..., 1)
-        half = self.dim // 2
-        freqs = torch.exp(
-            -math.log(10000) * torch.arange(half, device=x.device, dtype=x.dtype)
-            / max(half - 1, 1)
-        )
-        args = x * freqs  # (..., half)
-        return torch.cat([torch.sin(args), torch.cos(args)], dim=-1)  # (..., dim)
+from .embeddings import SinusoidalEmbedding, FourierEmbedding
+from bayesgpt.networks.mlp.time_mlp import TimeMLP
 
 
 class Decoder(nn.Module):
@@ -49,7 +27,7 @@ class Decoder(nn.Module):
             layer_kwargs: dict = None,
             time_embedding_dim: int = 32,
             pos_embedding_dim: int = 32,
-            model_embed_dim: int = 0,
+            model_embedding_dim: int = 0,
     ):
         super().__init__()
         assert num_layers >= 1, "num_layers must be >= 1"
@@ -57,12 +35,12 @@ class Decoder(nn.Module):
         if layer_kwargs is None:
             layer_kwargs = {}
 
-        self.time_embedding = SinusoidalEmbedding(time_embedding_dim)
+        self.time_embedding = FourierEmbedding(time_embedding_dim)
         self.pos_embedding = SinusoidalEmbedding(pos_embedding_dim)
 
         # input: theta_t (1) + param_embedding (pos_embedding_dim) + reg_embedding (pos_embedding_dim)
         #        + t_embedding (time_embedding_dim) [+ model_embedding (model_embed_dim)]
-        self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim + model_embed_dim, proj_dim)
+        self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim + model_embedding_dim, proj_dim)
 
         if layer_design is not None:
             match layer_design:
@@ -107,7 +85,7 @@ class Decoder(nn.Module):
                 **layer_kwargs
             )
 
-        self.output_proj = nn.Linear(proj_dim, 1)
+        self.output_proj = TimeMLP(input_dim=proj_dim, time_embedding_dim=time_embedding_dim)
         self.num_heads = num_heads
 
     def velocity(self, theta_t, query, key, t, query_mask=None, model_embedding=None):
@@ -136,7 +114,7 @@ class Decoder(nn.Module):
             if query_mask is not None:
                 out = out * query_mask[..., None]
 
-        return self.output_proj(out)
+        return self.output_proj(out, time_embedding)
 
     def forward(self, theta, query, key, query_mask=None, model_embedding=None):
         """Returns predicted and target velocity (potentially masked)."""

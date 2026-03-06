@@ -67,7 +67,7 @@ class BayesGPT(nn.Module):
             layer_kwargs=decoder_layer_kwargs,
             time_embedding_dim=time_embedding_dim,
             pos_embedding_dim=pos_embedding_dim,
-            model_embed_dim=self._model_embed_dim,
+            model_embedding_dim=self._model_embed_dim,
         )
 
     def forward(self, params, input_data, param_indices, regressor_indices, params_mask=None, model_ids=None):
