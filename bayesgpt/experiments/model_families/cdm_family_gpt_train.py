@@ -328,7 +328,7 @@ def parse_args():
     parser.add_argument("--max_num_obs", type=int, default=500, help="maximum number of observations")
     parser.add_argument("--train_batch_size", type=int, default=64, help="batch size")
     parser.add_argument("--val_batch_size", type=int, default=200, help="validation batch size")
-    parser.add_argument("--epochs", type=int, default=1000, help="number of epochs")
+    parser.add_argument("--epochs", type=int, default=5000, help="number of epochs")
     parser.add_argument("--steps_per_epoch", type=int, default=100, help="number of steps per epoch")
 
     # Inference (FM only)
