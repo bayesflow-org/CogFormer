@@ -2,7 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 
-import numpy as np
+import numpy as npg
 import torch
 import matplotlib.pyplot as plt
 

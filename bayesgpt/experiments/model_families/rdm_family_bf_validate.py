@@ -112,6 +112,30 @@ CASE_CONFIGS = {
             r"$u_1:u_{2, v}$", r"$u_1:u_{2, v_{\mathrm{diff}}}$", r"$u_1:u_{2, a}$",
         ],
     },
+    "full": {
+        "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+        "fixed_intrinsics": [],
+        "fixed_values": {},
+        "regressed_params": None,
+        "min_num_regressors": 2,
+        "max_num_regressors": 2,
+        "max_num_categories": 2,
+        "fixed_config": True,
+        "design_config": {
+            "1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+            "u_2": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+            "u_1:u_2": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+        },
+        "flatten_param_outputs": True,
+        "squeeze_outputs": False,
+        "param_names": [
+            r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$",
+            r"$u_{1, v}$", r"$u_{1, v_{\mathrm{diff}}}$", r"$u_{1, a}$", r"$u_{1, \tau}$", r"$u_{1, s_v}$", r"$u_{1, s_\tau}$",
+            r"$u_{2, v}$", r"$u_{2, v_{\mathrm{diff}}}$", r"$u_{2, a}$", r"$u_{2, \tau}$", r"$u_{2, s_v}$", r"$u_{2, s_\tau}$",
+            r"$u_1:u_{2, v}$", r"$u_1:u_{2, v_{\mathrm{diff}}}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, \tau}$", r"$u_1:u_{2, s_v}$", r"$u_1:u_{2, s_\tau}$",
+        ],
+    },
 }
 
 
@@ -131,8 +155,15 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "v_diff", "a"],
     }
 
-    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
-    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
+    full = {
+        "1": intrinsic_params,
+        "u_1": intrinsic_params,
+        "u_2": intrinsic_params,
+        "u_1:u_2": intrinsic_params,
+    }
+
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction", "full"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction, full]
     return {name: config for name, config in zip(names, configs)}
 
 

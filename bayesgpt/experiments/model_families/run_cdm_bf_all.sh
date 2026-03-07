@@ -10,7 +10,7 @@
 
 set -e
 
-CASES=("intercept_only" "fixed" "regressed" "fixed_regressed" "interaction")
+CASES=("intercept_only" "fixed" "regressed" "fixed_regressed" "interaction" "full")
 TRAIN_ARGS="$@"
 
 echo "=========================================="

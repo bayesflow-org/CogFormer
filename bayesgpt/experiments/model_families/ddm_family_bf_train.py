@@ -81,6 +81,24 @@ CASE_CONFIGS = {
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
     },
+    "full": {
+        "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
+        "fixed_intrinsics": [],
+        "fixed_values": {},
+        "regressed_params": None,
+        "min_num_regressors": 2,
+        "max_num_regressors": 2,
+        "max_num_categories": 2,
+        "fixed_config": True,
+        "design_config": {
+            "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_2": ["v", "a", "z", "tau", "s_v", "s_tau"],
+            "u_1:u_2": ["v", "a", "z", "tau", "s_v", "s_tau"],
+        },
+        "flatten_param_outputs": True,
+        "squeeze_outputs": False,
+    },
 }
 
 
