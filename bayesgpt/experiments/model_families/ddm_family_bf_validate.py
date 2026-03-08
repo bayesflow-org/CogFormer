@@ -306,7 +306,8 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     active_idx = masks[0].astype(bool)
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]
-    param_names = [name for name, active in zip(param_names, active_idx) if active]
+    if len(param_names) == len(active_idx):
+        param_names = [name for name, active in zip(param_names, active_idx) if active]
 
     rts = val_sims["rts"]
     choices = val_sims["choices"]
