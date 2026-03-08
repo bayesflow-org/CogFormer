@@ -138,6 +138,7 @@ def main(num_samples=200, case="regressed"):
     active_idx = masks[0].astype(bool)
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]
+    param_names = [name for name, active in zip(param_names, active_idx) if active]
 
     colors = bf_colors()
 
