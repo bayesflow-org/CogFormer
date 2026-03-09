@@ -32,21 +32,14 @@ class ContextManager:
 
         # Intercept first
         if keep_intercept:
-            # Enforce invariant: no slopes without intercept.
-            # So the intercept must cover (at least) the regressed parameters.
-            config["1"] = list(regressed)
+            # All intrinsic params get an intercept; fixedness is expressed via the mask/prior
+            config["1"] = list(intrinsic_params)
 
         # Then main effect
         main_keys: list[str] = []
         for r in range(num_regressors):
             key = f"u_{r + 1}"
-
-            if keep_intercept:
-                # Slopes can only appear if intercept exists for that intrinsic
-                config[key] = list(config["1"])
-            else:
-                config[key] = list(regressed)
-
+            config[key] = list(regressed)  # slopes only for regressed params
             main_keys.append(key)
 
         # Optionally, interaction effect
@@ -175,11 +168,9 @@ class ContextManager:
         # Start with intercept
         row_idx = 0
         if has_intercept:
+            fixed_set = set(fixed_params) if fixed_params is not None else set()
             for name in design_config.get("1", []):
-                if name in intrinsic_params:
-                    # Always allow intercepts, even for fixed parameters.
-                    # Fixedness should be expressed via the prior (fixed intercept, zero slopes),
-                    # not by deleting the intercept entry from the mask.
+                if name in intrinsic_params and name not in fixed_set:
                     j = intrinsic_params.index(name)
                     mask[row_idx, j] = 1.0
 
