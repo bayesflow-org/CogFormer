@@ -270,6 +270,7 @@ def test(case: str):
     print(f"Targets shape: {targets.shape}, Estimates shape: {estimates.shape}")
 
     masks = val_sims["masks"]
+    print(masks[0], masks[1])
     active_idx = masks[0].astype(bool)
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]
