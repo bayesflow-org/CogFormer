@@ -23,6 +23,7 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": False,
         "squeeze_outputs": True,
+        "expected_num_active": None,  # varies: random subset of 6 intrinsics
     },
     "fixed": {
         "free_intrinsics": ["v", "v_theta", "a", "tau"],
@@ -36,6 +37,7 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": False,
         "squeeze_outputs": True,
+        "expected_num_active": 4,  # v, v_theta, a, tau
     },
     "regressed": {
         "free_intrinsics": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
@@ -49,6 +51,7 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
+        "expected_num_active": 10,  # 6 intercepts + 2 u_1 + 2 u_2
     },
     "fixed_regressed": {
         "free_intrinsics": ["v", "v_theta", "a", "tau"],
@@ -62,6 +65,7 @@ CASE_CONFIGS = {
         "design_config": None,
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
+        "expected_num_active": 8,  # 4 intercepts (v, v_theta, a, tau) + 2 u_1 + 2 u_2
     },
     "interaction": {
         "free_intrinsics": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
@@ -80,6 +84,7 @@ CASE_CONFIGS = {
         },
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
+        "expected_num_active": 18,  # 6 + 5 + 4 + 3 from design_config
     },
     "full": {
         "free_intrinsics": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
@@ -98,6 +103,7 @@ CASE_CONFIGS = {
         },
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
+        "expected_num_active": 24,  # 6 * 4 columns
     },
 }
 
@@ -169,6 +175,7 @@ class CDMModelFamilyBF(bf.simulators.Simulator):
 
 
 def test(case: str):
+    config = CASE_CONFIGS[case]
     cdm_family_simulator = CDMModelFamilyBF(case=case)
     cdm_samples = cdm_family_simulator.sample(4)
 
@@ -181,6 +188,30 @@ def test(case: str):
         else:
             print(f"  {k}: {v}")
 
+    masks = cdm_samples["masks"]
+    params = cdm_samples["params"]
+
+    # Check 1: active param count matches expected
+    num_active = int(masks[0].astype(bool).sum())
+    expected = config["expected_num_active"]
+    if expected is not None:
+        status = "OK" if num_active == expected else f"FAIL (expected {expected})"
+        print(f"\n  [Check] Active params: {num_active}  →  {status}")
+        assert num_active == expected, f"Active param count: got {num_active}, expected {expected}"
+    else:
+        print(f"\n  [Check] Active params: {num_active}  →  (variable, no assertion)")
+
+    # Check 2: mask is identical across batch for fixed designs
+    if config["fixed_config"] or config["design_config"] is not None:
+        consistent = np.all(masks == masks[0])
+        print(f"  [Check] Mask consistent across batch: {'OK' if consistent else 'FAIL'}")
+        assert consistent, "Mask differs across batch items for a fixed-config case"
+
+    # Check 3: params are zero wherever mask is zero
+    zero_where_masked = np.allclose(params * (1 - masks), 0.0)
+    print(f"  [Check] Params zero where masked: {'OK' if zero_where_masked else 'FAIL'}")
+    assert zero_where_masked, "Non-zero param values found at masked-out positions"
+
     adapter = (
         bf.Adapter()
         .drop(["masks"])
@@ -190,7 +221,7 @@ def test(case: str):
     )
 
     adapted_sims = adapter(cdm_family_simulator.sample(4))
-    print("Adapted samples:")
+    print("\nAdapted samples:")
     for k, v in adapted_sims.items():
         if isinstance(v, np.ndarray):
             print(f"  {k}: {v.shape}")

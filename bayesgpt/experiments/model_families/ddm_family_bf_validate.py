@@ -37,6 +37,7 @@ CASE_CONFIGS = {
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
         "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
+        "expected_num_active": None,  # varies: random mask
     },
     "fixed": {
         "free_intrinsics": ["v", "a", "z", "tau"],
@@ -51,6 +52,7 @@ CASE_CONFIGS = {
         "flatten_param_outputs": False,
         "squeeze_outputs": True,
         "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$"],
+        "expected_num_active": 4,
     },
     "regressed": {
         "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
@@ -69,6 +71,7 @@ CASE_CONFIGS = {
             r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, z}$",
             r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$",
         ],
+        "expected_num_active": 12,
     },
     "fixed_regressed": {
         "free_intrinsics": ["v", "a", "z", "tau"],
@@ -87,6 +90,7 @@ CASE_CONFIGS = {
             r"$u_{1, v}$", r"$u_{1, a}$", r"$u_{1, z}$",
             r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$",
         ],
+        "expected_num_active": 10,
     },
     "interaction": {
         "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
@@ -111,6 +115,7 @@ CASE_CONFIGS = {
             r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$", r"$u_{2, \tau}$",
             r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, z}$",
         ],
+        "expected_num_active": 18,
     },
     "full": {
         "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
@@ -135,6 +140,7 @@ CASE_CONFIGS = {
             r"$u_{2, v}$", r"$u_{2, a}$", r"$u_{2, z}$", r"$u_{2, \tau}$", r"$u_{2, s_v}$", r"$u_{2, s_\tau}$",
             r"$u_1:u_{2, v}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, z}$", r"$u_1:u_{2, \tau}$", r"$u_1:u_{2, s_v}$", r"$u_1:u_{2, s_\tau}$",
         ],
+        "expected_num_active": 24,
     },
 }
 
@@ -252,8 +258,33 @@ class DDMModelFamilyBF(bf.simulators.Simulator):
 
 
 def test(case: str):
+    config = CASE_CONFIGS[case]
     ddm_family_simulator = DDMModelFamilyBF(case=case)
 
+    # --- Simulator checks (before loading checkpoint) ---
+    samples = ddm_family_simulator.sample(4)
+    masks = samples["masks"]
+    params = samples["params"]
+
+    num_active = int(masks[0].astype(bool).sum())
+    expected = config["expected_num_active"]
+    if expected is not None:
+        status = "OK" if num_active == expected else f"FAIL (expected {expected})"
+        print(f"  [Check] Active params: {num_active}  →  {status}")
+        assert num_active == expected, f"Active param count: got {num_active}, expected {expected}"
+    else:
+        print(f"  [Check] Active params: {num_active}  →  (variable, no assertion)")
+
+    if config["fixed_config"] or config["design_config"] is not None:
+        consistent = np.all(masks == masks[0])
+        print(f"  [Check] Mask consistent across batch: {'OK' if consistent else 'FAIL'}")
+        assert consistent, "Mask differs across batch items for a fixed-config case"
+
+    zero_where_masked = np.allclose(params * (1 - masks), 0.0)
+    print(f"  [Check] Params zero where masked: {'OK' if zero_where_masked else 'FAIL'}")
+    assert zero_where_masked, "Non-zero param values found at masked-out positions"
+
+    # --- Approximator checks ---
     checkpoint_path = f"./bayesgpt/experiments/checkpoints/ddm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
     print("Loaded model")
@@ -270,7 +301,6 @@ def test(case: str):
     print(f"Targets shape: {targets.shape}, Estimates shape: {estimates.shape}")
 
     masks = val_sims["masks"]
-    print(masks[0], masks[1])
     active_idx = masks[0].astype(bool)
     true_params = targets[:, active_idx]
     pred_params = estimates[:, :, active_idx]

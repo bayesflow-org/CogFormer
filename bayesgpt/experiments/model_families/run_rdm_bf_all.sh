@@ -8,10 +8,9 @@
 # All flags after the script name are forwarded to the train script only.
 # Validation always uses its own defaults (batch_size=200, num_samples=200).
 
-set -e
-
 CASES=("intercept_only" "fixed" "regressed" "fixed_regressed" "interaction" "full")
 TRAIN_ARGS="$@"
+SKIPPED=()
 
 echo "=========================================="
 echo " RDM BayesFlow: train + validate all cases"
@@ -21,10 +20,26 @@ echo "=========================================="
 for case in "${CASES[@]}"; do
     echo ""
     echo "------------------------------------------"
+    echo " CHECKING SIMULATOR: $case"
+    echo "------------------------------------------"
+    if ! python -m bayesgpt.experiments.model_families.rdm_family_bf_train \
+            --case "$case" --test; then
+        echo "  !! Simulator check failed for '$case' — skipping."
+        SKIPPED+=("$case")
+        continue
+    fi
+
+    echo ""
+    echo "------------------------------------------"
     echo " TRAINING: $case"
     echo "------------------------------------------"
     python -m bayesgpt.experiments.model_families.rdm_family_bf_train \
         --case "$case" $TRAIN_ARGS
+    if [ $? -ne 0 ]; then
+        echo "  !! Training failed for '$case' — skipping validation."
+        SKIPPED+=("$case")
+        continue
+    fi
 
     echo ""
     echo "------------------------------------------"
@@ -37,4 +52,7 @@ done
 echo ""
 echo "=========================================="
 echo " All cases complete."
+if [ ${#SKIPPED[@]} -gt 0 ]; then
+    echo " Skipped cases: ${SKIPPED[*]}"
+fi
 echo "=========================================="

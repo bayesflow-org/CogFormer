@@ -37,6 +37,7 @@ CASE_CONFIGS = {
         "flatten_param_outputs": True,
         "squeeze_outputs": False,
         "param_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
+        "expected_num_active": 6,
     },
     "fixed": {
         "free_intrinsics": ["v", "v_diff", "a", "tau"],
@@ -51,6 +52,7 @@ CASE_CONFIGS = {
         "flatten_param_outputs": False,
         "squeeze_outputs": True,
         "param_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$"],
+        "expected_num_active": 4,
     },
     "regressed": {
         "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
@@ -69,6 +71,7 @@ CASE_CONFIGS = {
             r"$u_{1, v_{\mathrm{diff}}}$", r"$u_{1, a}$",
             r"$u_{2, v_{\mathrm{diff}}}$", r"$u_{2, a}$",
         ],
+        "expected_num_active": 6,
     },
     "fixed_regressed": {
         "free_intrinsics": ["v", "v_diff", "a", "tau"],
@@ -87,6 +90,7 @@ CASE_CONFIGS = {
             r"$u_{1, v_{\mathrm{diff}}}$", r"$u_{1, a}$",
             r"$u_{2, v_{\mathrm{diff}}}$", r"$u_{2, a}$",
         ],
+        "expected_num_active": 6,
     },
     "interaction": {
         "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
@@ -111,6 +115,7 @@ CASE_CONFIGS = {
             r"$u_{2, v}$", r"$u_{2, v_{\mathrm{diff}}}$", r"$u_{2, a}$", r"$u_{2, \tau}$",
             r"$u_1:u_{2, v}$", r"$u_1:u_{2, v_{\mathrm{diff}}}$", r"$u_1:u_{2, a}$",
         ],
+        "expected_num_active": 18,
     },
     "full": {
         "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
@@ -135,6 +140,7 @@ CASE_CONFIGS = {
             r"$u_{2, v}$", r"$u_{2, v_{\mathrm{diff}}}$", r"$u_{2, a}$", r"$u_{2, \tau}$", r"$u_{2, s_v}$", r"$u_{2, s_\tau}$",
             r"$u_1:u_{2, v}$", r"$u_1:u_{2, v_{\mathrm{diff}}}$", r"$u_1:u_{2, a}$", r"$u_1:u_{2, \tau}$", r"$u_1:u_{2, s_v}$", r"$u_1:u_{2, s_\tau}$",
         ],
+        "expected_num_active": 24,
     },
 }
 
@@ -252,8 +258,33 @@ class RDMModelFamilyBF(bf.simulators.Simulator):
 
 
 def test(case: str):
+    config = CASE_CONFIGS[case]
     rdm_family_simulator = RDMModelFamilyBF(case=case)
 
+    # --- Simulator checks (before loading checkpoint) ---
+    samples = rdm_family_simulator.sample(4)
+    masks = samples["masks"]
+    params = samples["params"]
+
+    num_active = int(masks[0].astype(bool).sum())
+    expected = config["expected_num_active"]
+    if expected is not None:
+        status = "OK" if num_active == expected else f"FAIL (expected {expected})"
+        print(f"  [Check] Active params: {num_active}  →  {status}")
+        assert num_active == expected, f"Active param count: got {num_active}, expected {expected}"
+    else:
+        print(f"  [Check] Active params: {num_active}  →  (variable, no assertion)")
+
+    if config["fixed_config"] or config["design_config"] is not None:
+        consistent = np.all(masks == masks[0])
+        print(f"  [Check] Mask consistent across batch: {'OK' if consistent else 'FAIL'}")
+        assert consistent, "Mask differs across batch items for a fixed-config case"
+
+    zero_where_masked = np.allclose(params * (1 - masks), 0.0)
+    print(f"  [Check] Params zero where masked: {'OK' if zero_where_masked else 'FAIL'}")
+    assert zero_where_masked, "Non-zero param values found at masked-out positions"
+
+    # --- Approximator checks ---
     checkpoint_path = f"./bayesgpt/experiments/checkpoints/rdm_families_bf_{case}/model.keras"
     approximator = keras.saving.load_model(checkpoint_path)
     print("Loaded model")
