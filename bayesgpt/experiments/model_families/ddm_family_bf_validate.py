@@ -20,7 +20,7 @@ from bayesgpt.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
-from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
+from bayesgpt.utils.plot_utils import bf_colors
 
 
 CASE_CONFIGS = {
@@ -387,7 +387,7 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     intrinsic_params_all = ["v", "a", "z", "tau", "s_v", "s_tau"]
     variable_names_all = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
     design_config = get_benchmark_design_configs()[case]
-    adaptive_colors = bayesgpt_fm_colors()
+    adaptive_colors = bf_colors()
 
     true_grid = reshape_bf_to_gpt(true_params, design_config, intrinsic_params_all)
     pred_grid = reshape_bf_to_gpt(pred_params, design_config, intrinsic_params_all)
