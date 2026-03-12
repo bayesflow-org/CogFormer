@@ -1,4 +1,4 @@
-#!/bin/bash
+clau#!/bin/bash
 # Train and validate all DDM BayesFlow cases sequentially.
 #
 # Usage:
