@@ -51,8 +51,15 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "a", "z"]
     }
 
-    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
-    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
+    full = {
+        "1": intrinsic_params,
+        "u_1": intrinsic_params,
+        "u_2": intrinsic_params,
+        "u_1:u_2": intrinsic_params,
+    }
+
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction", "full"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction, full]
     return {name: config for name, config in zip(names, configs)}
 
 

@@ -21,23 +21,6 @@ from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as com
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
-def check_data_path(data_path: str | None, case: str) -> Path | None:
-    if data_path is None:
-        return None
-
-    p = Path(data_path)
-
-    if p.is_dir():
-        return p / f"cdm_families_bf_{case}_data.npz"
-
-    if "{case}" in str(p):
-        return Path(str(p).format(case=case))
-
-    if p.is_file() and p.suffix == ".npz":
-        return p
-
-    raise ValueError(f"Unrecognized data_path: {data_path}")
-
 
 def load_validation_data(data_path: Path):
     dataset = np.load(data_path, allow_pickle=True)
@@ -102,8 +85,15 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "v_theta", "a"]
     }
 
-    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
-    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
+    full = {
+        "1": intrinsic_params,
+        "u_1": intrinsic_params,
+        "u_2": intrinsic_params,
+        "u_1:u_2": intrinsic_params,
+    }
+
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction", "full"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction, full]
 
     return {name: config for name, config in zip(names, configs)}
 

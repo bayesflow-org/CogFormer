@@ -24,7 +24,7 @@ def get_benchmark_design_configs():
     }
 
     regressed = {
-        "1": ["v_diff", "a"],
+        "1": intrinsic_params,
         "u_1": ["v_diff", "a"],
         "u_2": ["v_diff", "a"],
         "u_1:u_2": []
@@ -38,7 +38,7 @@ def get_benchmark_design_configs():
     }
 
     fixed_regressed = {
-        "1": ["v_diff", "a"],
+        "1": free_params,
         "u_1": ["v_diff", "a"],
         "u_2": ["v_diff", "a"],
         "u_1:u_2": []
@@ -51,8 +51,15 @@ def get_benchmark_design_configs():
         "u_1:u_2": ["v", "v_diff", "a"]
     }
 
-    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
-    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction]
+    full = {
+        "1": intrinsic_params,
+        "u_1": intrinsic_params,
+        "u_2": intrinsic_params,
+        "u_1:u_2": intrinsic_params,
+    }
+
+    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction", "full"]
+    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction, full]
     return {name: config for name, config in zip(names, configs)}
 
 

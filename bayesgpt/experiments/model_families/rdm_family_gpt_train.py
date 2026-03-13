@@ -96,7 +96,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 250 == 0:
+            if (epoch + 1) % 1000 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
