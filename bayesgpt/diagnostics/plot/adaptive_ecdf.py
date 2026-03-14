@@ -205,7 +205,6 @@ def adaptive_ecdf(
                 )
                 ax.plot([0, 1], [0, 1], color="black", linestyle="dashed", label="Ideal (Uniform)")
                 ax.plot(ranks_sorted, ecdf_y, color=tint, alpha=1.0, label="Empirical CDF")
-                ax.set_ylim(-0.02, 1.02)
 
             ax.set_xlim(-0.02, 1.02)
             ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
