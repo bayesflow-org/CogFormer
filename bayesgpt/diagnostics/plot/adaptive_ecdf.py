@@ -1,42 +1,40 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import beta as beta_dist
 from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.utils.plot_utils import bayesgpt_cm_colors
 
 
 def compute_ecdf_bands(
     num_datasets: int,
-    num_simulations: int = 1000,
     prob: float = 0.95,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Compute simultaneous confidence bands for the ECDF of a uniform distribution.
+    Compute exact pointwise confidence bands for the ECDF of a uniform distribution.
 
-    Simulates `num_simulations` sets of `num_datasets` uniform samples, computes
-    their ECDFs, and returns pointwise quantile bands.
+    Uses the fact that the k-th order statistic of n i.i.d. Uniform(0,1) samples
+    follows a Beta(k, n−k+1) distribution, giving exact closed-form bands.
 
     Parameters
     ----------
     num_datasets : int
         Number of datasets (determines ECDF resolution).
-    num_simulations : int, optional, default: 1000
-        Number of simulated uniform samples for band estimation.
     prob : float, optional, default: 0.95
-        Confidence level for the simultaneous bands.
+        Confidence level for the bands.
 
     Returns
     -------
     x : np.ndarray of shape (num_datasets,)
-        Sorted x-axis positions (uniform quantiles).
+        Sorted x-axis positions (k / num_datasets).
     lower : np.ndarray of shape (num_datasets,)
         Lower confidence band.
     upper : np.ndarray of shape (num_datasets,)
         Upper confidence band.
     """
-    sim = np.sort(np.random.uniform(size=(num_simulations, num_datasets)), axis=1)
-    x = np.linspace(0, 1, num_datasets)
-    lower = np.quantile(sim, (1 - prob) / 2, axis=0)
-    upper = np.quantile(sim, (1 + prob) / 2, axis=0)
+    k = np.arange(1, num_datasets + 1)
+    x = k / num_datasets
+    lower = beta_dist.ppf((1 - prob) / 2, k, num_datasets - k + 1)
+    upper = beta_dist.ppf((1 + prob) / 2, k, num_datasets - k + 1)
     return x, lower, upper
 
 
@@ -58,8 +56,7 @@ def adaptive_ecdf(
     legend_fontsize: int = 12,
     legend_location: str = "lower right",
     prob: float = 0.95,
-    num_simulations: int = 1000,
-    difference: bool = False,
+    difference: bool = True,
 ) -> plt.Figure:
     """
     Adaptive (masked) ECDF calibration plot over a regressor-by-parameter grid.
@@ -134,7 +131,6 @@ def adaptive_ecdf(
     # Precompute confidence bands (same for all cells since num_datasets is fixed)
     band_x, band_lower, band_upper = compute_ecdf_bands(
         num_datasets=num_datasets,
-        num_simulations=num_simulations,
         prob=prob,
     )
 
@@ -215,7 +211,8 @@ def adaptive_ecdf(
 
             ticks = [0.0, 0.25, 0.5, 0.75, 1.0]
             ax.set_xticks(ticks)
-            ax.set_yticks(ticks if not difference else [-0.5, -0.25, 0.0, 0.25, 0.5])
+            if not difference:
+                ax.set_yticks(ticks)
             ax.tick_params(axis="both", labelsize=tick_fontsize)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
@@ -253,13 +250,7 @@ if __name__ == "__main__":
     intrinsic_params = design_config["1"]
     variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
 
-    num_params = len(intrinsic_params)
-    num_regressors = len(design_config.keys()) - 1
     num_categories = 3
-
-    num_rows = 1 + num_regressors * (num_categories - 1)
-    num_cols = num_params
-
     batch_size = 200
     num_draws = 256
 
@@ -273,9 +264,11 @@ if __name__ == "__main__":
     if parameter_mask.ndim == 3:
         parameter_mask = parameter_mask[0]
 
+    num_rows, num_cols = parameter_mask.shape
+
+    # Good calibration: true and draws from same marginal → exchangeable → ECDF ≈ diagonal
     true = np.random.normal(0.0, 1.0, size=(batch_size, num_rows, num_cols))
-    sigma = 0.5
-    pred = true[:, None, :, :] + np.random.normal(0.0, sigma, size=(batch_size, num_draws, num_rows, num_cols))
+    pred = np.random.normal(0.0, 1.0, size=(batch_size, num_draws, num_rows, num_cols))
 
     print("true:", true.shape)
     print("pred:", pred.shape)
@@ -292,8 +285,7 @@ if __name__ == "__main__":
         main_effect_color=color["main_effect"],
         interaction_color=color["interaction"],
         prob=0.95,
-        num_simulations=1000,
-        difference=False,
+        difference=True,
         title_fontsize=18,
         label_fontsize=14,
     )
