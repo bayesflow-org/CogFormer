@@ -35,9 +35,25 @@ class ModelClass:
         self.model_names = list(model_families.keys())
         self.model_registry = {name: i for i, name in enumerate(self.model_names)}
         self.num_models = len(self.model_names)
-        self.max_num_params = max(
-            len(mf.intrinsic_params) for mf in model_families.values()
-        )
+
+        # Build global parameter space as ordered union across all model families
+        seen_order: dict[str, int] = {}
+        for mf in model_families.values():
+            for p in mf.intrinsic_params:
+                if p not in seen_order:
+                    seen_order[p] = len(seen_order)
+        self.all_params: list[str] = list(seen_order.keys())
+        self.max_num_params: int = len(self.all_params)
+
+        # Per-model local→global index mappings and binary model masks
+        self.local_to_global: dict[str, list[int]] = {}
+        self.model_masks: dict[str, np.ndarray] = {}
+        for name, mf in model_families.items():
+            g_indices = [self.all_params.index(p) for p in mf.intrinsic_params]
+            self.local_to_global[name] = g_indices
+            mask = np.zeros(self.max_num_params, dtype=np.float32)
+            mask[g_indices] = 1.0
+            self.model_masks[name] = mask
 
         if weights is not None:
             weights = np.array(weights, dtype=np.float64)
@@ -164,17 +180,20 @@ class ModelClass:
 
             design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
 
-            # param_mask and param_matrix are (num_cols, num_params) — pad to max, then flatten
+            # param_mask and param_matrix are (num_cols, num_params) — place at global positions
+            global_indices = self.local_to_global[model_name]
             if flatten_param_outputs:
                 padded_mask = np.zeros((max_num_cols, max_num_params))
                 padded_matrix = np.zeros((max_num_cols, max_num_params))
-                padded_mask[:num_cols, :num_params] = b["param_mask"]
-                padded_matrix[:num_cols, :num_params] = b["param_matrix"]
+                for local_idx, global_idx in enumerate(global_indices):
+                    padded_mask[:num_cols, global_idx] = b["param_mask"][:, local_idx]
+                    padded_matrix[:num_cols, global_idx] = b["param_matrix"][:, local_idx]
                 param_masks[i] = padded_mask.flatten()
                 param_matrices[i] = padded_matrix.flatten()
             else:
-                param_masks[i, :num_cols, :num_params] = b["param_mask"]
-                param_matrices[i, :num_cols, :num_params] = b["param_matrix"]
+                for local_idx, global_idx in enumerate(global_indices):
+                    param_masks[i, :num_cols, global_idx] = b["param_mask"][:, local_idx]
+                    param_matrices[i, :num_cols, global_idx] = b["param_matrix"][:, local_idx]
 
             regressor_masks[i, :num_cols] = b["regressor_mask"]
             discrete_masks[i, : b["discrete_mask"].shape[0]] = b["discrete_mask"]
@@ -204,3 +223,42 @@ class ModelClass:
             "max_num_params": self.max_num_params,
             "num_models": self.num_models,
         }
+
+    def lift_to_global_space(
+        self,
+        model_name: str,
+        param_matrices: np.ndarray,
+        param_masks: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Reindex flattened param_matrices/param_masks from model-local to global param positions.
+
+        Parameters
+        ----------
+        model_name : str
+        param_matrices : ndarray, shape (batch_size, num_cols * n_local)
+        param_masks    : ndarray, shape (batch_size, num_cols * n_local)
+
+        Returns
+        -------
+        (param_matrices_global, param_masks_global), both shape (batch_size, num_cols * max_num_params)
+        """
+        n_local = len(self.model_families[model_name].intrinsic_params)
+        n_global = self.max_num_params
+        batch_size = param_matrices.shape[0]
+        n_rows = param_matrices.shape[1] // n_local
+        global_indices = self.local_to_global[model_name]
+
+        pm_local = param_matrices.reshape(batch_size, n_rows, n_local)
+        pmask_local = param_masks.reshape(batch_size, n_rows, n_local)
+
+        pm_global = np.zeros((batch_size, n_rows, n_global), dtype=param_matrices.dtype)
+        pmask_global = np.zeros((batch_size, n_rows, n_global), dtype=param_masks.dtype)
+
+        for local_idx, global_idx in enumerate(global_indices):
+            pm_global[:, :, global_idx] = pm_local[:, :, local_idx]
+            pmask_global[:, :, global_idx] = pmask_local[:, :, local_idx]
+
+        return (
+            pm_global.reshape(batch_size, n_rows * n_global),
+            pmask_global.reshape(batch_size, n_rows * n_global),
+        )
