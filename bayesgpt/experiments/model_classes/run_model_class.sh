@@ -65,6 +65,7 @@ python -m bayesgpt.experiments.model_classes.model_class_gpt_train \
     --lr                  "$LR" \
     --dropout             "$DROPOUT" \
     --layer_dropout       "$LAYER_DROPOUT" \
+    --use_wandb \
     --val_batch_size      "$VAL_BATCH_TRAIN" \
     --val_num_obs         "$VAL_NUM_OBS" \
     --fm_sample_steps     "$FM_STEPS" \
