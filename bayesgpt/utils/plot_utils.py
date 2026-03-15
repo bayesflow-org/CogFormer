@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 
 def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray, color: str = "black"):
@@ -70,6 +71,98 @@ def credible_interval(x: np.ndarray, prob: float = 0.95, axis: int = None, **kwa
 
     # Compute quantiles
     return np.quantile(x, q=(lower_q, upper_q), axis=axis, **kwargs)
+
+def _add_mask_legend(
+    fig: plt.Figure,
+    parameter_masks: list,
+    colors: list,
+    labels: list,
+    num_rows: int,
+    num_cols: int,
+    label_fontsize: int = 8,
+    pad: float = 0.012,
+    gap: float = 0.018,
+):
+    """
+    Add a row of parameter mask thumbnails as a visual legend at the bottom
+    of a figure. Active cells are drawn in the config's color; inactive cells
+    in light gray. Pixels are forced square. Config labels appear below each
+    thumbnail.
+
+    Parameters
+    ----------
+    fig : plt.Figure
+    parameter_masks : list of np.ndarray
+        One binary mask per config, shape (num_rows_k, num_cols).
+    colors : list
+        One matplotlib color per config.
+    labels : list of str
+        One label per config, displayed below the thumbnail.
+    num_rows : int
+        Global max num_rows (used to pad shorter masks).
+    num_cols : int
+        Number of columns (intrinsic parameters).
+    label_fontsize : int
+    pad : float
+        Vertical padding above and below thumbnails, in figure coords.
+    gap : float
+        Horizontal gap between thumbnails, in figure coords.
+    """
+    figW, figH = fig.get_size_inches()
+    n = len(parameter_masks)
+
+    left_margin  = 0.05
+    right_margin = 0.05
+    avail_w_fig  = 0.65  # smaller than full width so thumbnails are compact
+    total_gaps   = gap * (n - 1)
+    thumb_w_fig  = (avail_w_fig - total_gaps) / n
+    # Centre the thumbnail strip horizontally
+    left_margin  = (1.0 - avail_w_fig) / 2
+    thumb_w_in   = thumb_w_fig * figW
+    thumb_h_in   = thumb_w_in * num_rows / num_cols   # square pixels
+    thumb_h_fig  = thumb_h_in / figH
+
+    # Rough label height in figure coords (1 line of text)
+    label_h_fig = (label_fontsize * 2.2 / 72) / figH
+
+    strip_h_fig = pad + label_h_fig + thumb_h_fig + pad
+
+    # Re-layout main subplots leaving the bottom strip free
+    fig.tight_layout(rect=[0, strip_h_fig, 1, 1])
+
+    for k in range(n):
+        mask_k = np.array(parameter_masks[k])
+        # Pad to global num_rows
+        if mask_k.shape[0] < num_rows:
+            mask_k = np.vstack([
+                mask_k,
+                np.zeros((num_rows - mask_k.shape[0], num_cols))
+            ])
+
+        # Build RGBA image: active = config color, inactive = light gray
+        img = np.ones((num_rows, num_cols, 4))
+        img[..., :3] = 0.92   # inactive gray
+        rgba_k = np.array(mcolors.to_rgba(colors[k]))
+        img[mask_k == 1.0] = rgba_k
+
+        x0 = left_margin + k * (thumb_w_fig + gap)
+        y0 = pad + label_h_fig
+
+        ax_t = fig.add_axes([x0, y0, thumb_w_fig, thumb_h_fig])
+        ax_t.imshow(img, aspect="equal", interpolation="nearest")
+
+        # Major ticks off, minor ticks at pixel boundaries for gridlines
+        ax_t.set_xticks([])
+        ax_t.set_yticks([])
+        ax_t.set_xticks(np.arange(-0.5, num_cols, 1), minor=True)
+        ax_t.set_yticks(np.arange(-0.5, num_rows, 1), minor=True)
+        ax_t.grid(which="minor", color="white", linewidth=0.4, alpha=0.8)
+        ax_t.tick_params(which="minor", length=0)
+
+        for sp in ax_t.spines.values():
+            sp.set_visible(False)
+        ax_t.set_xlabel(labels[k], fontsize=label_fontsize, labelpad=3)
+
 
 def hex_code():
     return "#{:06x}".format(random.randint(0, 0xFFFFFF))

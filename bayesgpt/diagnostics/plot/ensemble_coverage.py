@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.diagnostics.plot.adaptive_coverage import compute_empirical_coverage
+from bayesgpt.utils.plot_utils import _add_mask_legend
 
 
 def ensemble_coverage(
@@ -97,7 +98,7 @@ def ensemble_coverage(
     num_cols = parameter_masks[0].shape[1]
 
     if figsize is None:
-        figsize = (3.2 * num_cols, 2.9 * num_rows)
+        figsize = (3 * num_cols, 3 * num_rows)
 
     fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize, squeeze=False)
 
@@ -193,6 +194,7 @@ def ensemble_coverage(
 
             ax.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
             ax.tick_params(axis="both", labelsize=tick_fontsize)
+            ax.set_box_aspect(1)
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.35)
@@ -202,21 +204,8 @@ def ensemble_coverage(
             if r == 0 and variable_names is not None:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
 
-    # Shared legend
-    handles = [
-        plt.Line2D([0], [0], color=colors[k], linewidth=2, label=labels[k])
-        for k in range(n_configs)
-    ]
-    fig.legend(
-        handles=handles,
-        loc="lower center",
-        ncol=n_configs,
-        fontsize=legend_fontsize,
-        bbox_to_anchor=(0.5, 0),
-        bbox_transform=fig.transFigure,
-    )
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=0.08)
+    _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
+                     label_fontsize=legend_fontsize)
     return fig
 
 

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from collections.abc import Callable
 
 from bayesgpt.simulators.context_manager import ContextManager
-from bayesgpt.utils.plot_utils import credible_interval, bayesgpt_cm_colors
+from bayesgpt.utils.plot_utils import credible_interval, bayesgpt_cm_colors, _add_mask_legend
 
 
 def ensemble_recovery(
@@ -97,7 +97,7 @@ def ensemble_recovery(
         labels = [f"Config {i + 1}" for i in range(n_configs)]
 
     if figsize is None:
-        figsize = (3 * num_cols, 2.8 * num_rows)
+        figsize = (3 * num_cols, 3 * num_rows)
 
     fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize)
 
@@ -215,29 +215,15 @@ def ensemble_recovery(
                 transform=ax.transAxes, size=12
             )
 
+            ax.set_box_aspect(1)
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
             sns.despine(ax=ax)
             ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
             ax.set_title(variable_names[c] if r == 0 else "", fontsize=title_fontsize)
             ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
-    # Single shared legend in one row at the bottom
-    handles = [
-        plt.Line2D([0], [0], marker="o", color="w",
-                   markerfacecolor=colors[k], markersize=8, label=labels[k])
-        for k in range(n_configs)
-    ]
-    fig.legend(
-        handles=handles,
-        loc="lower center",
-        ncol=n_configs,
-        fontsize=label_fontsize,
-        framealpha=0.8,
-        bbox_to_anchor=(0.5, 0),
-        bbox_transform=fig.transFigure,
-    )
-    fig.tight_layout()
-    fig.subplots_adjust(bottom=0.08)
+    _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
+                     label_fontsize=label_fontsize)
     return fig
 
 
