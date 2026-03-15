@@ -93,7 +93,7 @@ class BayesGPTTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % 500 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -263,7 +263,7 @@ def parse_args():
     parser.add_argument("--val_num_obs", type=int, default=500)
     parser.add_argument("--train_batch_size", type=int, default=64)
     parser.add_argument("--val_batch_size", type=int, default=100)
-    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--epochs", type=int, default=5000)
     parser.add_argument("--steps_per_epoch", type=int, default=100)
 
     # Flow matching
