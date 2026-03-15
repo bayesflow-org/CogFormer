@@ -25,7 +25,8 @@ def adaptive_c2st(
     tick_fontsize: int = 13,
     annot_fontsize: int = 11,
     fmt: str = ".3f",
-    mean_score: float | None = None,
+    global_accuracy: float | None = None,
+    joint_score: float | None = None,
     n_splits: int = 5,
     hidden_layer_sizes: tuple | str = "auto",
     max_iter: int = 1000,
@@ -176,7 +177,14 @@ def adaptive_c2st(
                     color=tint, alpha=0.7, zorder=3,
                 )
 
-    title = "C2ST Accuracy" if mean_score is None else f"C2ST Accuracy\nMean: {mean_score:.3f}"
+    title = "C2ST Accuracy"
+    subtitle_parts = []
+    if global_accuracy is not None:
+        subtitle_parts.append(f"Global Acc.: {global_accuracy:.3f}")
+    if joint_score is not None:
+        subtitle_parts.append(f"Joint C2ST: {joint_score:.3f}")
+    if subtitle_parts:
+        title = title + "\n" + "   |   ".join(subtitle_parts)
     ax.set_title(title, fontsize=title_fontsize)
     ax.set_xticks(range(num_cols))
     ax.set_xticklabels(col_labels, fontsize=tick_fontsize)
