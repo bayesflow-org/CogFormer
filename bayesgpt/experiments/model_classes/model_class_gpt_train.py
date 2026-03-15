@@ -172,6 +172,14 @@ class BayesGPTTrainer:
             )
             test_samples["model_ids"] = np.full(config["batch_size"], model_id, dtype=np.int64)
 
+            # Lift local param positions to global space before adapting
+            test_samples["param_matrices"], test_samples["param_masks"] = \
+                self.model_class.lift_to_global_space(
+                    model_name,
+                    test_samples["param_matrices"],
+                    test_samples["param_masks"],
+                )
+
             adapted = self.adapter.adapt(
                 test_samples,
                 intrinsic_params=[],
@@ -189,15 +197,15 @@ class BayesGPTTrainer:
             )
 
             batch_size = config["batch_size"]
-            n_cols = len(intrinsic_params)
+            global_indices = self.model_class.local_to_global[model_name]
 
             true_set = adapted["param_matrices"].detach().cpu().numpy()
             n_rows = true_set.shape[1] // max_num_params
-            true_set = true_set.reshape(batch_size, n_rows, max_num_params)[:, :, :n_cols]
-            pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, max_num_params)[:, :, :, :n_cols]
+            true_set = true_set.reshape(batch_size, n_rows, max_num_params)[:, :, global_indices]
+            pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, max_num_params)[:, :, :, global_indices]
 
             params_mask = adapted["param_masks"].detach().cpu().numpy()
-            params_mask = params_mask.reshape(batch_size, n_rows, max_num_params)[0, :, :n_cols]
+            params_mask = params_mask.reshape(batch_size, n_rows, max_num_params)[0, :, global_indices]
 
             recovery_fig = adaptive_recovery(
                 true=true_set,

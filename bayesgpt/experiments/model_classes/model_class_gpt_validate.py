@@ -2,7 +2,7 @@ import argparse
 import logging
 from pathlib import Path
 
-import numpy as npg
+import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
@@ -283,6 +283,14 @@ def main():
             )
             test_samples["model_ids"] = np.full(args.batch_size, model_id, dtype=np.int64)
 
+            # Lift local param positions to global space before adapting
+            test_samples["param_matrices"], test_samples["param_masks"] = \
+                model_class.lift_to_global_space(
+                    model_name,
+                    test_samples["param_matrices"],
+                    test_samples["param_masks"],
+                )
+
             adapted = adapter.adapt(
                 test_samples,
                 intrinsic_params=[],
@@ -299,13 +307,15 @@ def main():
                 model_ids=adapted["model_ids"],
             )
 
+            global_indices = model_class.local_to_global[model_name]
+
             true_set = adapted["param_matrices"].detach().cpu().numpy()
             n_rows = true_set.shape[1] // max_num_params
-            true_set = true_set.reshape(args.batch_size, n_rows, max_num_params)[:, :, :n_cols]
-            pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, max_num_params)[:, :, :, :n_cols]
+            true_set = true_set.reshape(args.batch_size, n_rows, max_num_params)[:, :, global_indices]
+            pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, max_num_params)[:, :, :, global_indices]
 
             params_mask = adapted["param_masks"].detach().cpu().numpy()
-            params_mask = params_mask.reshape(args.batch_size, n_rows, max_num_params)[0, :, :n_cols]
+            params_mask = params_mask.reshape(args.batch_size, n_rows, max_num_params)[0, :, global_indices]
 
             # Save predictions
             tag = f"{model_name.lower()}_{cfg_name}"
