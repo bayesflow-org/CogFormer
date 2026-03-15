@@ -2,6 +2,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.lines import Line2D
 
 
 def make_quadratic(ax: plt.Axes, x: np.ndarray, y: np.ndarray, color: str = "black"):
@@ -129,6 +130,14 @@ def _add_mask_legend(
 
     # Re-layout main subplots leaving the bottom strip free
     fig.tight_layout(rect=[0, strip_h_fig, 1, 1])
+
+    # Thin dividing line between main plots and thumbnail strip
+    line = Line2D(
+        [0.02, 0.98], [strip_h_fig, strip_h_fig],
+        transform=fig.transFigure,
+        color="lightgray", linewidth=0.7, zorder=10,
+    )
+    fig.add_artist(line)
 
     for k in range(n):
         mask_k = np.array(parameter_masks[k])
