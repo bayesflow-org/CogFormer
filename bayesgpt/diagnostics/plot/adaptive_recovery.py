@@ -39,14 +39,19 @@ def adaptive_recovery(
         parameter_mask = parameter_mask[0]
 
     num_rows, num_cols = parameter_mask.shape
-    print(num_rows, num_cols)
+
+    regressor_keys = list(design_config.keys())
+    # Cap num_rows to the number of rows the design_config actually covers.
+    # collate() pads the grid to max_num_cols regardless of the specific design,
+    # so parameter_mask may have more rows than design_config accounts for.
+    n_design_rows = 1 + (len(regressor_keys) - 1) * (max_num_categories - 1)
+    num_rows = min(num_rows, n_design_rows)
 
     if figsize is None:
         figsize = (3 * num_cols, 2.8 * num_rows)
 
     fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize)
 
-    regressor_keys = list(design_config.keys())
     for r in range(num_rows):
         if r > 0:
             category_id = (r - 1) % (max_num_categories - 1) + 1

@@ -59,6 +59,12 @@ def get_benchmark_design_configs():
                     "u_2": ["v", "a", "z", "tau"],
                     "u_1:u_2": ["v", "a", "z"],
                 },
+                "full": {
+                    "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+                    "u_1": ["v", "a", "z", "tau", "s_v", "s_tau"],
+                    "u_2": ["v", "a", "z", "tau", "s_v", "s_tau"],
+                    "u_1:u_2": ["v", "a", "z", "tau", "s_v", "s_tau"],
+                },
             },
         },
         "RDM": {
@@ -92,6 +98,12 @@ def get_benchmark_design_configs():
                     "u_2": ["v", "v_diff", "a", "tau"],
                     "u_1:u_2": ["v", "v_diff", "a"],
                 },
+                "full": {
+                    "1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+                    "u_1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+                    "u_2": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+                    "u_1:u_2": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
+                },
             },
         },
         "CDM": {
@@ -124,6 +136,12 @@ def get_benchmark_design_configs():
                     "u_1": ["v", "v_theta", "a", "tau", "s_v"],
                     "u_2": ["v", "v_theta", "a", "tau"],
                     "u_1:u_2": ["v", "v_theta", "a"],
+                },
+                "full": {
+                    "1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
+                    "u_1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
+                    "u_2": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
+                    "u_1:u_2": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
                 },
             },
         },
@@ -315,7 +333,7 @@ def main():
             pred_set = pred_set.reshape(args.batch_size, args.num_samples, n_rows, max_num_params)[:, :, :, global_indices]
 
             params_mask = adapted["param_masks"].detach().cpu().numpy()
-            params_mask = params_mask.reshape(args.batch_size, n_rows, max_num_params)[0, :, global_indices]
+            params_mask = params_mask.reshape(args.batch_size, n_rows, max_num_params)[0][:, global_indices]
 
             # Save predictions
             tag = f"{model_name.lower()}_{cfg_name}"

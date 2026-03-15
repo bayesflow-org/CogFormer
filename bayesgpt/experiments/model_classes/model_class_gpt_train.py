@@ -32,9 +32,9 @@ MODEL_CONFIGS = {
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "val_design_config": {
             "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "a", "tau"],
-            "u_2": ["v", "a"],
-            "u_1:u_2": [],
+            "u_1": ["v", "a", "z", "tau", "s_v"],
+            "u_2": ["v", "a", "z", "tau"],
+            "u_1:u_2": ["v", "a", "z"],
         },
     },
     "RDM": {
@@ -42,9 +42,9 @@ MODEL_CONFIGS = {
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "val_design_config": {
             "1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "v_diff", "a", "tau"],
-            "u_2": ["v", "v_diff", "a"],
-            "u_1:u_2": [],
+            "u_1": ["v", "v_diff", "a", "tau", "s_v"],
+            "u_2": ["v", "v_diff", "a", "tau"],
+            "u_1:u_2": ["v", "v_diff", "a"],
         },
     },
     "CDM": {
@@ -52,9 +52,9 @@ MODEL_CONFIGS = {
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "val_design_config": {
             "1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
-            "u_1": ["v", "v_theta", "a", "tau"],
-            "u_2": ["v", "v_theta", "a"],
-            "u_1:u_2": [],
+            "u_1": ["v", "v_theta", "a", "tau", "s_v"],
+            "u_2": ["v", "v_theta", "a", "tau"],
+            "u_1:u_2": ["v", "v_theta", "a"],
         },
     },
 }
@@ -205,7 +205,7 @@ class BayesGPTTrainer:
             pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, max_num_params)[:, :, :, global_indices]
 
             params_mask = adapted["param_masks"].detach().cpu().numpy()
-            params_mask = params_mask.reshape(batch_size, n_rows, max_num_params)[0, :, global_indices]
+            params_mask = params_mask.reshape(batch_size, n_rows, max_num_params)[0][:, global_indices]
 
             recovery_fig = adaptive_recovery(
                 true=true_set,
