@@ -113,6 +113,9 @@ def ensemble_recovery(
     first_dc = design_configs[0]
     regressor_keys_0 = list(first_dc.keys())
 
+    # Per-config r-value maps for mask legend pixel alphas
+    r_maps = [np.zeros((num_rows, num_cols)) for _ in range(n_configs)]
+
     for r in range(num_rows):
         # Determine ylabel from first design config structure
         if r == 0:
@@ -149,10 +152,10 @@ def ensemble_recovery(
                     ci_k = uncertainty_agg(y_k, prob=0.9, axis=1)
                     y_lo_k, y_hi_k = ci_k[0], ci_k[1]
                     y_err_k = np.vstack([y_mean_k - y_lo_k, y_hi_k - y_mean_k])
-                    active_entries.append((true_k, y_mean_k, y_err_k, colors[k], labels[k]))
+                    active_entries.append((k, true_k, y_mean_k, y_err_k, colors[k], labels[k]))
                 else:
                     y_mean_k = pred_k[..., r, c]
-                    active_entries.append((true_k, y_mean_k, None, colors[k], labels[k]))
+                    active_entries.append((k, true_k, y_mean_k, None, colors[k], labels[k]))
 
             if not active_entries:
                 # N/A cell — no config covers this cell
@@ -178,8 +181,8 @@ def ensemble_recovery(
                 continue
 
             # Compute global limits across all active configs for this cell
-            all_x = np.concatenate([e[0] for e in active_entries])
-            all_y = np.concatenate([e[1] for e in active_entries])
+            all_x = np.concatenate([e[1] for e in active_entries])
+            all_y = np.concatenate([e[2] for e in active_entries])
             lower = min(all_x.min(), all_y.min())
             upper = max(all_x.max(), all_y.max())
             span = upper - lower if upper != lower else 1.0
@@ -191,29 +194,40 @@ def ensemble_recovery(
             ax.set_ylim(ylim)
             ax.plot(xlim, ylim, color="black", alpha=0.4, linestyle="dashed", linewidth=1.0)
 
-            for (x_k, y_mean_k, y_err_k, color_k, label_k) in active_entries:
+            # Per-config correlations — used for annotation and mask legend pixel alphas
+            corrs = [np.corrcoef(e[1], e[2])[0, 1] for e in active_entries]
+            mean_corr = float(np.mean(corrs))
+            cell_alpha = alpha / len(active_entries)
+
+            for idx, (cfg_k, x_k, y_mean_k, y_err_k, color_k, label_k) in enumerate(active_entries):
+                r_maps[cfg_k][r, c] = corrs[idx]
                 if y_err_k is not None:
                     ax.errorbar(
                         x_k, y_mean_k, yerr=y_err_k,
-                        fmt="none", alpha=alpha * 0.6,
+                        fmt="none", alpha=cell_alpha * 0.6,
                         linewidth=1.2, color=color_k
                     )
                 sns.scatterplot(
                     x=x_k, y=y_mean_k, ax=ax,
-                    color=color_k, alpha=alpha,
+                    color=color_k, alpha=cell_alpha,
                 )
-
-            # Correlation annotation (average r across configs)
-            corrs = [
-                np.corrcoef(e[0], e[1])[0, 1]
-                for e in active_entries
-            ]
-            mean_corr = float(np.mean(corrs))
-            ax.text(
-                0.1, 0.95, f"r = {mean_corr:.3f}",
-                ha="left", va="center",
-                transform=ax.transAxes, size=12
-            )
+            if mean_corr < 0:
+                ax.text(
+                    0.07, 0.95, "\u2212",
+                    ha="left", va="center",
+                    transform=ax.transAxes, size=9, fontweight="bold"
+                )
+                ax.text(
+                    0.13, 0.95, f"r = {abs(mean_corr):.3f}",
+                    ha="left", va="center",
+                    transform=ax.transAxes, size=12
+                )
+            else:
+                ax.text(
+                    0.1, 0.95, f"r = {abs(mean_corr):.3f}",
+                    ha="left", va="center",
+                    transform=ax.transAxes, size=12
+                )
 
             ax.set_box_aspect(1)
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
@@ -222,8 +236,9 @@ def ensemble_recovery(
             ax.set_title(variable_names[c] if r == 0 else "", fontsize=title_fontsize)
             ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
+    pixel_alpha_maps = [np.abs(r_maps[k]) for k in range(n_configs)]
     _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=label_fontsize)
+                     label_fontsize=label_fontsize, pixel_alphas=pixel_alpha_maps)
     return fig
 
 

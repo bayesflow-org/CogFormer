@@ -83,6 +83,7 @@ def _add_mask_legend(
     label_fontsize: int = 8,
     pad: float = 0.012,
     gap: float = 0.018,
+    pixel_alphas: list[float] | None = None,
 ):
     """
     Add a row of parameter mask thumbnails as a visual legend at the bottom
@@ -114,7 +115,7 @@ def _add_mask_legend(
 
     left_margin  = 0.05
     right_margin = 0.05
-    avail_w_fig  = 0.65  # smaller than full width so thumbnails are compact
+    avail_w_fig  = 0.4  # smaller than full width so thumbnails are compact
     total_gaps   = gap * (n - 1)
     thumb_w_fig  = (avail_w_fig - total_gaps) / n
     # Centre the thumbnail strip horizontally
@@ -152,7 +153,22 @@ def _add_mask_legend(
         img = np.ones((num_rows, num_cols, 4))
         img[..., :3] = 0.92   # inactive gray
         rgba_k = np.array(mcolors.to_rgba(colors[k]))
-        img[mask_k == 1.0] = rgba_k
+        if pixel_alphas is not None:
+            alpha_k = pixel_alphas[k]
+            if np.ndim(alpha_k) == 0:
+                # Scalar: uniform alpha for all active pixels
+                rgba_k[3] = rgba_k[3] * float(np.clip(alpha_k, 0.0, 1.0))
+                img[mask_k == 1.0] = rgba_k
+            else:
+                # 2D array: per-cell alpha
+                alpha_arr = np.clip(np.array(alpha_k), 0.0, 1.0)
+                active_rows, active_cols = np.where(mask_k == 1.0)
+                for ar, ac in zip(active_rows, active_cols):
+                    cell_rgba = rgba_k.copy()
+                    cell_rgba[3] = cell_rgba[3] * float(alpha_arr[ar, ac])
+                    img[ar, ac] = cell_rgba
+        else:
+            img[mask_k == 1.0] = rgba_k
 
         x0 = left_margin + k * (thumb_w_fig + gap)
         y0 = pad + label_h_fig
@@ -210,6 +226,16 @@ def bayesgpt_fm_colors():
         "intercept": "#59315F",
         "main_effect": "#EC008C",
         "interaction": "#FF6969",
+    }
+
+    return colors
+
+def bayesgpt_mc_colors():
+    colors = {
+        # BayesGPT-VI
+        "intercept": "#4E2A84",
+        "main_effect": "#6969FF",
+        "interaction": "#47b5ff",
     }
 
     return colors

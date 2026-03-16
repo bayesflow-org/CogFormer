@@ -491,6 +491,8 @@ def main():
         cm.build_random_design_config(
             intrinsic_params=intrinsic_params,
             num_regressors=args.max_num_regressors,
+            free_intrinsics=["v", "v_theta", "a", "tau"],
+            fixed_intrinsics=["s_v", "s_tau"],
             keep_intercept=args.keep_intercept,
             add_interaction=args.add_interaction,
         )

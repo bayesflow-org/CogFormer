@@ -22,7 +22,7 @@ from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from bayesgpt.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
-from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
+from bayesgpt.utils.plot_utils import bayesgpt_mc_colors
 
 
 # Benchmark design configs per model
@@ -250,7 +250,7 @@ def main():
     bayesgpt.load_state_dict(state)
     bayesgpt.eval()
 
-    colors = bayesgpt_fm_colors()
+    colors = bayesgpt_mc_colors()
     all_model_configs = get_benchmark_design_configs()
     max_num_params = model_class.max_num_params
 

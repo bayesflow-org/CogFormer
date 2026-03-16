@@ -196,8 +196,26 @@ def ensemble_ecdf(
             if r == 0 and variable_names is not None:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
 
+    # Compute per-config ECE (mean |ECDF - diagonal| across active cells)
+    pixel_alphas = []
+    for k in range(n_configs):
+        cell_eces = []
+        for r in range(num_rows):
+            for c in range(num_cols):
+                if r >= parameter_masks[k].shape[0] or parameter_masks[k][r, c] != 1.0:
+                    continue
+                ranks = np.mean(
+                    pred_list[k][:, :, r, c] < true_list[k][:, r, c, np.newaxis],
+                    axis=1,
+                )
+                ranks_sorted = np.sort(ranks)
+                ecdf_y = np.arange(1, num_datasets + 1) / num_datasets
+                cell_eces.append(float(np.mean(np.abs(ecdf_y - ranks_sorted))))
+        ece_k = float(np.mean(cell_eces)) if cell_eces else 0.0
+        pixel_alphas.append(1.0 - ece_k)
+
     _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=legend_fontsize)
+                     label_fontsize=legend_fontsize, pixel_alphas=pixel_alphas)
     return fig
 
 

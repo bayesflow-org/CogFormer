@@ -8,8 +8,8 @@ DATA_DIR="./bayesgpt/experiments/data"
 PRED_DIR="./bayesgpt/experiments/data"
 
 DDM_CKPT="./bayesgpt/experiments/checkpoints/fm/ddm/bayesgpt_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
-RDM_CKPT="./bayesgpt/experiments/checkpoints/fm/rdm/bayesgpt_rdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e1000_t100.pt"
-CDM_CKPT="./bayesgpt/experiments/checkpoints/fm/cdm/bayesgpt_cdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e1000_t100.pt"
+RDM_CKPT="./bayesgpt/experiments/checkpoints/fm/rdm/bayesgpt_rdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
+CDM_CKPT="./bayesgpt/experiments/checkpoints/fm/cdm/bayesgpt_cdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
 
 DDM_OUTDIR="./bayesgpt/experiments/figures/fm/ddm/"
 RDM_OUTDIR="./bayesgpt/experiments/figures/fm/rdm/"

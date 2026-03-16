@@ -156,6 +156,8 @@ def main():
         dc = cm.build_random_design_config(
             intrinsic_params=intrinsic_params_local,
             num_regressors=args.max_num_regressors,
+            free_intrinsics=[p for p in intrinsic_params_local if p not in default_fixed],
+            fixed_intrinsics=list(default_fixed.keys()),
             keep_intercept=args.keep_intercept,
             add_interaction=args.add_interaction,
         )

@@ -42,58 +42,58 @@ CKPT="${CKPT_DIR}/${CKPT_NAME}"
 OUTDIR="./bayesgpt/experiments/figures/fm/model_class"
 PRED_DIR="./bayesgpt/experiments/data/model_class"
 
-# ============================================================
-# Step 1: Train
-# ============================================================
-echo "=== [1/2] Training ModelClass GPT ==="
-python -m bayesgpt.experiments.model_classes.model_class_gpt_train \
-    --encoder_num_layers  "$ENCODER_LAYERS" \
-    --decoder_num_layers  "$DECODER_LAYERS" \
-    --encoder_num_heads   "$ENCODER_HEADS" \
-    --decoder_num_heads   "$DECODER_HEADS" \
-    --projection_dim      "$PROJ_DIM" \
-    --num_seeds           "$NUM_SEEDS" \
-    --seed_dim            "$SEED_DIM" \
-    --model_embed_dim     "$MODEL_EMBED_DIM" \
-    --time_embedding_dim  "$TIME_EMB_DIM" \
-    --pos_embedding_dim   "$POS_EMB_DIM" \
-    --train_batch_size    "$TRAIN_BATCH" \
-    --epochs              "$EPOCHS" \
-    --steps_per_epoch     "$STEPS" \
-    --min_num_obs         "$MIN_OBS" \
-    --max_num_obs         "$MAX_OBS" \
-    --lr                  "$LR" \
-    --dropout             "$DROPOUT" \
-    --layer_dropout       "$LAYER_DROPOUT" \
-    --use_wandb \
-    --val_batch_size      "$VAL_BATCH_TRAIN" \
-    --val_num_obs         "$VAL_NUM_OBS" \
-    --fm_sample_steps     "$FM_STEPS" \
-    --fm_num_samples      "$FM_SAMPLES"
+## ============================================================
+## Step 1: Train
+## ============================================================
+#echo "=== [1/2] Training ModelClass GPT ==="
+#python -m bayesgpt.experiments.model_classes.model_class_gpt_train \
+#    --encoder_num_layers  "$ENCODER_LAYERS" \
+#    --decoder_num_layers  "$DECODER_LAYERS" \
+#    --encoder_num_heads   "$ENCODER_HEADS" \
+#    --decoder_num_heads   "$DECODER_HEADS" \
+#    --projection_dim      "$PROJ_DIM" \
+#    --num_seeds           "$NUM_SEEDS" \
+#    --seed_dim            "$SEED_DIM" \
+#    --model_embed_dim     "$MODEL_EMBED_DIM" \
+#    --time_embedding_dim  "$TIME_EMB_DIM" \
+#    --pos_embedding_dim   "$POS_EMB_DIM" \
+#    --train_batch_size    "$TRAIN_BATCH" \
+#    --epochs              "$EPOCHS" \
+#    --steps_per_epoch     "$STEPS" \
+#    --min_num_obs         "$MIN_OBS" \
+#    --max_num_obs         "$MAX_OBS" \
+#    --lr                  "$LR" \
+#    --dropout             "$DROPOUT" \
+#    --layer_dropout       "$LAYER_DROPOUT" \
+#    --use_wandb \
+#    --val_batch_size      "$VAL_BATCH_TRAIN" \
+#    --val_num_obs         "$VAL_NUM_OBS" \
+#    --fm_sample_steps     "$FM_STEPS" \
+#    --fm_num_samples      "$FM_SAMPLES"
 
 # ============================================================
 # Step 2: Validate
 # ============================================================
-echo "=== [2/3] Validating ModelClass GPT ==="
-python -m bayesgpt.experiments.model_classes.model_class_gpt_validate \
-    --checkpoint          "$CKPT" \
-    --outdir              "$OUTDIR" \
-    --pred_dir            "$PRED_DIR" \
-    --batch_size          "$VAL_BATCH" \
-    --num_obs             "$VAL_NUM_OBS" \
-    --encoder_num_layers  "$ENCODER_LAYERS" \
-    --decoder_num_layers  "$DECODER_LAYERS" \
-    --encoder_num_heads   "$ENCODER_HEADS" \
-    --decoder_num_heads   "$DECODER_HEADS" \
-    --num_seeds           "$NUM_SEEDS" \
-    --seed_dim            "$SEED_DIM" \
-    --proj_dim            "$PROJ_DIM" \
-    --model_embed_dim     "$MODEL_EMBED_DIM" \
-    --time_embedding_dim  "$TIME_EMB_DIM" \
-    --pos_embedding_dim   "$POS_EMB_DIM" \
-    --num_sample_steps    "$FM_STEPS" \
-    --num_samples         "$FM_SAMPLES"
-
+#echo "=== [2/3] Validating ModelClass GPT ==="
+#python -m bayesgpt.experiments.model_classes.model_class_gpt_validate \
+#    --checkpoint          "$CKPT" \
+#    --outdir              "$OUTDIR" \
+#    --pred_dir            "$PRED_DIR" \
+#    --batch_size          "$VAL_BATCH" \
+#    --num_obs             "$VAL_NUM_OBS" \
+#    --encoder_num_layers  "$ENCODER_LAYERS" \
+#    --decoder_num_layers  "$DECODER_LAYERS" \
+#    --encoder_num_heads   "$ENCODER_HEADS" \
+#    --decoder_num_heads   "$DECODER_HEADS" \
+#    --num_seeds           "$NUM_SEEDS" \
+#    --seed_dim            "$SEED_DIM" \
+#    --proj_dim            "$PROJ_DIM" \
+#    --model_embed_dim     "$MODEL_EMBED_DIM" \
+#    --time_embedding_dim  "$TIME_EMB_DIM" \
+#    --pos_embedding_dim   "$POS_EMB_DIM" \
+#    --num_sample_steps    "$FM_STEPS" \
+#    --num_samples         "$FM_SAMPLES"
+#
 ENSEMBLE_OUTDIR="${OUTDIR}/ensemble"
 
 # ============================================================
@@ -115,29 +115,29 @@ python -m bayesgpt.experiments.model_classes.model_class_ensemble_eval \
     --pos_embedding_dim   "$POS_EMB_DIM" \
     --num_sample_steps    "$FM_STEPS" \
     --num_samples         "$FM_SAMPLES"
-
-# ============================================================
-# Step 4: Ensemble metrics heatmap (50 configs, global space)
-# ============================================================
-echo "=== [4/4] Ensemble metrics: ModelClass GPT ==="
-python -m bayesgpt.experiments.model_classes.model_class_ensemble_metrics \
-    --checkpoint          "$CKPT" \
-    --outdir              "$ENSEMBLE_OUTDIR" \
-    --encoder_num_layers  "$ENCODER_LAYERS" \
-    --decoder_num_layers  "$DECODER_LAYERS" \
-    --encoder_num_heads   "$ENCODER_HEADS" \
-    --decoder_num_heads   "$DECODER_HEADS" \
-    --num_seeds           "$NUM_SEEDS" \
-    --seed_dim            "$SEED_DIM" \
-    --proj_dim            "$PROJ_DIM" \
-    --model_embed_dim     "$MODEL_EMBED_DIM" \
-    --time_embedding_dim  "$TIME_EMB_DIM" \
-    --pos_embedding_dim   "$POS_EMB_DIM" \
-    --num_sample_steps    "$FM_STEPS" \
-    --num_samples         "$FM_SAMPLES"
-
-echo "=== Done ==="
-echo "Checkpoint : ${CKPT}"
-echo "Figures    : ${OUTDIR}"
-echo "Predictions: ${PRED_DIR}"
-echo "Ensemble   : ${ENSEMBLE_OUTDIR}"
+#
+## ============================================================
+## Step 4: Ensemble metrics heatmap (50 configs, global space)
+## ============================================================
+#echo "=== [4/4] Ensemble metrics: ModelClass GPT ==="
+#python -m bayesgpt.experiments.model_classes.model_class_ensemble_metrics \
+#    --checkpoint          "$CKPT" \
+#    --outdir              "$ENSEMBLE_OUTDIR" \
+#    --encoder_num_layers  "$ENCODER_LAYERS" \
+#    --decoder_num_layers  "$DECODER_LAYERS" \
+#    --encoder_num_heads   "$ENCODER_HEADS" \
+#    --decoder_num_heads   "$DECODER_HEADS" \
+#    --num_seeds           "$NUM_SEEDS" \
+#    --seed_dim            "$SEED_DIM" \
+#    --proj_dim            "$PROJ_DIM" \
+#    --model_embed_dim     "$MODEL_EMBED_DIM" \
+#    --time_embedding_dim  "$TIME_EMB_DIM" \
+#    --pos_embedding_dim   "$POS_EMB_DIM" \
+#    --num_sample_steps    "$FM_STEPS" \
+#    --num_samples         "$FM_SAMPLES"
+#
+#echo "=== Done ==="
+#echo "Checkpoint : ${CKPT}"
+#echo "Figures    : ${OUTDIR}"
+#echo "Predictions: ${PRED_DIR}"
+#echo "Ensemble   : ${ENSEMBLE_OUTDIR}"
