@@ -350,22 +350,22 @@ if __name__ == "__main__":
         "DDM": NestedModelFamily(
             model=DDM(), name="DDM", prior_fun=ddm_priors(),
             mask_randomizer_kwargs={
-                "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
-                "fixed_intrinsics": [], "fixed_values": {},
+                "free_intrinsics": ["v", "a", "z", "tau"],
+                "fixed_intrinsics": ["s_v", "s_tau"], "fixed_values": {},
             },
         ),
         "RDM": NestedModelFamily(
             model=RDM(), name="RDM", prior_fun=rdm_priors(),
             mask_randomizer_kwargs={
-                "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
-                "fixed_intrinsics": [], "fixed_values": {},
+                "free_intrinsics": ["v", "v_diff", "a", "tau"],
+                "fixed_intrinsics": ["s_v", "s_tau"], "fixed_values": {},
             },
         ),
         "CDM": NestedModelFamily(
             model=CDM(), name="CDM", prior_fun=cdm_priors(),
             mask_randomizer_kwargs={
-                "free_intrinsics": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
-                "fixed_intrinsics": [], "fixed_values": {},
+                "free_intrinsics": ["v", "v_theta", "a", "tau"],
+                "fixed_intrinsics": ["s_v", "s_tau"], "fixed_values": {},
             },
         ),
     }
