@@ -107,6 +107,7 @@ class NestedModelFamily:
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
                 free_prob=free_prob,
+                intercept_prob=kwargs.get("intercept_prob", 0.5),
                 free_intrinsics=kwargs.get("free_intrinsics"),
                 fixed_intrinsics=kwargs.get("fixed_intrinsics"),
                 add_interaction=add_interaction,
