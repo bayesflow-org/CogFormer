@@ -19,7 +19,7 @@ POS_EMB_DIM=32
 
 # Training schedule
 TRAIN_BATCH=64
-EPOCHS=3000
+EPOCHS=5000
 STEPS=100
 MIN_OBS=200
 MAX_OBS=500
@@ -99,22 +99,22 @@ ENSEMBLE_OUTDIR="${OUTDIR}/ensemble"
 # ============================================================
 # Step 3: Ensemble eval (global 8-param space, cross-model)
 # ============================================================
-echo "=== [3/4] Ensemble eval: ModelClass GPT ==="
-python -m bayesgpt.experiments.model_classes.model_class_ensemble_eval \
-    --checkpoint          "$CKPT" \
-    --outdir              "$ENSEMBLE_OUTDIR" \
-    --encoder_num_layers  "$ENCODER_LAYERS" \
-    --decoder_num_layers  "$DECODER_LAYERS" \
-    --encoder_num_heads   "$ENCODER_HEADS" \
-    --decoder_num_heads   "$DECODER_HEADS" \
-    --num_seeds           "$NUM_SEEDS" \
-    --seed_dim            "$SEED_DIM" \
-    --proj_dim            "$PROJ_DIM" \
-    --model_embed_dim     "$MODEL_EMBED_DIM" \
-    --time_embedding_dim  "$TIME_EMB_DIM" \
-    --pos_embedding_dim   "$POS_EMB_DIM" \
-    --num_sample_steps    "$FM_STEPS" \
-    --num_samples         "$FM_SAMPLES"
+#echo "=== [3/4] Ensemble eval: ModelClass GPT ==="
+#python -m bayesgpt.experiments.model_classes.model_class_ensemble_eval \
+#    --checkpoint          "$CKPT" \
+#    --outdir              "$ENSEMBLE_OUTDIR" \
+#    --encoder_num_layers  "$ENCODER_LAYERS" \
+#    --decoder_num_layers  "$DECODER_LAYERS" \
+#    --encoder_num_heads   "$ENCODER_HEADS" \
+#    --decoder_num_heads   "$DECODER_HEADS" \
+#    --num_seeds           "$NUM_SEEDS" \
+#    --seed_dim            "$SEED_DIM" \
+#    --proj_dim            "$PROJ_DIM" \
+#    --model_embed_dim     "$MODEL_EMBED_DIM" \
+#    --time_embedding_dim  "$TIME_EMB_DIM" \
+#    --pos_embedding_dim   "$POS_EMB_DIM" \
+#    --num_sample_steps    "$FM_STEPS" \
+#    --num_samples         "$FM_SAMPLES"
 #
 ## ============================================================
 ## Step 4: Ensemble metrics heatmap (50 configs, global space)
