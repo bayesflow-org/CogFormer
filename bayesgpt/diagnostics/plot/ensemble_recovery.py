@@ -17,10 +17,13 @@ def ensemble_recovery(
     parameter_masks: list[np.ndarray] = None,
     variable_names: list[str] = None,
     colors: list[str] = None,
+    n_colors: int = 8,
+    palette_lightness: float = 0.75,
     labels: list[str] = None,
     uncertainty_agg: Callable = credible_interval,
     title_fontsize: int = 20,
     label_fontsize: int = 14,
+    legend_fontsize: int = 10,
     alpha: float = 0.5,
     figsize: tuple = None
 ):
@@ -91,7 +94,7 @@ def ensemble_recovery(
 
     # Default colors from husl palette
     if colors is None:
-        colors = sns.color_palette("husl", 8)
+        colors = sns.husl_palette(n_colors, l=palette_lightness)
 
     if labels is None:
         labels = [f"Config {i + 1}" for i in range(n_configs)]
@@ -211,23 +214,11 @@ def ensemble_recovery(
                     x=x_k, y=y_mean_k, ax=ax,
                     color=color_k, alpha=cell_alpha,
                 )
-            if mean_corr < 0:
-                ax.text(
-                    0.07, 0.95, "\u2212",
-                    ha="left", va="center",
-                    transform=ax.transAxes, size=9, fontweight="bold"
-                )
-                ax.text(
-                    0.13, 0.95, f"r = {abs(mean_corr):.3f}",
-                    ha="left", va="center",
-                    transform=ax.transAxes, size=12
-                )
-            else:
-                ax.text(
-                    0.1, 0.95, f"r = {abs(mean_corr):.3f}",
-                    ha="left", va="center",
-                    transform=ax.transAxes, size=12
-                )
+            ax.text(
+                0.1, 0.95, f"r = {mean_corr:.3f}",
+                ha="left", va="center",
+                transform=ax.transAxes, size=12
+            )
 
             ax.set_box_aspect(1)
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.2)
@@ -236,9 +227,9 @@ def ensemble_recovery(
             ax.set_title(variable_names[c] if r == 0 else "", fontsize=title_fontsize)
             ax.set_xlabel("Ground Truth" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
-    pixel_alpha_maps = [np.abs(r_maps[k]) for k in range(n_configs)]
+    pixel_alpha_maps = [np.clip(np.abs(r_maps[k]), 0.2, 1.0) for k in range(n_configs)]
     _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=label_fontsize, pixel_alphas=pixel_alpha_maps)
+                     label_fontsize=legend_fontsize, pixel_alphas=pixel_alpha_maps)
     return fig
 
 
@@ -261,7 +252,7 @@ if __name__ == "__main__":
     ]
     labels = [f"Config {i + 1}" for i in range(8)]
 
-    def make_data(dc, batch, draws, max_cats):
+    def make_data(dc, batch, draws, max_cats, poor_recovery=False):
         context_manager = ContextManager()
         mask = context_manager.build_parameter_mask(
             design_config=dc,
@@ -271,11 +262,19 @@ if __name__ == "__main__":
         )
         nr, nc = mask.shape
         true = np.random.normal(0, 1, (batch, nr, nc))
-        # Good recovery: draws centered tightly on true
-        pred = true[:, None, :, :] + np.random.normal(0, 0.15, (batch, draws, nr, nc))
+        if poor_recovery:
+            # Draws unrelated to true → low correlation
+            pred = np.random.normal(0, 1, (batch, draws, nr, nc))
+        else:
+            # Good recovery: draws centered tightly on true
+            pred = true[:, None, :, :] + np.random.normal(0, 0.15, (batch, draws, nr, nc))
         return true, pred
 
-    true_list, pred_list = zip(*[make_data(dc, batch_size, draws, max_num_categories) for dc in design_configs])
+    data = [
+        make_data(dc, batch_size, draws, max_num_categories, poor_recovery=(i >= 4))
+        for i, dc in enumerate(design_configs)
+    ]
+    true_list, pred_list = zip(*data)
 
     fig = ensemble_recovery(
         true_list=list(true_list),

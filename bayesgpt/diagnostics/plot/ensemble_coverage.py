@@ -16,12 +16,14 @@ def ensemble_coverage(
     parameter_masks: list[np.ndarray] = None,
     variable_names: list[str] = None,
     colors: list[str] = None,
+    n_colors: int = 8,
+    palette_lightness: float = 0.75,
     labels: list[str] = None,
     figsize: tuple = None,
     title_fontsize: int = 20,
     label_fontsize: int = 14,
     tick_fontsize: int = 11,
-    legend_fontsize: int = 12,
+    legend_fontsize: int = 10,
     prob: float = 0.95,
     interval_type: str = "central",
     difference: bool = True,
@@ -89,7 +91,7 @@ def ensemble_coverage(
         ]
 
     if colors is None:
-        colors = sns.color_palette("husl", 8)
+        colors = sns.husl_palette(n_colors, l=palette_lightness)
 
     if labels is None:
         labels = [f"Config {i + 1}" for i in range(n_configs)]

@@ -1,6 +1,8 @@
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 
 from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.diagnostics.plot.adaptive_ecdf import compute_ecdf_bands
@@ -16,15 +18,17 @@ def ensemble_ecdf(
     parameter_masks: list[np.ndarray] = None,
     variable_names: list[str] = None,
     colors: list[str] = None,
+    n_colors: int = 8,
+    palette_lightness: float = 0.75,
     labels: list[str] = None,
     figsize: tuple = None,
     title_fontsize: int = 20,
     label_fontsize: int = 14,
     tick_fontsize: int = 11,
-    legend_fontsize: int = 12,
+    legend_fontsize: int = 10,
     prob: float = 0.95,
     difference: bool = True,
-    band_alpha: float = 0.07,
+    band_alpha: float = 0.035,
 ) -> plt.Figure:
     """
     Overlay ECDF calibration plots for multiple design configs on a shared
@@ -89,7 +93,7 @@ def ensemble_ecdf(
         ]
 
     if colors is None:
-        colors = sns.color_palette("husl", 8)
+        colors = sns.husl_palette(n_colors, l=palette_lightness)
 
     if labels is None:
         labels = [f"Config {i + 1}" for i in range(n_configs)]
@@ -151,7 +155,7 @@ def ensemble_ecdf(
                     fontsize=18, weight="bold",
                     alpha=0.7, color="gray"
                 )
-                ax.set_xlabel("Rank" if r == num_rows - 1 else "", fontsize=label_fontsize)
+                ax.set_xlabel("Fractional rank statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
                 continue
 
             # Shared confidence band drawn once per active cell
@@ -177,9 +181,9 @@ def ensemble_ecdf(
                 ecdf_y = np.arange(1, num_datasets + 1) / num_datasets
 
                 if difference:
-                    ax.plot(ranks_sorted, ecdf_y - ranks_sorted, color=colors[k], alpha=1.0)
+                    ax.plot(ranks_sorted, ecdf_y - ranks_sorted, color=colors[k], alpha=0.7)
                 else:
-                    ax.plot(ranks_sorted, ecdf_y, color=colors[k], alpha=1.0)
+                    ax.plot(ranks_sorted, ecdf_y, color=colors[k], alpha=0.7)
 
             ax.set_xlim(-0.02, 1.02)
             ax.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
@@ -192,14 +196,16 @@ def ensemble_ecdf(
             ax.grid(True, color="lightgray", linestyle="--", linewidth=0.5, alpha=0.35)
 
             ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
-            ax.set_xlabel("Rank" if r == num_rows - 1 else "", fontsize=label_fontsize)
+            ax.set_xlabel("Fractional rank statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
             if r == 0 and variable_names is not None:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
 
-    # Compute per-config ECE (mean |ECDF - diagonal| across active cells)
+    # Compute per-cell ECE → per-cell alpha map in [0.5, 1.0]
+    # ECE is bounded by ~0.25, so we rescale: alpha = clip(1 - 4*ece, 0.5, 1.0)
     pixel_alphas = []
+    ecdf_y = np.arange(1, num_datasets + 1) / num_datasets
     for k in range(n_configs):
-        cell_eces = []
+        alpha_map = np.full((num_rows, num_cols), 0.5)
         for r in range(num_rows):
             for c in range(num_cols):
                 if r >= parameter_masks[k].shape[0] or parameter_masks[k][r, c] != 1.0:
@@ -209,13 +215,27 @@ def ensemble_ecdf(
                     axis=1,
                 )
                 ranks_sorted = np.sort(ranks)
-                ecdf_y = np.arange(1, num_datasets + 1) / num_datasets
-                cell_eces.append(float(np.mean(np.abs(ecdf_y - ranks_sorted))))
-        ece_k = float(np.mean(cell_eces)) if cell_eces else 0.0
-        pixel_alphas.append(1.0 - ece_k)
+                ece = float(np.mean(np.abs(ecdf_y - ranks_sorted)))
+                alpha_map[r, c] = float(np.clip(1.0 - 4.0 * ece, 0.2, 1.0))
+        pixel_alphas.append(alpha_map)
 
-    _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=legend_fontsize, pixel_alphas=pixel_alphas)
+    strip_h_fig = _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
+                                   label_fontsize=legend_fontsize, pixel_alphas=pixel_alphas)
+
+    # Reserve space above the thumbnail strip for the band/ECDF legend
+    legend_gap = 0.10
+    fig.subplots_adjust(bottom=strip_h_fig + legend_gap)
+
+    band_handle = mpatches.Patch(facecolor="black", alpha=band_alpha * 6, label=f"{int(prob * 100)}% confidence band")
+    ecdf_handle = mlines.Line2D([], [], color="black", alpha=0.7, label="Rank ECDF")
+    fig.legend(
+        handles=[band_handle, ecdf_handle],
+        loc="upper center",
+        bbox_to_anchor=(0.5, strip_h_fig + legend_gap / 2),
+        ncol=2,
+        fontsize=legend_fontsize + 2,
+        frameon=True,
+    )
     return fig
 
 
@@ -238,7 +258,7 @@ if __name__ == "__main__":
     ]
     labels = [f"Config {i + 1}" for i in range(8)]
 
-    def make_data(dc, batch, draws, max_cats):
+    def make_data(dc, batch, draws, max_cats, miscalibrated=False):
         mask = cm.build_parameter_mask(
             design_config=dc,
             max_num_categories=max_cats,
@@ -246,12 +266,20 @@ if __name__ == "__main__":
             keep_intercept=True
         )
         nr, nc = mask.shape
-        # Good calibration: exchangeable draws → ECDF ≈ diagonal
         true = np.random.normal(0, 1, (batch, nr, nc))
         pred = np.random.normal(0, 1, (batch, draws, nr, nc))
+        if miscalibrated:
+            # Apply overestimation bias to a random subset of cells
+            rng = np.random.default_rng()
+            bias = rng.uniform(0.0, 2.0, (nr, nc))  # per-cell bias magnitude
+            pred = pred + bias[np.newaxis, np.newaxis, :, :]
         return true, pred
 
-    true_list, pred_list = zip(*[make_data(dc, batch_size, draws, max_num_categories) for dc in design_configs])
+    data = [
+        make_data(dc, batch_size, draws, max_num_categories, miscalibrated=(i >= 4))
+        for i, dc in enumerate(design_configs)
+    ]
+    true_list, pred_list = zip(*data)
 
     fig = ensemble_ecdf(
         true_list=list(true_list),

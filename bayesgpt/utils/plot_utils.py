@@ -188,6 +188,8 @@ def _add_mask_legend(
             sp.set_visible(False)
         ax_t.set_xlabel(labels[k], fontsize=label_fontsize, labelpad=3)
 
+    return strip_h_fig
+
 
 def hex_code():
     return "#{:06x}".format(random.randint(0, 0xFFFFFF))
