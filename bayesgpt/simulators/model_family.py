@@ -71,7 +71,7 @@ class NestedModelFamily:
             parameter_mask = self.context_manager.build_parameter_mask(
                 design_config=design_config,
                 intrinsic_params=self.intrinsic_params,
-                fixed_params=kwargs.get("fixed_intrinsics"),
+                fixed_params=None,
                 max_num_categories=max_num_categories,
                 keep_intercept=keep_intercept,
             )
