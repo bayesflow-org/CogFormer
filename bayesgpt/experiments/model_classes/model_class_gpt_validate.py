@@ -39,8 +39,8 @@ def get_benchmark_design_configs():
                 },
                 "regressed": {
                     "1": ["v", "a", "z", "tau", "s_v", "s_tau"],
-                    "u_1": ["v", "a", "tau"],
-                    "u_2": ["v", "a"],
+                    "u_1": ["v", "a", "z"],
+                    "u_2": ["v", "a", "z"],
                     "u_1:u_2": [],
                 },
                 "fixed": {
@@ -49,8 +49,8 @@ def get_benchmark_design_configs():
                 },
                 "fixed_regressed": {
                     "1": ["v", "a", "z", "tau"],
-                    "u_1": ["v", "a", "tau"],
-                    "u_2": ["v", "a"],
+                    "u_1": ["v", "a", "z"],
+                    "u_2": ["v", "a", "z"],
                     "u_1:u_2": [],
                 },
                 "interaction": {

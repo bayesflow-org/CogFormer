@@ -139,7 +139,7 @@ class NestedModelFamily:
             context = self.model.build_default_context(num_obs=num_obs)
 
         # Design matrix
-        design_matrix = self.context_manager.build_design_matrix(
+        design_matrix = self.contparaext_manager.build_design_matrix(
             design_config=design_config,
             num_obs=num_obs,
             context=context,
