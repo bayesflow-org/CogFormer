@@ -307,7 +307,7 @@ def test(case: str):
     print(f"Active true_params shape: {true_params.shape}, pred_params shape: {pred_params.shape}")
 
 
-def main(case: str, batch_size: int = 200, num_samples: int = 200):
+def main(case: str, batch_size: int = 200, num_samples: int = 200, skip_posteriors: bool = False, skip_log_gamma: bool = True):
     config = CASE_CONFIGS[case]
     param_names = config["param_names"]
 
@@ -362,9 +362,6 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
     rmse = bf.diagnostics.metrics.root_mean_squared_error(
         estimates=pred_params, targets=true_params, variable_names=param_names
     )
-    log_gamma = bf.diagnostics.metrics.calibration_log_gamma(
-        estimates=pred_params, targets=true_params, variable_names=param_names
-    )
     calibration_errors = bf.diagnostics.metrics.calibration_error(
         estimates=pred_params, targets=true_params, variable_names=param_names
     )
@@ -372,14 +369,18 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
         estimates=pred_params, targets=true_params, variable_names=param_names
     )
 
-    metrics = pd.DataFrame(
-        {
-            rmse["metric_name"]: rmse["values"],
-            log_gamma["metric_name"]: log_gamma["values"],
-            calibration_errors["metric_name"]: calibration_errors["values"],
-            contraction["metric_name"]: contraction["values"],
-        }
-    )
+    metrics_dict = {
+        rmse["metric_name"]: rmse["values"],
+        calibration_errors["metric_name"]: calibration_errors["values"],
+        contraction["metric_name"]: contraction["values"],
+    }
+    if not skip_log_gamma:
+        log_gamma = bf.diagnostics.metrics.calibration_log_gamma(
+            estimates=pred_params, targets=true_params, variable_names=param_names
+        )
+        metrics_dict[log_gamma["metric_name"]] = log_gamma["values"]
+
+    metrics = pd.DataFrame(metrics_dict)
     metrics.to_csv(evals_dir / f"cdm_families_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
@@ -455,6 +456,7 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
         intercept_color=adaptive_colors["intercept"],
         main_effect_color=adaptive_colors["main_effect"],
         interaction_color=adaptive_colors["interaction"],
+        skip_log_gamma=skip_log_gamma,
     )
     metrics_fig.savefig(figures_dir / f"cdm_family_{case}_bf_metrics.pdf", bbox_inches="tight")
     plt.close(metrics_fig)
@@ -468,26 +470,28 @@ def main(case: str, batch_size: int = 200, num_samples: int = 200):
         max_num_categories=2,
         parameter_mask=params_mask,
         variable_names=variable_names_all,
+        skip_log_gamma=skip_log_gamma,
     )
     metrics_df.to_csv(figures_dir / f"cdm_family_{case}_bf_metrics.csv")
     logging.info(f"Saved adaptive metrics CSV to {figures_dir}")
 
-    for i in range(10):
-        posterior_fig = adaptive_posterior(
-            samples=pred_grid[i],
-            design_config=design_config,
-            intrinsic_params=intrinsic_params_all,
-            max_num_categories=2,
-            unfold=False,
-            intercept_color=adaptive_colors["intercept"],
-            main_effect_color=adaptive_colors["main_effect"],
-            interaction_color=adaptive_colors["interaction"],
-        )
-        posterior_fig.savefig(
-            figures_dir / f"cdm_family_{case}_bf_posterior_{i}.pdf", bbox_inches="tight"
-        )
-        plt.close(posterior_fig.fig)
-    logging.info(f"Saved adaptive posteriors to {figures_dir}")
+    if not skip_posteriors:
+        for i in range(10):
+            posterior_fig = adaptive_posterior(
+                samples=pred_grid[i],
+                design_config=design_config,
+                intrinsic_params=intrinsic_params_all,
+                max_num_categories=2,
+                unfold=False,
+                intercept_color=adaptive_colors["intercept"],
+                main_effect_color=adaptive_colors["main_effect"],
+                interaction_color=adaptive_colors["interaction"],
+            )
+            posterior_fig.savefig(
+                figures_dir / f"cdm_family_{case}_bf_posterior_{i}.pdf", bbox_inches="tight"
+            )
+            plt.close(posterior_fig.fig)
+        logging.info(f"Saved adaptive posteriors to {figures_dir}")
 
 
 if __name__ == "__main__":
@@ -518,9 +522,26 @@ if __name__ == "__main__":
         action="store_true",
         help="Run in test mode",
     )
+    parser.add_argument(
+        "--skip_posteriors",
+        action="store_true",
+        help="Skip posterior pairplots",
+    )
+    parser.add_argument(
+        "--skip_log_gamma",
+        action="store_true",
+        default=True,
+        help="Skip log gamma metric (slow, skipped by default)",
+    )
+    parser.add_argument(
+        "--include_log_gamma",
+        dest="skip_log_gamma",
+        action="store_false",
+        help="Include log gamma metric",
+    )
     args = parser.parse_args()
 
     if args.test:
         test(case=args.case)
     else:
-        main(case=args.case, batch_size=args.batch_size, num_samples=args.num_samples)
+        main(case=args.case, batch_size=args.batch_size, num_samples=args.num_samples, skip_posteriors=args.skip_posteriors, skip_log_gamma=args.skip_log_gamma)

@@ -25,6 +25,58 @@ from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as com
 from bayesgpt.utils.plot_utils import bayesgpt_mc_colors
 
 
+def load_bf_validation_data(
+    data_path: Path,
+    design_config: dict,
+    intrinsic_params: list,
+    model_id: int,
+    batch_size: int,
+    max_dm_cols: int | None = None,
+) -> dict:
+    """Load BF-generated validation data and reconstruct full local param space.
+
+    BF data stores only active params in flat format. This function reconstructs
+    (batch, n_rows * n_local) matrices expected by lift_to_global_space.
+
+    max_dm_cols: if provided, zero-pads design matrices to this width (needed for
+    model class encoder which expects fixed-width input across all cases).
+    """
+    dataset = np.load(data_path, allow_pickle=True)
+    rts = dataset["rts"]
+    choices = dataset["choices"]
+    design_matrices = dataset["design_matrices"]
+    flat_params = dataset["true_set"]
+    flat_masks = dataset["param_masks"]
+
+    if max_dm_cols is not None and design_matrices.shape[-1] < max_dm_cols:
+        pad_width = max_dm_cols - design_matrices.shape[-1]
+        design_matrices = np.pad(design_matrices, ((0, 0), (0, 0), (0, pad_width)))
+
+    n_local = len(intrinsic_params)
+    n_rows = len(design_config)
+    param_col = {p: j for j, p in enumerate(intrinsic_params)}
+
+    pm_full = np.zeros((batch_size, n_rows * n_local), dtype=flat_params.dtype)
+    pmask_full = np.zeros((batch_size, n_rows * n_local), dtype=flat_masks.dtype)
+
+    flat_pos = 0
+    for row_i, active_params in enumerate(design_config.values()):
+        ordered = [p for p in intrinsic_params if p in active_params]
+        for p in ordered:
+            col_idx = param_col[p]
+            pm_full[:, row_i * n_local + col_idx] = flat_params[:, flat_pos]
+            pmask_full[:, row_i * n_local + col_idx] = flat_masks[:, flat_pos]
+            flat_pos += 1
+
+    return {
+        "sim_data": {"rts": rts, "choices": choices},
+        "design_matrices": design_matrices,
+        "param_matrices": pm_full,
+        "param_masks": pmask_full,
+        "model_ids": np.full(batch_size, model_id, dtype=np.int64),
+    }
+
+
 # Benchmark design configs per model
 def get_benchmark_design_configs():
     return {
@@ -170,6 +222,7 @@ def parse_args():
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/fm/model_class/")
     p.add_argument("--pred_dir", type=str, default="./bayesgpt/experiments/data/model_class/")
+    p.add_argument("--data_dir", type=str, default="./bayesgpt/experiments/data/", help="Directory with BayesFlow validation data")
 
     # Validation settings
     p.add_argument("--batch_size", type=int, default=200)
@@ -183,6 +236,9 @@ def parse_args():
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
     p.add_argument("--include_full", action="store_true", default=False, help="Include the 'full' benchmark case (skipped by default)")
+    p.add_argument("--skip_posteriors", action="store_true", default=False, help="Skip posterior pairplots")
+    p.add_argument("--skip_log_gamma", action="store_true", default=True, help="Skip log gamma metric (slow, skipped by default)")
+    p.add_argument("--include_log_gamma", dest="skip_log_gamma", action="store_false", help="Include log gamma metric")
 
     # Architecture (must match training)
     p.add_argument("--encoder_num_layers", type=int, default=8)
@@ -290,20 +346,35 @@ def main():
                 default_fixed_values=default_fixed_values,
             )
 
-            test_samples = mf.batch_sample(
-                design_config=design_config,
-                batch_size=args.batch_size,
-                num_obs=args.num_obs,
-                mask_randomizer_kwargs=mask_kwargs,
-                max_num_regressors=args.max_num_regressors,
-                max_num_categories=args.max_num_categories,
-                keep_intercept=args.keep_intercept,
-                add_interaction=args.add_interaction,
-                flatten_param_outputs=True,
-                fixed_config=True,
-                link_fun=link_fun,
-            )
-            test_samples["model_ids"] = np.full(args.batch_size, model_id, dtype=np.int64)
+            if args.data_dir is not None:
+                data_path = Path(args.data_dir) / f"{model_name.lower()}_{cfg_name}_data.npz"
+                max_total_regressors = args.max_num_regressors * (args.max_num_regressors + 1) // 2
+                max_dm_cols = max_total_regressors * (args.max_num_categories - 1) + (1 if args.keep_intercept else 0)
+                test_samples = load_bf_validation_data(
+                    data_path=data_path,
+                    design_config=design_config,
+                    intrinsic_params=intrinsic_params,
+                    model_id=model_id,
+                    batch_size=args.batch_size,
+                    max_dm_cols=max_dm_cols,
+                )
+                test_samples["max_num_regressors"] = args.max_num_regressors
+                test_samples["max_num_categories"] = args.max_num_categories
+            else:
+                test_samples = mf.batch_sample(
+                    design_config=design_config,
+                    batch_size=args.batch_size,
+                    num_obs=args.num_obs,
+                    mask_randomizer_kwargs=mask_kwargs,
+                    max_num_regressors=args.max_num_regressors,
+                    max_num_categories=args.max_num_categories,
+                    keep_intercept=args.keep_intercept,
+                    add_interaction=args.add_interaction,
+                    flatten_param_outputs=True,
+                    fixed_config=True,
+                    link_fun=link_fun,
+                )
+                test_samples["model_ids"] = np.full(args.batch_size, model_id, dtype=np.int64)
 
             # Lift local param positions to global space before adapting
             test_samples["param_matrices"], test_samples["param_masks"] = \
@@ -416,6 +487,7 @@ def main():
                 intercept_color=colors["intercept"],
                 main_effect_color=colors["main_effect"],
                 interaction_color=colors["interaction"],
+                skip_log_gamma=args.skip_log_gamma,
             )
             metrics_fig_path = outdir / f"{tag}_fm_metrics.pdf"
             metrics_fig.savefig(metrics_fig_path, bbox_inches="tight")
@@ -431,26 +503,28 @@ def main():
                 max_num_categories=args.max_num_categories,
                 parameter_mask=params_mask,
                 variable_names=variable_names,
+                skip_log_gamma=args.skip_log_gamma,
             )
             metrics_csv_path = outdir / f"{tag}_fm_metrics.csv"
             metrics_df.to_csv(metrics_csv_path)
             logging.info(f"[saved] {metrics_csv_path}")
 
             # Posterior plots for first 10 datasets
-            for i in range(10):
-                posterior_fig = adaptive_posterior(
-                    samples=pred_set[i],
-                    design_config=design_config,
-                    intrinsic_params=intrinsic_params,
-                    max_num_categories=args.max_num_categories,
-                    unfold=False,
-                    intercept_color=colors["intercept"],
-                    main_effect_color=colors["main_effect"],
-                    interaction_color=colors["interaction"],
-                )
-                posterior_path = outdir / f"{tag}_fm_posterior_{i}.pdf"
-                posterior_fig.savefig(posterior_path, bbox_inches="tight")
-                plt.close(posterior_fig.fig)
+            if not args.skip_posteriors:
+                for i in range(10):
+                    posterior_fig = adaptive_posterior(
+                        samples=pred_set[i],
+                        design_config=design_config,
+                        intrinsic_params=intrinsic_params,
+                        max_num_categories=args.max_num_categories,
+                        unfold=False,
+                        intercept_color=colors["intercept"],
+                        main_effect_color=colors["main_effect"],
+                        interaction_color=colors["interaction"],
+                    )
+                    posterior_path = outdir / f"{tag}_fm_posterior_{i}.pdf"
+                    posterior_fig.savefig(posterior_path, bbox_inches="tight")
+                    plt.close(posterior_fig.fig)
 
     logging.info("Done.")
 

@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from bayesgpt.diagnostics.metric.adaptive_c2st import adaptive_c2st as compute_adaptive_c2st
@@ -11,225 +12,153 @@ from bayesgpt.diagnostics.plot.adaptive_c2st import adaptive_c2st as plot_adapti
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
+CASES = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction"]
+
+
 def get_benchmark_design_configs():
     free_params = ["v", "a", "z", "tau"]
     fixed_params = ["s_v", "s_tau"]
     intrinsic_params = free_params + fixed_params
 
-    intercept_only = {
-        "1": intrinsic_params,
-        "u_1": [],
-        "u_2": [],
-        "u_1:u_2": []
+    return {
+        "intercept_only": {"1": intrinsic_params, "u_1": [], "u_2": [], "u_1:u_2": []},
+        "regressed": {"1": intrinsic_params, "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
+        "fixed": {"1": free_params, "u_1": [], "u_2": [], "u_1:u_2": []},
+        "fixed_regressed": {"1": free_params, "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
+        "interaction": {"1": intrinsic_params, "u_1": ["v", "a", "z", "tau", "s_v"], "u_2": ["v", "a", "z", "tau"], "u_1:u_2": ["v", "a", "z"]},
     }
 
-    regressed = {
-        "1": intrinsic_params,
-        "u_1": ["v", "a", "z"],
-        "u_2": ["v", "a", "z"],
-        "u_1:u_2": []
-    }
 
-    fixed = {
-        "1": free_params,
-        "u_1": [],
-        "u_2": [],
-        "u_1:u_2": []
-    }
-
-    fixed_regressed = {
-        "1": free_params,
-        "u_1": ["v", "a", "z"],
-        "u_2": ["v", "a", "z"],
-        "u_1:u_2": []
-    }
-
-    interaction = {
-        "1": intrinsic_params,
-        "u_1": ["v", "a", "z", "tau", "s_v"],
-        "u_2": ["v", "a", "z", "tau"],
-        "u_1:u_2": ["v", "a", "z"]
-    }
-
-    full = {
-        "1": intrinsic_params,
-        "u_1": intrinsic_params,
-        "u_2": intrinsic_params,
-        "u_1:u_2": intrinsic_params,
-    }
-
-    names = ["intercept_only", "regressed", "fixed", "fixed_regressed", "interaction", "full"]
-    configs = [intercept_only, regressed, fixed, fixed_regressed, interaction, full]
-    return {name: config for name, config in zip(names, configs)}
-
-
-def reshape_bf_to_gpt(
-    bf_samples: np.ndarray,
-    design_config: dict,
-    intrinsic_params: list[str],
-) -> np.ndarray:
-    """
-    Reshape BayesFlow flat active-param samples to (..., num_rows, num_cols).
-
-    BayesFlow stores only active parameters in row-major order: for each row
-    in design_config, active params appear in intrinsic_params order. Inactive
-    cells are filled with 0 to match BayesGPT's grid layout.
-
-    Parameters
-    ----------
-    bf_samples : np.ndarray of shape (..., num_active_params)
-        Active-parameter array from BayesFlow, already filtered by active_idx.
-    design_config : dict
-        Mapping from row names to lists of active param names, in row order.
-    intrinsic_params : list[str]
-        Ordered list of all intrinsic param names (defines columns).
-
-    Returns
-    -------
-    np.ndarray of shape (..., num_rows, num_cols)
-    """
+def reshape_bf_to_gpt(bf_samples, design_config, intrinsic_params):
     *leading, num_active = bf_samples.shape
     num_rows = len(design_config)
     num_cols = len(intrinsic_params)
     col_idx = {p: j for j, p in enumerate(intrinsic_params)}
-
     result = np.zeros((*leading, num_rows, num_cols))
-
     flat_pos = 0
     for row_i, active_params in enumerate(design_config.values()):
         ordered = [p for p in intrinsic_params if p in active_params]
         for p in ordered:
             result[..., row_i, col_idx[p]] = bf_samples[..., flat_pos]
             flat_pos += 1
-
-    assert flat_pos == num_active, (
-        f"Expected {num_active} active params but mapped {flat_pos}. "
-        "Check that design_config and intrinsic_params match the BayesFlow model."
-    )
+    assert flat_pos == num_active
     return result
 
 
-def load_bf_data(data_path: Path):
+def load_bf_data(data_path):
     dataset = np.load(data_path, allow_pickle=True)
-    return {
-        "param_masks": dataset["param_masks"],
-        "pred_set": dataset["pred_set"],
-    }
+    return {"param_masks": dataset["param_masks"], "pred_set": dataset["pred_set"]}
 
 
-def load_gpt_pred(pred_path: Path):
+def load_gpt_pred(pred_path):
     dataset = np.load(pred_path, allow_pickle=True)
     return dataset["pred_set"], dataset["params_mask"]
 
 
+def run_comparison(pred_a, pred_b, design_config, intrinsic_params, variable_names,
+                   colors, max_num_categories, params_mask, outdir, file_prefix):
+    joint_score = compute_joint_c2st(
+        pred_a=pred_a, pred_b=pred_b, design_config=design_config,
+        intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
+        parameter_mask=params_mask,
+    )
+    c2st_df = compute_adaptive_c2st(
+        pred_a=pred_a, pred_b=pred_b, design_config=design_config,
+        intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
+        parameter_mask=params_mask, variable_names=variable_names,
+    )
+    mean_accuracy = float(c2st_df["C2ST Accuracy"].mean())
+
+    fig = plot_adaptive_c2st(
+        pred_a=pred_a, pred_b=pred_b, design_config=design_config,
+        intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
+        parameter_mask=params_mask, variable_names=variable_names,
+        intercept_color=colors["intercept"], main_effect_color=colors["main_effect"],
+        interaction_color=colors["interaction"],
+        global_accuracy=mean_accuracy, joint_score=joint_score,
+    )
+    fig.savefig(outdir / f"{file_prefix}_c2st.pdf", bbox_inches="tight")
+    plt.close(fig)
+
+    c2st_df.loc["_mean_accuracy_"] = {"C2ST Accuracy": mean_accuracy}
+    c2st_df.loc["_joint_c2st_"] = {"C2ST Accuracy": joint_score}
+    c2st_df.to_csv(outdir / f"{file_prefix}_c2st.csv")
+    logging.info(f"[saved] {outdir / file_prefix}_c2st.pdf  mean_acc={mean_accuracy:.3f}  joint={joint_score:.3f}")
+
+    return mean_accuracy, joint_score
+
+
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--bf_data_dir", type=str, default="./bayesgpt/experiments/data",
-                   help="Directory with BayesFlow validation data (.npz files)")
-    p.add_argument("--gpt_pred_dir", type=str, required=True,
-                   help="Directory with saved BayesGPT pred .npz files (output of gpt_validate)")
+    p.add_argument("--bf_data_dir", type=str, default="./bayesgpt/experiments/data")
+    p.add_argument("--gpt_pred_dir", type=str, default="./bayesgpt/experiments/data")
+    p.add_argument("--mc_pred_dir", type=str, default="./bayesgpt/experiments/data/model_class",
+                   help="Directory with BayesGPT ModelClass pred files; if set, also runs Class vs Family C2ST")
     p.add_argument("--outdir", type=str, default="./bayesgpt/experiments/figures/c2st/ddm/")
     p.add_argument("--max_num_categories", type=int, default=2)
-
     return p.parse_args()
 
 
 def main():
     args = parse_args()
-
     intrinsic_params = ["v", "a", "z", "tau", "s_v", "s_tau"]
     variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
-
     colors = bayesgpt_fm_colors()
     benchmark = get_benchmark_design_configs()
+    summary_rows = []
 
     for cfg_name, design_config in benchmark.items():
         bf_data_path = Path(args.bf_data_dir) / f"ddm_{cfg_name}_data.npz"
         gpt_pred_path = Path(args.gpt_pred_dir) / f"ddm_family_{cfg_name}_gpt_pred.npz"
 
         if not bf_data_path.exists():
-            logging.warning(f"No BF data for '{cfg_name}' at {bf_data_path}, skipping.")
+            logging.warning(f"No BF data for '{cfg_name}', skipping.")
             continue
         if not gpt_pred_path.exists():
-            logging.warning(f"No GPT pred for '{cfg_name}' at {gpt_pred_path}, skipping.")
+            logging.warning(f"No GPT pred for '{cfg_name}', skipping.")
             continue
 
         outdir = Path(args.outdir) / cfg_name
         outdir.mkdir(parents=True, exist_ok=True)
 
-        logging.info(f"Running C2ST for case '{cfg_name}'")
-
-        # Load GPT predictions (already in (batch, draws, num_rows, num_cols) format)
         gpt_pred_set, params_mask = load_gpt_pred(gpt_pred_path)
-
-        # Load BF predictions and reshape to match GPT format
         bf_data = load_bf_data(bf_data_path)
-        bf_masks = bf_data["param_masks"]
-        bf_pred_set = bf_data["pred_set"]
-
-        active_idx = bf_masks[0].astype(bool)
-        bf_pred_active = bf_pred_set[:, :, active_idx]  # (batch, draws, num_active)
-        bf_pred_reshaped = reshape_bf_to_gpt(bf_pred_active, design_config, intrinsic_params)
-
-        logging.info(
-            f"[{cfg_name}] GPT: {gpt_pred_set.shape}, BF: {bf_pred_reshaped.shape}"
+        active_idx = bf_data["param_masks"][0].astype(bool)
+        bf_pred_reshaped = reshape_bf_to_gpt(
+            bf_data["pred_set"][:, :, active_idx], design_config, intrinsic_params
         )
 
-        # --- C2ST ---
-        joint_score = compute_joint_c2st(
-            pred_a=gpt_pred_set,
-            pred_b=bf_pred_reshaped,
-            design_config=design_config,
-            intrinsic_params=intrinsic_params,
-            max_num_categories=args.max_num_categories,
-            parameter_mask=params_mask,
+        # Family vs BF
+        mean_acc, joint = run_comparison(
+            gpt_pred_set, bf_pred_reshaped, design_config, intrinsic_params,
+            variable_names, colors, args.max_num_categories, params_mask,
+            outdir, f"ddm_families_{cfg_name}",
         )
-        c2st_df = compute_adaptive_c2st(
-            pred_a=gpt_pred_set,
-            pred_b=bf_pred_reshaped,
-            design_config=design_config,
-            intrinsic_params=intrinsic_params,
-            max_num_categories=args.max_num_categories,
-            parameter_mask=params_mask,
-            variable_names=variable_names,
-        )
-        global_accuracy = float(c2st_df["C2ST Accuracy"].mean())
-        logging.info(f"[{cfg_name}] Global Accuracy: {global_accuracy:.3f}   Joint C2ST: {joint_score:.3f}")
+        summary_rows.append({"model": "DDM", "case": cfg_name, "scenario": "Family_vs_BF",
+                              "mean_accuracy": mean_acc, "joint_c2st": joint})
 
-        c2st_fig = plot_adaptive_c2st(
-            pred_a=gpt_pred_set,
-            pred_b=bf_pred_reshaped,
-            design_config=design_config,
-            intrinsic_params=intrinsic_params,
-            max_num_categories=args.max_num_categories,
-            parameter_mask=params_mask,
-            variable_names=variable_names,
-            intercept_color=colors["intercept"],
-            main_effect_color=colors["main_effect"],
-            interaction_color=colors["interaction"],
-            global_accuracy=global_accuracy,
-            joint_score=joint_score,
-        )
-        c2st_fig_path = outdir / f"ddm_families_{cfg_name}_c2st.pdf"
-        c2st_fig.savefig(c2st_fig_path, bbox_inches="tight")
-        plt.close(c2st_fig)
-        logging.info(f"[saved] {c2st_fig_path}")
+        # Class vs Family
+        if args.mc_pred_dir is not None:
+            mc_pred_path = Path(args.mc_pred_dir) / f"ddm_{cfg_name}_gpt_pred.npz"
+            if mc_pred_path.exists():
+                mc_pred_set, _ = load_gpt_pred(mc_pred_path)
+                mean_acc_mc, joint_mc = run_comparison(
+                    mc_pred_set, gpt_pred_set, design_config, intrinsic_params,
+                    variable_names, colors, args.max_num_categories, params_mask,
+                    outdir, f"ddm_{cfg_name}_mc",
+                )
+                summary_rows.append({"model": "DDM", "case": cfg_name, "scenario": "Class_vs_Family",
+                                      "mean_accuracy": mean_acc_mc, "joint_c2st": joint_mc})
+            else:
+                logging.warning(f"No MC pred for '{cfg_name}' at {mc_pred_path}, skipping.")
 
-        c2st_df.loc["_global_accuracy_"] = {"C2ST Accuracy": global_accuracy}
-        c2st_df.loc["_joint_c2st_"] = {"C2ST Accuracy": joint_score}
-        c2st_csv_path = outdir / f"ddm_families_{cfg_name}_c2st.csv"
-        c2st_df.to_csv(c2st_csv_path)
-        logging.info(f"[saved] {c2st_csv_path}")
-
+    summary_df = pd.DataFrame(summary_rows)
+    summary_path = Path(args.outdir) / "ddm_c2st_summary.csv"
+    summary_df.to_csv(summary_path, index=False)
+    logging.info(f"[saved] {summary_path}")
     logging.info("Done.")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     main()
-
-    # Usage:
-    # python -m bayesgpt.experiments.model_families.ddm_family_c2st \
-    #   --bf_data_dir bayesgpt/experiments/data \
-    #   --gpt_pred_dir bayesgpt/experiments/figures/fm/ddm \
-    #   --outdir bayesgpt/experiments/figures/c2st/ddm

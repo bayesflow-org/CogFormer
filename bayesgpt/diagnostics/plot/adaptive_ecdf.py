@@ -186,7 +186,7 @@ def adaptive_ecdf(
                     band_x,
                     band_lower - band_x,
                     band_upper - band_x,
-                    color="grey", alpha=0.33,
+                    color="grey", alpha=0.2,
                     label=f"{int(prob * 100)}% Confidence Band",
                 )
                 ax.axhline(0.0, color="black", linestyle="dashed", label="Ideal (Uniform)")
@@ -196,7 +196,7 @@ def adaptive_ecdf(
                     band_x,
                     band_lower,
                     band_upper,
-                    color="grey", alpha=0.33,
+                    color="grey", alpha=0.2,
                     label=f"{int(prob * 100)}% Confidence Band",
                 )
                 ax.plot([0, 1], [0, 1], color="black", linestyle="dashed", label="Ideal (Uniform)")
@@ -204,7 +204,7 @@ def adaptive_ecdf(
 
             ax.set_xlim(-0.02, 1.02)
             ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
-            ax.set_xlabel("Rank" if r == num_rows - 1 else "", fontsize=label_fontsize)
+            ax.set_xlabel("Fractional Rank Statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
             if variable_names is not None and r == 0:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)

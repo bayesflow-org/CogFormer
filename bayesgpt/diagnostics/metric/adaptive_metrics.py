@@ -159,6 +159,7 @@ def adaptive_metrics(
     max_quantile: float = 0.995,
     num_null_draws: int = 1000,
     log_gamma_quantile: float = 0.05,
+    skip_log_gamma: bool = True,
 ) -> pd.DataFrame:
     """
     Compute adaptive diagnostic metrics for all active parameters in the
@@ -234,8 +235,9 @@ def adaptive_metrics(
     uppers = 1 - lowers
 
     # Pre-compute null distribution for log gamma (shared across all parameters)
-    null_dist = _gamma_null_distribution(batch_size, num_draws, num_null_draws)
-    null_quantile = np.quantile(null_dist, log_gamma_quantile)
+    if not skip_log_gamma:
+        null_dist = _gamma_null_distribution(batch_size, num_draws, num_null_draws)
+        null_quantile = np.quantile(null_dist, log_gamma_quantile)
 
     records = {}
 
@@ -262,13 +264,15 @@ def adaptive_metrics(
             estimates = pred[:, :, r, c]  # (batch_size, num_draws)
             targets = true[:, r, c]       # (batch_size,)
 
-            records[param_label] = {
+            entry = {
                 rmse_col: _rmse(estimates, targets, normalize, aggregation),
                 "Posterior Contraction": _contraction(estimates, targets, aggregation),
                 "Calibration Error": _calibration_error(
                     estimates, targets, alphas, lowers, uppers, aggregation
                 ),
-                "Log Gamma": _log_gamma(estimates, targets, null_quantile),
             }
+            if not skip_log_gamma:
+                entry["Log Gamma"] = _log_gamma(estimates, targets, null_quantile)
+            records[param_label] = entry
 
     return pd.DataFrame.from_dict(records, orient="index")

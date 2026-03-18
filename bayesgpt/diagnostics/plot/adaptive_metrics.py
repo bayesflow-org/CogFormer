@@ -29,6 +29,7 @@ def adaptive_metrics(
     max_quantile: float = 0.995,
     num_null_draws: int = 1000,
     log_gamma_quantile: float = 0.05,
+    skip_log_gamma: bool = True,
     intercept_color: str = "#4e2a84",
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
@@ -104,8 +105,9 @@ def adaptive_metrics(
     lowers = regions / 2
     uppers = 1 - lowers
 
-    null_dist = _gamma_null_distribution(batch_size, num_draws, num_null_draws)
-    null_quantile = np.quantile(null_dist, log_gamma_quantile)
+    if not skip_log_gamma:
+        null_dist = _gamma_null_distribution(batch_size, num_draws, num_null_draws)
+        null_quantile = np.quantile(null_dist, log_gamma_quantile)
 
     # ------------------------------------------------------------------
     # Build metric grids  (NaN where masked)
@@ -116,8 +118,9 @@ def adaptive_metrics(
         rmse_col: np.full((num_rows, num_cols), np.nan),
         "Posterior Contraction": np.full((num_rows, num_cols), np.nan),
         "Calibration Error": np.full((num_rows, num_cols), np.nan),
-        "Log Gamma": np.full((num_rows, num_cols), np.nan),
     }
+    if not skip_log_gamma:
+        grids["Log Gamma"] = np.full((num_rows, num_cols), np.nan)
 
     for r in range(num_rows):
         for c in range(num_cols):
@@ -130,7 +133,8 @@ def adaptive_metrics(
             grids["Calibration Error"][r, c] = _calibration_error(
                 estimates, targets, alphas, lowers, uppers, aggregation
             )
-            grids["Log Gamma"][r, c] = _log_gamma(estimates, targets, null_quantile)
+            if not skip_log_gamma:
+                grids["Log Gamma"][r, c] = _log_gamma(estimates, targets, null_quantile)
 
     # ------------------------------------------------------------------
     # Row / column axis labels
@@ -156,17 +160,19 @@ def adaptive_metrics(
         (rmse_col,                "mako",   0.0, 1.0),
         ("Posterior Contraction", "rocket", 0.0, 1.0),
         ("Calibration Error",     "crest",  0.0, 1.0),
-        ("Log Gamma",             "flare",  None, None),
     ]
+    if not skip_log_gamma:
+        metric_specs.append(("Log Gamma", "flare", None, None))
 
+    n_metrics = len(metric_specs)
     cell_size = 1.0  # inches per cell
     if figsize is None:
         figsize = (
-            4 * num_cols * cell_size + 2.0,
+            n_metrics * num_cols * cell_size + 2.0,
             num_rows * cell_size + 2.5,
         )
 
-    fig, axes = plt.subplots(1, 4, figsize=figsize)
+    fig, axes = plt.subplots(1, n_metrics, figsize=figsize)
 
     for ax, (metric_name, palette, vmin, vmax) in zip(axes, metric_specs):
         grid = grids[metric_name]
