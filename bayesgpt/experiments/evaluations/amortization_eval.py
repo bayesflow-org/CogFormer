@@ -25,7 +25,7 @@ BASE = Path("./bayesgpt/experiments/figures")
 OUT_DIR = Path("./bayesgpt/experiments/evaluations")
 
 MODELS = ["DDM", "RDM", "CDM"]
-CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction", "full"]
+CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
 METRICS = ["NRMSE", "Calibration Error", "Posterior Contraction"]
 
 
