@@ -63,8 +63,8 @@ def ensemble_recovery(
     figsize : tuple, optional
     """
     n_configs = len(design_configs)
-    if n_configs > 8:
-        raise ValueError("ensemble_recovery supports at most 8 design configs.")
+    if n_configs > 12:
+        raise ValueError("ensemble_recovery supports at most 12 design configs.")
     if len(true_list) != n_configs or len(pred_list) != n_configs:
         raise ValueError("true_list, pred_list, and design_configs must have the same length.")
 
