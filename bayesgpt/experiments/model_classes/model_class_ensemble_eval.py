@@ -57,7 +57,7 @@ def parse_args():
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str,
                    default="./bayesgpt/experiments/figures/fm/model_class/ensemble/")
-    p.add_argument("--n_configs", type=int, default=8)
+    p.add_argument("--n_configs", type=int, default=12, help="Total random configs (4 per family by default; use 8 for 2-3 per family)")
     p.add_argument("--batch_size", type=int, default=200)
     p.add_argument("--num_obs", type=int, default=500)
     p.add_argument("--max_num_regressors", type=int, default=2)
@@ -128,16 +128,19 @@ def main():
     bayesgpt.load_state_dict(state)
     bayesgpt.eval()
 
-    # Sample model families for each config (reproducible via rng)
+    # Build balanced model-name list: floor(n_configs / n_families) per family,
+    # distributing any remainder to the first families.
     model_names_ordered = list(model_families.keys())
-    sampled_model_names = [
-        model_names_ordered[i]
-        for i in rng.integers(0, len(model_names_ordered), size=args.n_configs)
-    ]
+    n_families = len(model_names_ordered)
+    base, remainder = divmod(args.n_configs, n_families)
+    sampled_model_names = []
+    for j, name in enumerate(model_names_ordered):
+        sampled_model_names.extend([name] * (base + (1 if j < remainder else 0)))
+    rng.shuffle(sampled_model_names)
 
     true_list, pred_list, masks = [], [], []
     design_configs_out, labels = [], []
-    colors = sns.color_palette("husl", args.n_configs)
+    colors = sns.husl_palette(args.n_configs, h=0.05, l=0.82)
 
     # Per-model counter for label numbering: "DDM | 1", "RDM | 1", "DDM | 2", ...
     model_counters = {name: 0 for name in model_names_ordered}

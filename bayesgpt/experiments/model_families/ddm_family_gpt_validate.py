@@ -148,6 +148,8 @@ def parse_args():
     # Inference mode
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
+    p.add_argument("--include_full", action="store_true", default=False, help="Include the 'full' benchmark case (skipped by default)")
+    p.add_argument("--num_random_configs", type=int, default=8, help="Number of random configs for the random ensemble eval (8 or 12)")
 
     # MUST match training architecture
     p.add_argument("--encoder_num_layers", type=int, default=8)
@@ -260,6 +262,8 @@ def main():
 
     colors = bayesgpt_fm_colors()
     benchmark = get_benchmark_design_configs()
+    if not args.include_full:
+        benchmark = {k: v for k, v in benchmark.items() if k != "full"}
 
     default_fixed_values = {"s_v": 0.0, "s_tau": 0.0}
 
@@ -500,7 +504,7 @@ def main():
         plt.close(fig)
         logging.info(f"[saved] {fig_path}")
 
-    # ── Random configs (6) ─────────────────────────────────────────────────────
+    # ── Random configs ──────────────────────────────────────────────────────────
     cm = ContextManager()
     random_design_configs = [
         cm.build_random_design_config(
@@ -511,9 +515,9 @@ def main():
             keep_intercept=args.keep_intercept,
             add_interaction=args.add_interaction,
         )
-        for _ in range(6)
+        for _ in range(args.num_random_configs)
     ]
-    random_labels = [f"Random {i + 1}" for i in range(6)]
+    random_labels = [f"Random {i + 1}" for i in range(args.num_random_configs)]
     random_true_list = []
     random_pred_list = []
     random_masks = []
@@ -578,11 +582,13 @@ def main():
             parameter_masks=random_masks,
             variable_names=variable_names,
             labels=random_labels,
+            n_colors=args.num_random_configs,
         )
         fig_path = ensemble_outdir / f"ddm_ensemble_random_{plot_name}.pdf"
         fig.savefig(fig_path, bbox_inches="tight")
         plt.close(fig)
         logging.info(f"[saved] {fig_path}")
+
 
     logging.info("Done.")
 

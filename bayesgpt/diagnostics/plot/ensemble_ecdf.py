@@ -18,8 +18,9 @@ def ensemble_ecdf(
     parameter_masks: list[np.ndarray] = None,
     variable_names: list[str] = None,
     colors: list[str] = None,
-    n_colors: int = 8,
-    palette_lightness: float = 0.75,
+    n_colors: int = None,
+    palette_lightness: float = 0.82,
+    palette_start_hue: float = 0.05,
     labels: list[str] = None,
     figsize: tuple = None,
     title_fontsize: int = 20,
@@ -67,8 +68,8 @@ def ensemble_ecdf(
         Alpha for the shared confidence band fill (barely visible).
     """
     n_configs = len(design_configs)
-    if n_configs > 8:
-        raise ValueError("ensemble_ecdf supports at most 8 design configs.")
+    if n_configs > 12:
+        raise ValueError("ensemble_ecdf supports at most 12 design configs.")
     if len(true_list) != n_configs or len(pred_list) != n_configs:
         raise ValueError("true_list, pred_list, and design_configs must have the same length.")
 
@@ -93,7 +94,7 @@ def ensemble_ecdf(
         ]
 
     if colors is None:
-        colors = sns.husl_palette(n_colors, l=palette_lightness)
+        colors = sns.husl_palette(n_configs if n_colors is None else n_colors, h=palette_start_hue, l=palette_lightness)
 
     if labels is None:
         labels = [f"Config {i + 1}" for i in range(n_configs)]
@@ -254,7 +255,7 @@ if __name__ == "__main__":
             keep_intercept=True,
             add_interaction=True,
         )
-        for _ in range(8)
+        for _ in range(12)
     ]
     labels = [f"Config {i + 1}" for i in range(8)]
 

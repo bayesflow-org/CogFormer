@@ -182,6 +182,7 @@ def parse_args():
     # Inference
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
+    p.add_argument("--include_full", action="store_true", default=False, help="Include the 'full' benchmark case (skipped by default)")
 
     # Architecture (must match training)
     p.add_argument("--encoder_num_layers", type=int, default=8)
@@ -252,6 +253,9 @@ def main():
 
     colors = bayesgpt_mc_colors()
     all_model_configs = get_benchmark_design_configs()
+    if not args.include_full:
+        for mc in all_model_configs.values():
+            mc["benchmarks"] = {k: v for k, v in mc["benchmarks"].items() if k != "full"}
     max_num_params = model_class.max_num_params
 
     model_family_config = {
