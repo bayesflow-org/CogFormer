@@ -1,14 +1,15 @@
 """
 Amortization gap evaluation script.
 
-Computes the amortization gap between BayesFlow (baseline), BayesGPT model family,
-and BayesGPT model class for NRMSE, Calibration Error, and Posterior Contraction,
+Computes the amortization gap for NRMSE, Calibration Error, and Posterior Contraction,
 across all model families (DDM, RDM, CDM) and design configs.
 
 Gap formula:
     Gap = 100 * (Reference - Baseline) / Baseline
 
-where Baseline = BayesFlow.
+Baselines:
+    BayesGPT_Family    vs BayesFlow          (baseline = BayesFlow)
+    BayesGPT_ModelClass vs BayesGPT_Family   (baseline = BayesGPT_Family)
 
 Outputs:
     amortization_gap_detailed.csv  — per-parameter gaps
@@ -65,24 +66,32 @@ def main():
     detailed_rows = []
     summary_rows = []
 
-    scenarios = {
-        "BayesGPT_Family": fm_family_path,
-        "BayesGPT_ModelClass": fm_model_class_path,
-    }
-
     for model in MODELS:
         for case in CASES:
-            baseline_df = load_metrics(bf_path(model, case))
-            if baseline_df is None:
-                print(f"[skip] BayesFlow {model}/{case} — metrics not found")
-                continue
+            bf_df = load_metrics(bf_path(model, case))
+            fm_family_df = load_metrics(fm_family_path(model, case))
+            fm_class_df = load_metrics(fm_model_class_path(model, case))
 
-            for scenario_name, path_fn in scenarios.items():
-                ref_df = load_metrics(path_fn(model, case))
-                if ref_df is None:
-                    print(f"[skip] {scenario_name} {model}/{case} — metrics not found")
-                    continue
+            # Scenario 1: BayesGPT_Family vs BayesFlow
+            scenario_pairs = []
+            if bf_df is not None and fm_family_df is not None:
+                scenario_pairs.append(("BayesGPT_Family", fm_family_df, bf_df))
+            else:
+                if bf_df is None:
+                    print(f"[skip] BayesFlow {model}/{case} — metrics not found")
+                if fm_family_df is None:
+                    print(f"[skip] BayesGPT_Family {model}/{case} — metrics not found")
 
+            # Scenario 2: BayesGPT_ModelClass vs BayesGPT_Family
+            if fm_family_df is not None and fm_class_df is not None:
+                scenario_pairs.append(("BayesGPT_ModelClass", fm_class_df, fm_family_df))
+            else:
+                if fm_family_df is None:
+                    print(f"[skip] BayesGPT_Family {model}/{case} — needed as baseline for ModelClass")
+                if fm_class_df is None:
+                    print(f"[skip] BayesGPT_ModelClass {model}/{case} — metrics not found")
+
+            for scenario_name, ref_df, baseline_df in scenario_pairs:
                 gap_df = compute_gap(ref_df, baseline_df)
 
                 # Detailed: one row per parameter
