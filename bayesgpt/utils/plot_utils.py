@@ -80,7 +80,7 @@ def _add_mask_legend(
     labels: list,
     num_rows: int,
     num_cols: int,
-    label_fontsize: int = 8,
+    label_fontsize: int = 11,
     pad: float = 0.012,
     gap: float = 0.018,
     pixel_alphas: list[float] | None = None,
@@ -113,11 +113,10 @@ def _add_mask_legend(
     figW, figH = fig.get_size_inches()
     n = len(parameter_masks)
 
-    left_margin  = 0.05
-    right_margin = 0.05
-    avail_w_fig  = 0.4  # smaller than full width so thumbnails are compact
+    # Fixed thumbnail width: n=12 fills ~full width (0.95)
+    thumb_w_fig  = (0.95 - 11 * gap) / 12
+    avail_w_fig  = n * thumb_w_fig + (n - 1) * gap
     total_gaps   = gap * (n - 1)
-    thumb_w_fig  = (avail_w_fig - total_gaps) / n
     # Centre the thumbnail strip horizontally
     left_margin  = (1.0 - avail_w_fig) / 2
     thumb_w_in   = thumb_w_fig * figW
@@ -152,23 +151,27 @@ def _add_mask_legend(
         # Build RGBA image: active = config color, inactive = light gray
         img = np.ones((num_rows, num_cols, 4))
         img[..., :3] = 0.92   # inactive gray
-        rgba_k = np.array(mcolors.to_rgba(colors[k]))
+        dark_gray = np.array([0.25, 0.25, 0.25])
+        config_rgb = np.array(mcolors.to_rgb(colors[k]))
         if pixel_alphas is not None:
             alpha_k = pixel_alphas[k]
             if np.ndim(alpha_k) == 0:
-                # Scalar: uniform alpha for all active pixels
-                rgba_k[3] = rgba_k[3] * float(np.clip(alpha_k, 0.0, 1.0))
-                img[mask_k == 1.0] = rgba_k
+                # Scalar: uniform fade for all active pixels
+                t = float(np.clip(alpha_k, 0.0, 1.0))
+                cell_rgb = t * config_rgb + (1 - t) * dark_gray
+                img[mask_k == 1.0, :3] = cell_rgb
+                img[mask_k == 1.0,  3] = 1.0
             else:
-                # 2D array: per-cell alpha
+                # 2D array: per-cell fade
                 alpha_arr = np.clip(np.array(alpha_k), 0.0, 1.0)
                 active_rows, active_cols = np.where(mask_k == 1.0)
                 for ar, ac in zip(active_rows, active_cols):
-                    cell_rgba = rgba_k.copy()
-                    cell_rgba[3] = cell_rgba[3] * float(alpha_arr[ar, ac])
-                    img[ar, ac] = cell_rgba
+                    t = float(alpha_arr[ar, ac])
+                    img[ar, ac, :3] = t * config_rgb + (1 - t) * dark_gray
+                    img[ar, ac,  3] = 1.0
         else:
-            img[mask_k == 1.0] = rgba_k
+            img[mask_k == 1.0, :3] = config_rgb
+            img[mask_k == 1.0,  3] = 1.0
 
         x0 = left_margin + k * (thumb_w_fig + gap)
         y0 = pad + label_h_fig

@@ -33,10 +33,10 @@ def ensemble_metrics(
     main_effect_color: str = "#6969ff",
     interaction_color: str = "#ff6969",
     figsize: tuple | None = None,
-    title_fontsize: int = 18,
-    label_fontsize: int = 15,
-    tick_fontsize: int = 13,
-    annot_fontsize: int = 11,
+    title_fontsize: int = 24,
+    label_fontsize: int = 12,
+    tick_fontsize: int = 10,
+    annot_fontsize: int = 16,
     fmt: str = ".3f",
 ) -> plt.Figure:
     """
@@ -342,9 +342,6 @@ if __name__ == "__main__":
         max_num_categories=max_num_categories,
         variable_names=variable_names,
         num_null_draws=200,
-        title_fontsize=16,
-        label_fontsize=13,
-        annot_fontsize=8,
     )
     fig.savefig("test_ensemble_metrics.pdf", bbox_inches="tight")
     print("done")

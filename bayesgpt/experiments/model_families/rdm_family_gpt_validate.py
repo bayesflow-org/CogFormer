@@ -12,16 +12,12 @@ from bayesgpt.simulators.benchmarks.rdms.rdm_priors import rdm_priors
 from bayesgpt.simulators.benchmarks.rdms.rdm_link_fun import rdm_link_fun
 from bayesgpt.adapters import Adapter
 from bayesgpt.networks.transformers.gpt.bayesgpt import BayesGPT
-from bayesgpt.simulators.context_manager import ContextManager
 from bayesgpt.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from bayesgpt.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from bayesgpt.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from bayesgpt.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from bayesgpt.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from bayesgpt.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
-from bayesgpt.diagnostics.plot.ensemble_recovery import ensemble_recovery
-from bayesgpt.diagnostics.plot.ensemble_coverage import ensemble_coverage
-from bayesgpt.diagnostics.plot.ensemble_ecdf import ensemble_ecdf
 from bayesgpt.utils.plot_utils import bayesgpt_fm_colors
 
 
@@ -149,9 +145,7 @@ def parse_args():
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
     p.add_argument("--include_full", action="store_true", default=False, help="Include the 'full' benchmark case (skipped by default)")
-    p.add_argument("--num_random_configs", type=int, default=8, help="Number of random configs for the random ensemble eval (8 or 12)")
     p.add_argument("--skip_posteriors", action="store_true", default=False, help="Skip posterior pairplots")
-    p.add_argument("--skip_ensemble", action="store_true", default=False, help="Skip ensemble and random config plots")
     p.add_argument("--skip_log_gamma", action="store_true", default=True, help="Skip log gamma metric (slow, skipped by default)")
     p.add_argument("--include_log_gamma", dest="skip_log_gamma", action="store_false", help="Include log gamma metric")
 
@@ -270,13 +264,6 @@ def main():
         benchmark = {k: v for k, v in benchmark.items() if k != "full"}
 
     default_fixed_values = {"s_v": 0.0, "s_tau": 0.0}
-
-    # Accumulation for ensemble plots
-    ensemble_true_list = []
-    ensemble_pred_list = []
-    ensemble_masks = []
-    ensemble_design_configs = []
-    ensemble_labels = []
 
     for cfg_name, design_config in benchmark.items():
         print(f"Validating case {cfg_name}")
@@ -478,124 +465,6 @@ def main():
                 posterior_path = outdir / f"rdm_family_{cfg_name}_fm_mixed_posterior_{i}.pdf"
                 posterior.savefig(posterior_path, bbox_inches="tight")
                 plt.close(posterior.fig)
-
-        # Accumulate for ensemble
-        ensemble_true_list.append(true_set)
-        ensemble_pred_list.append(pred_set)
-        ensemble_masks.append(params_mask)
-        ensemble_design_configs.append(design_config)
-        ensemble_labels.append(cfg_name)
-
-    if not args.skip_ensemble:
-        # ── Ensemble plots ─────────────────────────────────────────────────────────
-        n_cols = len(intrinsic_params)
-        ensemble_outdir = Path(args.outdir) / "ensemble"
-        ensemble_outdir.mkdir(parents=True, exist_ok=True)
-
-        for plot_fn, plot_name in [
-            (ensemble_recovery, "recovery"),
-            (ensemble_coverage, "coverage"),
-            (ensemble_ecdf, "ecdf"),
-        ]:
-            fig = plot_fn(
-                true_list=ensemble_true_list,
-                pred_list=ensemble_pred_list,
-                design_configs=ensemble_design_configs,
-                intrinsic_params=intrinsic_params,
-                max_num_categories=model_family_config["max_num_categories"],
-                parameter_masks=ensemble_masks,
-                variable_names=variable_names,
-                labels=ensemble_labels,
-            )
-            fig_path = ensemble_outdir / f"rdm_ensemble_benchmark_{plot_name}.pdf"
-            fig.savefig(fig_path, bbox_inches="tight")
-            plt.close(fig)
-            logging.info(f"[saved] {fig_path}")
-
-        # ── Random configs ──────────────────────────────────────────────────────────
-        cm = ContextManager()
-        random_design_configs = [
-            cm.build_random_design_config(
-                intrinsic_params=intrinsic_params,
-                num_regressors=args.max_num_regressors,
-                free_intrinsics=["v", "v_diff", "a", "tau"],
-                fixed_intrinsics=["s_v", "s_tau"],
-                keep_intercept=args.keep_intercept,
-                add_interaction=args.add_interaction,
-            )
-            for _ in range(args.num_random_configs)
-        ]
-        random_labels = [f"Random {i + 1}" for i in range(args.num_random_configs)]
-        random_true_list = []
-        random_pred_list = []
-        random_masks = []
-
-        for rand_dc in random_design_configs:
-            free_intr_r, fixed_intr_r, fixed_vals_r = infer_free_fixed_intrinsics(
-                design_config=rand_dc,
-                all_intrinsics=intrinsic_params,
-                default_fixed_values=default_fixed_values,
-            )
-            rand_samples = model_family.batch_sample(
-                **model_family_config,
-                mask_randomizer_kwargs={
-                    "free_intrinsics": free_intr_r,
-                    "fixed_intrinsics": fixed_intr_r,
-                    "fixed_values": fixed_vals_r,
-                },
-                min_num_regressors=0,
-                fixed_config=True,
-                batch_size=args.batch_size,
-                flatten_param_outputs=True,
-                design_config=rand_dc,
-                link_fun=rdm_link_fun(),
-            )
-            rand_adapted = adapter.adapt(rand_samples, intrinsic_params=model_family.intrinsic_params)
-            for k, v in rand_adapted.items():
-                if torch.is_tensor(v):
-                    rand_adapted[k] = v.to(device)
-
-            rand_true = rand_adapted["param_matrices"].detach().cpu().numpy()
-            n_rows_r = rand_true.shape[1] // n_cols
-            rand_true = rand_true.reshape(args.batch_size, n_rows_r, n_cols)
-
-            rand_pred = bayesgpt.sample(
-                rand_adapted["input_data"],
-                rand_adapted["param_indices"],
-                rand_adapted["regressor_indices"],
-                rand_adapted["param_masks"],
-                steps=args.num_sample_steps,
-                num_samples=args.num_samples,
-            )
-            rand_pred = rand_pred.reshape(args.batch_size, args.num_samples, n_rows_r, n_cols)
-
-            rand_mask = rand_adapted["param_masks"].detach().cpu().numpy()
-            rand_mask = rand_mask.reshape((args.batch_size, n_rows_r, n_cols))[0]
-
-            random_true_list.append(rand_true)
-            random_pred_list.append(rand_pred)
-            random_masks.append(rand_mask)
-
-        for plot_fn, plot_name in [
-            (ensemble_recovery, "recovery"),
-            (ensemble_coverage, "coverage"),
-            (ensemble_ecdf, "ecdf"),
-        ]:
-            fig = plot_fn(
-                true_list=random_true_list,
-                pred_list=random_pred_list,
-                design_configs=random_design_configs,
-                intrinsic_params=intrinsic_params,
-                max_num_categories=model_family_config["max_num_categories"],
-                parameter_masks=random_masks,
-                variable_names=variable_names,
-                labels=random_labels,
-                n_colors=args.num_random_configs,
-            )
-            fig_path = ensemble_outdir / f"rdm_ensemble_random_{plot_name}.pdf"
-            fig.savefig(fig_path, bbox_inches="tight")
-            plt.close(fig)
-            logging.info(f"[saved] {fig_path}")
 
     logging.info("Done.")
 

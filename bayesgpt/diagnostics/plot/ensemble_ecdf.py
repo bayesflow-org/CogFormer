@@ -19,17 +19,17 @@ def ensemble_ecdf(
     variable_names: list[str] = None,
     colors: list[str] = None,
     n_colors: int = None,
-    palette_lightness: float = 0.82,
+    palette_lightness: float = 0.77,
     palette_start_hue: float = 0.05,
     labels: list[str] = None,
     figsize: tuple = None,
-    title_fontsize: int = 20,
-    label_fontsize: int = 14,
-    tick_fontsize: int = 11,
-    legend_fontsize: int = 10,
+    title_fontsize: int = 24,
+    label_fontsize: int = 12,
+    tick_fontsize: int = 10,
+    legend_fontsize: int = 13,
     prob: float = 0.95,
     difference: bool = True,
-    band_alpha: float = 0.035,
+    band_alpha: float = 0.07,
 ) -> plt.Figure:
     """
     Overlay ECDF calibration plots for multiple design configs on a shared
@@ -182,9 +182,9 @@ def ensemble_ecdf(
                 ecdf_y = np.arange(1, num_datasets + 1) / num_datasets
 
                 if difference:
-                    ax.plot(ranks_sorted, ecdf_y - ranks_sorted, color=colors[k], alpha=0.7)
+                    ax.plot(ranks_sorted, ecdf_y - ranks_sorted, color=colors[k], alpha=1.0)
                 else:
-                    ax.plot(ranks_sorted, ecdf_y, color=colors[k], alpha=0.7)
+                    ax.plot(ranks_sorted, ecdf_y, color=colors[k], alpha=1.0)
 
             ax.set_xlim(-0.02, 1.02)
             ax.set_xticks([0.0, 0.25, 0.5, 0.75, 1.0])
@@ -241,8 +241,8 @@ def ensemble_ecdf(
 
 
 if __name__ == "__main__":
-    intrinsic_params = ["v", "a", "z", "tau"]
-    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
+    intrinsic_params = ["v", "a", "z", "tau", "p1", "p2", "p3", "p4"]
+    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$p_1$", r"$p_2$", r"$p_3$", r"$p_4$"]
     max_num_categories = 2
     batch_size = 200
     draws = 256
@@ -257,7 +257,7 @@ if __name__ == "__main__":
         )
         for _ in range(12)
     ]
-    labels = [f"Config {i + 1}" for i in range(8)]
+    labels = [f"Config {i + 1}" for i in range(12)]
 
     def make_data(dc, batch, draws, max_cats, miscalibrated=False):
         mask = cm.build_parameter_mask(
@@ -290,8 +290,6 @@ if __name__ == "__main__":
         max_num_categories=max_num_categories,
         variable_names=variable_names,
         labels=labels,
-        title_fontsize=18,
-        label_fontsize=14,
     )
     fig.savefig("test_ensemble_ecdf.pdf")
     print("done")

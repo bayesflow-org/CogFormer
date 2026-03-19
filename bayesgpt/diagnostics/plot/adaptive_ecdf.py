@@ -171,7 +171,7 @@ def adaptive_ecdf(
                     fontsize=18, weight="bold",
                     alpha=0.7, color=tint,
                 )
-                ax.set_xlabel("Rank" if r == num_rows - 1 else "", fontsize=label_fontsize)
+                ax.set_xlabel("Fractional rank statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
                 continue
 
             # Compute fractional ranks: for each dataset, fraction of draws < true value
@@ -186,7 +186,7 @@ def adaptive_ecdf(
                     band_x,
                     band_lower - band_x,
                     band_upper - band_x,
-                    color="grey", alpha=0.2,
+                    color="grey", alpha=0.07,
                     label=f"{int(prob * 100)}% Confidence Band",
                 )
                 ax.axhline(0.0, color="black", linestyle="dashed", label="Ideal (Uniform)")
@@ -196,7 +196,7 @@ def adaptive_ecdf(
                     band_x,
                     band_lower,
                     band_upper,
-                    color="grey", alpha=0.2,
+                    color="grey", alpha=0.07,
                     label=f"{int(prob * 100)}% Confidence Band",
                 )
                 ax.plot([0, 1], [0, 1], color="black", linestyle="dashed", label="Ideal (Uniform)")
@@ -204,7 +204,7 @@ def adaptive_ecdf(
 
             ax.set_xlim(-0.02, 1.02)
             ax.set_ylabel(ylabel if c == 0 else "", fontsize=label_fontsize)
-            ax.set_xlabel("Fractional Rank Statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
+            ax.set_xlabel("Fractional rank statistic" if r == num_rows - 1 else "", fontsize=label_fontsize)
 
             if variable_names is not None and r == 0:
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
@@ -286,8 +286,6 @@ if __name__ == "__main__":
         interaction_color=color["interaction"],
         prob=0.95,
         difference=True,
-        title_fontsize=18,
-        label_fontsize=14,
     )
 
     fig.savefig("test_adaptive_ecdf.pdf")

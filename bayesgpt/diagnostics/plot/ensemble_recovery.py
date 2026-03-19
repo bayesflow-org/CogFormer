@@ -18,13 +18,13 @@ def ensemble_recovery(
     variable_names: list[str] = None,
     colors: list[str] = None,
     n_colors: int = None,
-    palette_lightness: float = 0.82,
+    palette_lightness: float = 0.77,
     palette_start_hue: float = 0.05,
     labels: list[str] = None,
     uncertainty_agg: Callable = credible_interval,
-    title_fontsize: int = 20,
-    label_fontsize: int = 14,
-    legend_fontsize: int = 10,
+    title_fontsize: int = 24,
+    label_fontsize: int = 12,
+    legend_fontsize: int = 13,
     alpha: float = 0.5,
     figsize: tuple = None
 ):
@@ -201,7 +201,7 @@ def ensemble_recovery(
             # Per-config correlations — used for annotation and mask legend pixel alphas
             corrs = [np.corrcoef(e[1], e[2])[0, 1] for e in active_entries]
             mean_corr = float(np.mean(corrs))
-            cell_alpha = alpha / len(active_entries)
+            cell_alpha = 1.0 if n_configs <= 2 else 2.0 / n_configs
 
             for idx, (cfg_k, x_k, y_mean_k, y_err_k, color_k, label_k) in enumerate(active_entries):
                 r_maps[cfg_k][r, c] = corrs[idx]
@@ -235,8 +235,8 @@ def ensemble_recovery(
 
 
 if __name__ == "__main__":
-    intrinsic_params = ["v", "a", "z", "tau"]
-    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
+    intrinsic_params = ["v", "a", "z", "tau", "p1", "p2", "p3", "p4"]
+    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$p_1$", r"$p_2$", r"$p_3$", r"$p_4$"]
     max_num_categories = 2
     batch_size = 20
     draws = 50
@@ -249,9 +249,9 @@ if __name__ == "__main__":
             keep_intercept=True,
             add_interaction=True,
         )
-        for _ in range(8)
+        for _ in range(12)
     ]
-    labels = [f"Config {i + 1}" for i in range(8)]
+    labels = [f"Config {i + 1}" for i in range(12)]
 
     def make_data(dc, batch, draws, max_cats, poor_recovery=False):
         context_manager = ContextManager()
@@ -272,7 +272,7 @@ if __name__ == "__main__":
         return true, pred
 
     data = [
-        make_data(dc, batch_size, draws, max_num_categories, poor_recovery=(i >= 4))
+        make_data(dc, batch_size, draws, max_num_categories, poor_recovery=(i >= 6))
         for i, dc in enumerate(design_configs)
     ]
     true_list, pred_list = zip(*data)
@@ -285,8 +285,6 @@ if __name__ == "__main__":
         max_num_categories=max_num_categories,
         variable_names=variable_names,
         labels=labels,
-        title_fontsize=18,
-        label_fontsize=14,
     )
     fig.savefig("test_ensemble_recovery.pdf")
     print("done")

@@ -17,14 +17,14 @@ def ensemble_coverage(
     variable_names: list[str] = None,
     colors: list[str] = None,
     n_colors: int = None,
-    palette_lightness: float = 0.82,
+    palette_lightness: float = 0.77,
     palette_start_hue: float = 0.05,
     labels: list[str] = None,
     figsize: tuple = None,
-    title_fontsize: int = 20,
-    label_fontsize: int = 14,
-    tick_fontsize: int = 11,
-    legend_fontsize: int = 10,
+    title_fontsize: int = 24,
+    label_fontsize: int = 12,
+    tick_fontsize: int = 10,
+    legend_fontsize: int = 13,
     prob: float = 0.95,
     interval_type: str = "central",
     difference: bool = True,
@@ -215,8 +215,8 @@ def ensemble_coverage(
 if __name__ == "__main__":
     from bayesgpt.simulators.context_manager import ContextManager
 
-    intrinsic_params = ["v", "a", "z", "tau"]
-    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$"]
+    intrinsic_params = ["v", "a", "z", "tau", "p1", "p2", "p3", "p4"]
+    variable_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$p_1$", r"$p_2$", r"$p_3$", r"$p_4$"]
     max_num_categories = 2
     batch_size = 200
     draws = 256
@@ -229,9 +229,9 @@ if __name__ == "__main__":
             keep_intercept=True,
             add_interaction=True,
         )
-        for _ in range(8)
+        for _ in range(12)
     ]
-    labels = [f"Config {i + 1}" for i in range(8)]
+    labels = [f"Config {i + 1}" for i in range(12)]
 
     def make_data(dc, batch, draws, max_cats):
         cm = ContextManager()
@@ -257,8 +257,6 @@ if __name__ == "__main__":
         max_num_categories=max_num_categories,
         variable_names=variable_names,
         labels=labels,
-        title_fontsize=18,
-        label_fontsize=14,
     )
     fig.savefig("test_ensemble_coverage.pdf")
     print("done")
