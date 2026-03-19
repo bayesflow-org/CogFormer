@@ -67,6 +67,7 @@ def parse_args():
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--free_prob", type=float, default=0.5)
     p.add_argument("--metrics", action="store_true", default=False)
     # Architecture (must match checkpoint)
     p.add_argument("--encoder_num_layers", type=int, default=8)
@@ -163,6 +164,7 @@ def main():
             fixed_intrinsics=list(default_fixed.keys()),
             keep_intercept=args.keep_intercept,
             add_interaction=args.add_interaction,
+            free_prob=args.free_prob,
         )
 
         free_intr, fixed_intr, fixed_vals = infer_free_fixed_intrinsics(
