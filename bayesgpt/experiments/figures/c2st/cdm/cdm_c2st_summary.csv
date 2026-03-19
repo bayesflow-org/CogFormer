@@ -1,11 +1,11 @@
 model,case,scenario,mean_accuracy,joint_c2st
 CDM,intercept_only,Family_vs_BF,0.50390625,0.51555
-CDM,intercept_only,Class_vs_Family,0.5078583333333334,0.5359625
+CDM,intercept_only,Class_vs_Family,0.5063874999999999,0.5327
 CDM,regressed,Family_vs_BF,0.5112362500000002,0.7634
-CDM,regressed,Class_vs_Family,0.53329125,0.9716124999999998
+CDM,regressed,Class_vs_Family,0.50893875,0.6816
 CDM,fixed,Family_vs_BF,0.5026656250000001,0.51125
-CDM,fixed,Class_vs_Family,0.5115937500000001,0.545975
+CDM,fixed,Class_vs_Family,0.512665625,0.5485875
 CDM,fixed_regressed,Family_vs_BF,0.50876875,0.7015125
-CDM,fixed_regressed,Class_vs_Family,0.53058125,0.9674375
+CDM,fixed_regressed,Class_vs_Family,0.5086078125,0.6640499999999999
 CDM,interaction,Family_vs_BF,0.5151111111111111,0.8506124999999999
-CDM,interaction,Class_vs_Family,0.5180465277777778,0.9381250000000001
+CDM,interaction,Class_vs_Family,0.50995625,0.7460875

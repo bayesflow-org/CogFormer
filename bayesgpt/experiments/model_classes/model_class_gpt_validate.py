@@ -33,10 +33,11 @@ def load_bf_validation_data(
     batch_size: int,
     max_dm_cols: int | None = None,
 ) -> dict:
-    """Load BF-generated validation data and reconstruct full local param space.
+    """Load BF-generated validation data into full (batch, n_rows * n_local) param space.
 
-    BF data stores only active params in flat format. This function reconstructs
-    (batch, n_rows * n_local) matrices expected by lift_to_global_space.
+    BF stores params in two formats depending on the case:
+      - Intercept-only cases: (batch, n_local) — only intercept row params
+      - Cases with regression rows: (batch, n_rows * n_local) — full grid already
 
     max_dm_cols: if provided, zero-pads design matrices to this width (needed for
     model class encoder which expects fixed-width input across all cases).
@@ -54,19 +55,18 @@ def load_bf_validation_data(
 
     n_local = len(intrinsic_params)
     n_rows = len(design_config)
-    param_col = {p: j for j, p in enumerate(intrinsic_params)}
+    full_size = n_rows * n_local
 
-    pm_full = np.zeros((batch_size, n_rows * n_local), dtype=flat_params.dtype)
-    pmask_full = np.zeros((batch_size, n_rows * n_local), dtype=flat_masks.dtype)
-
-    flat_pos = 0
-    for row_i, active_params in enumerate(design_config.values()):
-        ordered = [p for p in intrinsic_params if p in active_params]
-        for p in ordered:
-            col_idx = param_col[p]
-            pm_full[:, row_i * n_local + col_idx] = flat_params[:, flat_pos]
-            pmask_full[:, row_i * n_local + col_idx] = flat_masks[:, flat_pos]
-            flat_pos += 1
+    if flat_params.shape[1] == full_size:
+        # BF stored as full (n_rows * n_local) grid — use directly
+        pm_full = flat_params.copy()
+        pmask_full = flat_masks.copy()
+    else:
+        # BF stored only intercept-row params — pad remaining rows with zeros
+        pm_full = np.zeros((batch_size, full_size), dtype=flat_params.dtype)
+        pmask_full = np.zeros((batch_size, full_size), dtype=flat_masks.dtype)
+        pm_full[:, :flat_params.shape[1]] = flat_params
+        pmask_full[:, :flat_masks.shape[1]] = flat_masks
 
     return {
         "sim_data": {"rts": rts, "choices": choices},
