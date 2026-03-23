@@ -24,7 +24,8 @@ def ensemble_coverage(
     title_fontsize: int = 24,
     label_fontsize: int = 12,
     tick_fontsize: int = 10,
-    legend_fontsize: int = 13,
+    legend_fontsize: int = 17,
+    thumb_scale: float = 1.0,
     prob: float = 0.95,
     interval_type: str = "central",
     difference: bool = True,
@@ -208,7 +209,7 @@ def ensemble_coverage(
                 ax.set_title(variable_names[c], fontsize=title_fontsize)
 
     _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=legend_fontsize)
+                     label_fontsize=legend_fontsize, thumb_scale=thumb_scale)
     return fig
 
 

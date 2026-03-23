@@ -74,6 +74,7 @@ def parse_args():
     p.add_argument("--num_sample_steps", type=int, default=200)
     p.add_argument("--num_samples", type=int, default=200)
     p.add_argument("--num_random_configs", type=int, default=8)
+    p.add_argument("--benchmark_only", action="store_true", default=False)
     # Architecture (must match checkpoint)
     p.add_argument("--encoder_num_layers", type=int, default=8)
     p.add_argument("--decoder_num_layers", type=int, default=8)
@@ -146,11 +147,11 @@ def main():
     benchmark = get_benchmark_design_configs()
 
     case_labels = {
-        "intercept_only": "Intercept Only",
+        "intercept_only": "Intercept",
         "regressed":       "Regressed",
-        "fixed":           "Fixed Variability",
-        "fixed_regressed": "Fixed + Regressed",
-        "interaction":     "With Interaction",
+        "fixed":           "Fixed",
+        "fixed_regressed": "Fixed Reg.",
+        "interaction":     "Interaction",
     }
 
     # ── Benchmark ensemble (5 standard cases) ─────────────────────────────────
@@ -206,11 +207,16 @@ def main():
             design_configs=design_configs, intrinsic_params=intrinsic_params,
             max_num_categories=args.max_num_categories,
             parameter_masks=masks, variable_names=variable_names, labels=labels,
+            thumb_scale=2.0,
         )
         fig_path = outdir / f"ddm_ensemble_benchmark_{plot_name}.pdf"
         fig.savefig(fig_path, bbox_inches="tight")
         plt.close(fig)
         logging.info(f"[saved] {fig_path}")
+
+    if args.benchmark_only:
+        logging.info("Done.")
+        return
 
     # ── Random configs ensemble ────────────────────────────────────────────────
     random_design_configs = [

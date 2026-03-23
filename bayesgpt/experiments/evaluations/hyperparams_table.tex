@@ -1,0 +1,28 @@
+\begin{table}[ht]
+\centering
+\small
+\caption{BayesGPT hyperparameters for the family-level models (DDM, RDM, CDM) and the model-class model. QKV dim per head = projection dim $\div$ heads.}
+\label{tab:hyperparams}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Family} & \textbf{Model Class} \\
+\midrule
+\addlinespace[2pt]
+\textbf{Layers} & & \\
+\quad Encoder layers & 8 & 8 \\
+\quad Decoder layers & 8 & 8 \\
+\addlinespace[2pt]
+\textbf{Attention} & & \\
+\quad Heads (encoder \& decoder) & 8 & 8 \\
+\quad Projection dim $d_{\text{model}}$ & 256 & 256 \\
+\quad QKV dim per head & 32 & 32 \\
+\addlinespace[2pt]
+\textbf{Embeddings} & & \\
+\quad Time embedding dim & 32 & 32 \\
+\quad Positional embedding dim & 32 & 32 \\
+\quad Seed tokens & 32 & 32 \\
+\quad Seed dim & 64 & 128 \\
+\quad Model embedding dim & $-$ & 8 \\
+\bottomrule
+\end{tabular}
+\end{table}

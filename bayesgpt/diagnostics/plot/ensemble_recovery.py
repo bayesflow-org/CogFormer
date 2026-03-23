@@ -24,7 +24,8 @@ def ensemble_recovery(
     uncertainty_agg: Callable = credible_interval,
     title_fontsize: int = 24,
     label_fontsize: int = 12,
-    legend_fontsize: int = 13,
+    legend_fontsize: int = 17,
+    thumb_scale: float = 1.0,
     alpha: float = 0.5,
     figsize: tuple = None
 ):
@@ -230,7 +231,8 @@ def ensemble_recovery(
 
     pixel_alpha_maps = [np.clip(np.abs(r_maps[k]), 0.2, 1.0) for k in range(n_configs)]
     _add_mask_legend(fig, parameter_masks, colors, labels, num_rows, num_cols,
-                     label_fontsize=legend_fontsize, pixel_alphas=pixel_alpha_maps)
+                     label_fontsize=legend_fontsize, pixel_alphas=pixel_alpha_maps,
+                     thumb_scale=thumb_scale)
     return fig
 
 
