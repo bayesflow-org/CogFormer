@@ -1,4 +1,4 @@
-# BayesGPT
+# CogFormer
 Generalized framework for multi-model amortized Bayesian inference
 
 ## Install

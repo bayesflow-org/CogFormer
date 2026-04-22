@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from bayesgpt.simulators import NestedModelFamily
-from bayesgpt.simulators.benchmarks import DDM
+from cogformer.simulators import NestedModelFamily
+from cogformer.simulators.benchmarks import DDM
 
 @pytest.fixture(scope="module")
 def test_standard_ddm():

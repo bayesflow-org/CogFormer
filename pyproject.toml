@@ -1,5 +1,5 @@
 [project]
-name = "bayesgpt"
+name = "cogformer"
 version = "0.1.0"
 description = "Generalized framework for multi-model amortized Bayesian inference"
 authors = [
