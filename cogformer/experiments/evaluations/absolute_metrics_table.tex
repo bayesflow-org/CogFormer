@@ -1,0 +1,23 @@
+\begin{table}[ht]
+\centering
+\small
+\caption{Absolute metric values (mean $\pm$ SEM) averaged across design configurations and parameters, providing context for the amortization gap percentages.}
+\label{tab:absolute-metrics}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Model} & \textbf{Method} & NRMSE & Cal.\ Error & Post.\ Contr. \\
+\midrule
+\textbf{DDM} & \textsc{BayesFlow} & $0.078 \pm 0.007$ & $0.022 \pm 0.002$ & $0.902 \pm 0.023$ \\
+ & \textsc{BayesGPT}\textsubscript{Family} & $0.087 \pm 0.007$ & $0.021 \pm 0.002$ & $0.881 \pm 0.025$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} & $0.091 \pm 0.007$ & $0.029 \pm 0.003$ & $0.862 \pm 0.026$ \\
+\midrule
+\textbf{RDM} & \textsc{BayesFlow} & $0.112 \pm 0.008$ & $0.061 \pm 0.010$ & $0.803 \pm 0.032$ \\
+ & \textsc{BayesGPT}\textsubscript{Family} & $0.112 \pm 0.009$ & $0.026 \pm 0.004$ & $0.786 \pm 0.033$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} & $0.117 \pm 0.009$ & $0.029 \pm 0.003$ & $0.750 \pm 0.036$ \\
+\midrule
+\textbf{CDM} & \textsc{BayesFlow} & $0.075 \pm 0.008$ & $0.020 \pm 0.001$ & $0.896 \pm 0.030$ \\
+ & \textsc{BayesGPT}\textsubscript{Family} & $0.083 \pm 0.008$ & $0.024 \pm 0.002$ & $0.874 \pm 0.032$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} & $0.087 \pm 0.008$ & $0.028 \pm 0.002$ & $0.859 \pm 0.032$ \\
+\bottomrule
+\end{tabular}
+\end{table}

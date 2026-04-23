@@ -182,9 +182,14 @@ wandb-summary.json
 bayesgpt/wandb
 /wandb
 
-# Checkpoints
+# Checkpoints and model weights
 *.ckpt
-#model.keras
+*.pt
+*.keras
+
+# Data files
+*.npz
+*.npy
 
 # config.yaml
 config.yaml

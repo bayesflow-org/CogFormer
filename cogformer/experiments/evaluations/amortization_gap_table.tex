@@ -1,0 +1,21 @@
+\begin{table}[ht]
+\centering
+\small
+\caption{Amortization gaps (\%) averaged across design configurations and parameters.
+Values are mean $\pm$ SEM. Negative values indicate improvement over baseline.}
+\label{tab:amortization-gap}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Model} & \textbf{Comparison} & NRMSE & Cal.\ Error & Post.\ Contr. \\
+\midrule
+\textbf{DDM} & \textsc{BayesGPT}\textsubscript{Family} vs.\ \textsc{BayesFlow} & $+12.9 \pm 1.7$ & $+11.5 \pm 10.0$ & $-3.0 \pm 0.9$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} vs.\ \textsc{BayesGPT}\textsubscript{Family} & $+7.1 \pm 0.6$ & $+77.0 \pm 16.8$ & $-2.5 \pm 0.3$ \\
+\midrule
+\textbf{RDM} & \textsc{BayesGPT}\textsubscript{Family} vs.\ \textsc{BayesFlow} & $-0.7 \pm 2.4$ & $+4.7 \pm 17.7$ & $-2.6 \pm 1.0$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} vs.\ \textsc{BayesGPT}\textsubscript{Family} & $+6.3 \pm 0.6$ & $+51.3 \pm 16.3$ & $-6.8 \pm 1.5$ \\
+\midrule
+\textbf{CDM} & \textsc{BayesGPT}\textsubscript{Family} vs.\ \textsc{BayesFlow} & $+14.6 \pm 2.1$ & $+35.8 \pm 12.8$ & $-3.6 \pm 1.0$ \\
+ & \textsc{BayesGPT}\textsubscript{Class} vs.\ \textsc{BayesGPT}\textsubscript{Family} & $+5.2 \pm 0.8$ & $+78.8 \pm 24.7$ & $-2.4 \pm 1.1$ \\
+\bottomrule
+\end{tabular}
+\end{table}
