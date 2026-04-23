@@ -28,10 +28,10 @@ from cogformer.utils.plot_utils import cogformer_fm_colors
 
 
 SIZE_CONFIGS = {
-    "s":  {"num_layers": 4,  "num_heads": 4,  "proj_dim": 64,  "num_seeds": 8,  "seed_dim": 16, "embed_dim": 8},
-    "m":  {"num_layers": 6,  "num_heads": 6,  "proj_dim": 128, "num_seeds": 16, "seed_dim": 32, "embed_dim": 16},
-    "l":  {"num_layers": 8,  "num_heads": 8,  "proj_dim": 256, "num_seeds": 32, "seed_dim": 64, "embed_dim": 32},
-    "xl": {"num_layers": 10, "num_heads": 10, "proj_dim": 512, "num_seeds": 64, "seed_dim": 128, "embed_dim": 64},
+    "s":  {"num_layers": 2,  "num_heads": 2,  "proj_dim": 32,  "num_seeds": 4,  "seed_dim": 8,   "embed_dim": 4},
+    "m":  {"num_layers": 4,  "num_heads": 4,  "proj_dim": 64,  "num_seeds": 8,  "seed_dim": 16,  "embed_dim": 8},
+    "l":  {"num_layers": 8,  "num_heads": 8,  "proj_dim": 256, "num_seeds": 32, "seed_dim": 64,  "embed_dim": 32},
+    "xl": {"num_layers": 16, "num_heads": 16, "proj_dim": 512, "num_seeds": 64, "seed_dim": 128, "embed_dim": 64},
 }
 
 INTERACTION_DESIGN_CONFIG = {

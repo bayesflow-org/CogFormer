@@ -1,0 +1,14 @@
+\begin{table}[t]
+\centering
+\caption{Mean posterior approximation metrics across all parameters and conditions for each CogFormer size variant. NRMSE and Calibration Error: lower is better ($\downarrow$). Posterior Contraction: higher is better ($\uparrow$). Best result per column is \textbf{bolded}.}
+\label{tab:size_comparison}
+\begin{tabular}{lccc}
+\toprule
+ & S (2L, 2H) & M (4L, 4H) & L (8L, 8H) \\
+\midrule
+NRMSE $\downarrow$        & 0.1794 & 0.1700 & \textbf{0.1240} \\
+Cal.\ Error $\downarrow$  & 0.0244 & 0.0320 & \textbf{0.0223} \\
+Post.\ Contr.\ $\uparrow$ & 0.4719 & 0.5662 & \textbf{0.7466} \\
+\bottomrule
+\end{tabular}
+\end{table}
