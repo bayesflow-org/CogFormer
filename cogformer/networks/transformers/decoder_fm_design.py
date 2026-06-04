@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 
 from .attention_layers import (
+    cross_attention_layers,
     self_attention_layers,
     mixed_attention_layers,
-    custom_attention_layers
+    custom_attention_layers,
 )
 from .self_attention_block import SelfAttentionBlock
 from cogformer.utils.tensor_utils import broadcast_right
@@ -28,64 +29,76 @@ class Decoder(nn.Module):
             time_embedding_dim: int = 32,
             pos_embedding_dim: int = 32,
             model_embedding_dim: int = 0,
+            use_film: bool = True,
+            time_embedding_type: str = "fourier",
     ):
         super().__init__()
         assert num_layers >= 1, "num_layers must be >= 1"
+        assert time_embedding_type in ("fourier", "sinusoidal")
 
         if layer_kwargs is None:
             layer_kwargs = {}
 
-        self.time_embedding = FourierEmbedding(time_embedding_dim)
+        self.use_film = use_film
+
+        if time_embedding_type == "fourier":
+            self.time_embedding = FourierEmbedding(time_embedding_dim)
+        else:
+            self.time_embedding = SinusoidalEmbedding(time_embedding_dim)
+
         self.pos_embedding = SinusoidalEmbedding(pos_embedding_dim)
 
         # input: theta_t (1) + param_embedding (pos_embedding_dim) + reg_embedding (pos_embedding_dim)
         #        + t_embedding (time_embedding_dim) [+ model_embedding (model_embed_dim)]
         self.input_proj = nn.Linear(1 + 2 * pos_embedding_dim + time_embedding_dim + model_embedding_dim, proj_dim)
 
-        if layer_design is not None:
-            match layer_design:
-                case "self_attention":
-                    self.layers = self_attention_layers(
-                        query_dim=proj_dim,
-                        key_dim=seed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        layer_norm=layer_norm,
-                        dropout=dropout,
-                        **layer_kwargs
-                    )
-                case "mixed_attention":
-                    self.layers = mixed_attention_layers(
-                        query_dim=proj_dim,
-                        key_dim=seed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        layer_norm=layer_norm,
-                        dropout=dropout,
-                        **layer_kwargs
-                    )
-                case "custom_attention":
-                    self.layers = custom_attention_layers(
-                        query_dim=proj_dim,
-                        key_dim=seed_dim,
-                        num_heads=num_heads,
-                        num_layers=num_layers,
-                        layer_norm=layer_norm,
-                        dropout=dropout,
-                        **layer_kwargs
-                    )
-        else:
-            self.layers = mixed_attention_layers(
-                query_dim=proj_dim,
-                key_dim=seed_dim,
-                num_heads=num_heads,
-                num_layers=num_layers,
-                layer_norm=layer_norm,
-                dropout=dropout,
-                **layer_kwargs
-            )
+        match layer_design:
+            case "cross_attention":
+                self.layers = cross_attention_layers(
+                    query_dim=proj_dim,
+                    key_dim=seed_dim,
+                    num_heads=num_heads,
+                    num_layers=num_layers,
+                    layer_norm=layer_norm,
+                    dropout=dropout,
+                    **layer_kwargs
+                )
+            case "self_attention":
+                self.layers = self_attention_layers(
+                    query_dim=proj_dim,
+                    key_dim=seed_dim,
+                    num_heads=num_heads,
+                    num_layers=num_layers,
+                    layer_norm=layer_norm,
+                    dropout=dropout,
+                    **layer_kwargs
+                )
+            case "custom_attention":
+                self.layers = custom_attention_layers(
+                    query_dim=proj_dim,
+                    key_dim=seed_dim,
+                    num_heads=num_heads,
+                    num_layers=num_layers,
+                    layer_norm=layer_norm,
+                    dropout=dropout,
+                    **layer_kwargs
+                )
+            case _:
+                self.layers = mixed_attention_layers(
+                    query_dim=proj_dim,
+                    key_dim=seed_dim,
+                    num_heads=num_heads,
+                    num_layers=num_layers,
+                    layer_norm=layer_norm,
+                    dropout=dropout,
+                    **layer_kwargs
+                )
 
-        self.output_proj = TimeMLP(input_dim=proj_dim, time_embedding_dim=time_embedding_dim)
+        if use_film:
+            self.output_proj = TimeMLP(input_dim=proj_dim, time_embedding_dim=time_embedding_dim)
+        else:
+            self.output_proj = nn.Linear(proj_dim, 1)
+
         self.num_heads = num_heads
 
     def velocity(self, theta_t, query, key, t, query_mask=None, model_embedding=None):
@@ -114,7 +127,9 @@ class Decoder(nn.Module):
             if query_mask is not None:
                 out = out * query_mask[..., None]
 
-        return self.output_proj(out, time_embedding)
+        if self.use_film:
+            return self.output_proj(out, time_embedding)
+        return self.output_proj(out)
 
     def forward(self, theta, query, key, query_mask=None, model_embedding=None):
         """Returns predicted and target velocity (potentially masked)."""

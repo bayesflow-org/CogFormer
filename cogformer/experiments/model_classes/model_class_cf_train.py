@@ -239,6 +239,8 @@ class CogFormerTrainer:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--no_model_embedding", action="store_true",
+                        help="Ablation: train without model identity embedding")
 
     # Architecture
     parser.add_argument("--encoder_num_layers", type=int, default=8)
@@ -282,7 +284,7 @@ if __name__ == "__main__":
     max_num_regressors = 2
     max_num_categories = 2
     keep_intercept = True
-    num_models = 3
+    num_models = None if args.no_model_embedding else 3
 
     model_family_config = {
         "max_num_regressors": max_num_regressors,
@@ -381,14 +383,22 @@ if __name__ == "__main__":
     cogformer = CogFormer(**cogformer_config).to(device).train()
 
     if args.use_wandb:
+        run_name = "cogformer-model-class-no-embed" if args.no_model_embedding else "cogformer-model-class"
+        tags = ["CogFormer", "ModelClass", "DDM", "RDM", "CDM"]
+        if args.no_model_embedding:
+            tags.append("NoModelEmbedding")
         wandb.init(
             project="cogformer-model-class",
-            tags=["CogFormer", "ModelClass", "DDM", "RDM", "CDM"],
+            name=run_name,
+            tags=tags,
             config={**train_config, "cogformer": cogformer_config},
         )
 
+    embed_tag = "_no_embed" if args.no_model_embedding else ""
+
     checkpoint_path = (
         f"cogformer_model_class_fm"
+        f"{embed_tag}"
         f"_l{cogformer_config['decoder_num_layers']}"
         f"_h{cogformer_config['decoder_num_heads']}"
         f"_p{cogformer_config['proj_dim']}"
@@ -401,6 +411,7 @@ if __name__ == "__main__":
 
     fig_path = (
         f"model_class_fm"
+        f"{embed_tag}"
         f"_l{cogformer_config['decoder_num_layers']}"
         f"_h{cogformer_config['decoder_num_heads']}"
         f"_p{cogformer_config['proj_dim']}"
