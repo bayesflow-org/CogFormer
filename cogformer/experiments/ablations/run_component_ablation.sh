@@ -8,7 +8,7 @@ set -euo pipefail
 #          cogformer/experiments/ablations/component_ablation_figures/
 # ============================================================
 
-EPOCHS=1000
+EPOCHS=5000
 STEPS_PER_EPOCH=100
 TRAIN_BATCH=64
 VAL_BATCH=200
@@ -55,7 +55,6 @@ run_ablation() {
     echo "=== Done: ${ABLATION} ==="
 }
 
-run_ablation baseline
 run_ablation no_sab
 run_ablation no_mab
 run_ablation no_film

@@ -27,12 +27,6 @@ from cogformer.utils.plot_utils import cogformer_fm_colors
 
 
 ABLATION_CONFIGS = {
-    "baseline": {
-        "decoder_layer_design": "mixed_attention",
-        "decoder_layer_kwargs": {"mab_first": True},
-        "use_film": True,
-        "time_embedding_type": "fourier",
-    },
     "no_sab": {
         "decoder_layer_design": "cross_attention",
         "decoder_layer_kwargs": {},
@@ -68,10 +62,11 @@ INTERACTION_DESIGN_CONFIG = {
 
 
 class CogFormerAblationTrainer:
-    def __init__(self, cf, model_family, adapter, use_wandb=False):
+    def __init__(self, cf, model_family, adapter, ablation, use_wandb=False):
         self.cf = cf
         self.model_family = model_family
         self.adapter = adapter
+        self.ablation = ablation
         self.use_wandb = use_wandb
 
     def train(self, train_config, val_config, checkpoint_path="cogformer_ablation.pt", fig_path="fig.pdf"):
@@ -97,7 +92,7 @@ class CogFormerAblationTrainer:
                 pbar.set_postfix(loss=f"{loss:.4f}", lr=f"{current_lr:.2e}")
                 pbar.update(1)
 
-            if (epoch + 1) % 1000 == 0:
+            if (epoch + 1) % 2500 == 0:
                 self.val_step(val_config, global_step, fig_path)
 
             scheduler.step()
@@ -261,6 +256,9 @@ class CogFormerAblationTrainer:
         )
         metrics_df.to_csv(metrics_dir / f"{stem}_interaction_metrics.csv")
 
+        # Clean copy for downstream comparison (overwritten each val step)
+        metrics_df.to_csv(pred_dir / f"{self.ablation}_metrics.csv")
+
         if self.use_wandb:
             wandb.log(
                 {
@@ -286,7 +284,7 @@ def parse_args():
         type=str,
         choices=list(ABLATION_CONFIGS.keys()),
         required=True,
-        help="Which component to ablate",
+        help="Which component to ablate: no_sab, no_mab, no_film, no_fourier",
     )
     parser.add_argument("--use_wandb", action="store_true")
 
@@ -306,7 +304,7 @@ def parse_args():
     parser.add_argument("--max_num_obs", type=int, default=500)
     parser.add_argument("--train_batch_size", type=int, default=64)
     parser.add_argument("--val_batch_size", type=int, default=200)
-    parser.add_argument("--epochs", type=int, default=1000)
+    parser.add_argument("--epochs", type=int, default=5000)
     parser.add_argument("--steps_per_epoch", type=int, default=100)
     parser.add_argument("--lr", type=float, default=1e-4)
 
@@ -432,6 +430,7 @@ if __name__ == "__main__":
         model_family=model_family,
         adapter=adapter,
         cf=cf,
+        ablation=args.ablation,
         use_wandb=args.use_wandb,
     )
 
