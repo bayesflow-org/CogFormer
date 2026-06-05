@@ -24,6 +24,7 @@ from cogformer.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.training_utils import Prefetcher
 
 
 ABLATION_CONFIGS = {
@@ -62,18 +63,32 @@ INTERACTION_DESIGN_CONFIG = {
 
 
 class CogFormerAblationTrainer:
-    def __init__(self, cf, model_family, adapter, ablation, use_wandb=False):
+    def __init__(self, cf, model_family, adapter, ablation, use_wandb=False, use_amp=False):
         self.cf = cf
         self.model_family = model_family
         self.adapter = adapter
         self.ablation = ablation
         self.use_wandb = use_wandb
+        self.use_amp = use_amp and torch.cuda.is_available()
+        self.scaler = torch.amp.GradScaler("cuda") if self.use_amp else None
+
+    def _make_sample_fn(self, config):
+        def sample_fn():
+            return self.model_family.batch_sample(
+                **config["model_family_config"],
+                prior_fun=self.model_family.prior_fun,
+                batch_size=config["batch_size"],
+                flatten_param_outputs=True,
+                link_fun=ddm_link_fun(),
+            )
+        return sample_fn
 
     def train(self, train_config, val_config, checkpoint_path="cogformer_ablation.pt", fig_path="fig.pdf"):
         global_step = 0
 
         optimizer = AdamW(self.cf.parameters(), lr=train_config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
+        prefetcher = Prefetcher(self._make_sample_fn(train_config))
 
         for epoch in range(train_config["epochs"]):
             pbar = tqdm(
@@ -82,7 +97,8 @@ class CogFormerAblationTrainer:
                 miniters=100,
             )
             for _ in range(train_config["steps_per_epoch"]):
-                loss, current_lr = self.train_step(train_config, optimizer, scheduler)
+                samples = prefetcher.next()
+                loss, current_lr = self.train_step(samples, train_config, optimizer, scheduler)
                 if self.use_wandb:
                     wandb.log(
                         {"train/loss": loss, "opt/lr": current_lr, "epoch": epoch + 1},
@@ -98,38 +114,41 @@ class CogFormerAblationTrainer:
             scheduler.step()
             pbar.close()
 
+        prefetcher.shutdown()
         checkpoint_dir = Path("./cogformer/experiments/ablations/component_ablation_data/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
 
-    def train_step(self, config, optimizer, scheduler):
-        train_samples = self.model_family.batch_sample(
-            **config["model_family_config"],
-            prior_fun=self.model_family.prior_fun,
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-            link_fun=ddm_link_fun(),
-        )
+    def train_step(self, samples, config, optimizer, scheduler):
         adapted = self.adapter.adapt(
-            train_samples,
+            samples,
             intrinsic_params=self.model_family.intrinsic_params,
         )
 
         optimizer.zero_grad()
-        pred_velocity, target_velocity = self.cf(
-            adapted["param_matrices"][..., None],
-            adapted["input_data"],
-            adapted["param_indices"],
-            adapted["regressor_indices"],
-            adapted["param_masks"],
-        )
-        L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
-        L.backward()
+        with torch.amp.autocast("cuda", enabled=self.use_amp):
+            pred_velocity, target_velocity = self.cf(
+                adapted["param_matrices"][..., None],
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+            )
+            L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
 
-        if config["gradient_clip_norm"] is not None:
-            torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+        if self.scaler is not None:
+            self.scaler.scale(L).backward()
+            self.scaler.unscale_(optimizer)
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            self.scaler.step(optimizer)
+            self.scaler.update()
+        else:
+            L.backward()
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            optimizer.step()
 
-        optimizer.step()
         return L.detach().item(), scheduler.get_last_lr()[0]
 
     def val_step(self, config, global_step, fig_path):
@@ -287,6 +306,8 @@ def parse_args():
         help="Which component to ablate: no_sab, no_mab, no_film, no_fourier",
     )
     parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--use_amp", action="store_true",
+                        help="Enable automatic mixed precision (float16) training")
 
     # Architecture (defaults match the 'l' size from the size comparison)
     parser.add_argument("--num_layers", type=int, default=8)
@@ -432,6 +453,7 @@ if __name__ == "__main__":
         cf=cf,
         ablation=args.ablation,
         use_wandb=args.use_wandb,
+        use_amp=args.use_amp,
     )
 
     trainer.train(

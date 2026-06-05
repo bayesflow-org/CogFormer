@@ -32,6 +32,8 @@ run_model_class() {
         --layer_dropout    "$LAYER_DROPOUT" \
         --fm_sample_steps  "$FM_SAMPLE_STEPS" \
         --fm_num_samples   "$FM_NUM_SAMPLES" \
+        --use_wandb \
+        --use_amp \
         $EXTRA_ARGS
     echo "=== Done: ${LABEL} ==="
 }

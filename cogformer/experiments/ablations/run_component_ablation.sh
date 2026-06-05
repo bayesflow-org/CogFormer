@@ -51,7 +51,9 @@ run_ablation() {
         --num_seeds        "$NUM_SEEDS" \
         --seed_dim         "$SEED_DIM" \
         --time_embedding_dim "$TIME_EMB_DIM" \
-        --pos_embedding_dim  "$POS_EMB_DIM"
+        --pos_embedding_dim  "$POS_EMB_DIM" \
+        --use_wandb \
+        --use_amp
     echo "=== Done: ${ABLATION} ==="
 }
 

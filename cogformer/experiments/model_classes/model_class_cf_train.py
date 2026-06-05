@@ -23,6 +23,7 @@ from cogformer.adapters import Adapter
 from cogformer.networks.transformers.cf import CogFormer
 from cogformer.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.training_utils import Prefetcher
 
 
 # Per-model metadata used in val_step (fixed design config + display info)
@@ -61,16 +62,29 @@ MODEL_CONFIGS = {
 
 
 class CogFormerTrainer:
-    def __init__(self, cf, model_class, adapter, use_wandb=False):
+    def __init__(self, cf, model_class, adapter, use_wandb=False, use_amp=False):
         self.cf = cf
         self.model_class = model_class
         self.adapter = adapter
         self.use_wandb = use_wandb
+        self.use_amp = use_amp and torch.cuda.is_available()
+        self.scaler = torch.amp.GradScaler("cuda") if self.use_amp else None
+
+    def _make_sample_fn(self, config):
+        def sample_fn():
+            return self.model_class.batch_sample(
+                **config["model_family_config"],
+                **config["train_sample_config"],
+                batch_size=config["batch_size"],
+                flatten_param_outputs=True,
+            )
+        return sample_fn
 
     def train(self, train_config, val_config, checkpoint_path="cogformer_model_class_fm.pt", fig_path="fig"):
         global_step = 0
         optimizer = AdamW(self.cf.parameters(), lr=train_config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
+        prefetcher = Prefetcher(self._make_sample_fn(train_config))
 
         for epoch in range(train_config["epochs"]):
             pbar = tqdm(
@@ -79,7 +93,9 @@ class CogFormerTrainer:
                 miniters=100,
             )
             for _ in range(train_config["steps_per_epoch"]):
+                samples = prefetcher.next()
                 loss, current_lr = self.train_step(
+                    samples=samples,
                     config=train_config,
                     optimizer=optimizer,
                     scheduler=scheduler,
@@ -99,46 +115,46 @@ class CogFormerTrainer:
             scheduler.step()
             pbar.close()
 
+        prefetcher.shutdown()
         checkpoint_dir = Path("./cogformer/experiments/checkpoints/fm/model_class/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
         logging.info(f"[saved] {checkpoint_dir / checkpoint_path}")
 
-    def train_step(self, config, optimizer, scheduler):
-        train_samples = self.model_class.batch_sample(
-            **config["model_family_config"],
-            **config["train_sample_config"],
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-        )
-
+    def train_step(self, samples, config, optimizer, scheduler):
         adapted = self.adapter.adapt(
-            train_samples,
+            samples,
             intrinsic_params=[],
-            num_params=train_samples["max_num_params"],
+            num_params=samples["max_num_params"],
         )
 
         optimizer.zero_grad()
 
-        pred_velocity, target_velocity = self.cf(
-            adapted["param_matrices"][..., None],
-            adapted["input_data"],
-            adapted["param_indices"],
-            adapted["regressor_indices"],
-            adapted["param_masks"],
-            model_ids=adapted["model_ids"],
-        )
+        with torch.amp.autocast("cuda", enabled=self.use_amp):
+            pred_velocity, target_velocity = self.cf(
+                adapted["param_matrices"][..., None],
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+                model_ids=adapted["model_ids"],
+            )
+            L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
 
-        L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
-        L.backward()
+        if self.scaler is not None:
+            self.scaler.scale(L).backward()
+            self.scaler.unscale_(optimizer)
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            self.scaler.step(optimizer)
+            self.scaler.update()
+        else:
+            L.backward()
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            optimizer.step()
 
-        if config["gradient_clip_norm"] is not None:
-            torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
-
-        optimizer.step()
-        loss = L.detach().item()
-        current_lr = scheduler.get_last_lr()[0]
-        return loss, current_lr
+        return L.detach().item(), scheduler.get_last_lr()[0]
 
     @torch.no_grad()
     def val_step(self, config, global_step, fig_path):
@@ -239,6 +255,8 @@ class CogFormerTrainer:
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--use_amp", action="store_true",
+                        help="Enable automatic mixed precision (float16) training")
     parser.add_argument("--no_model_embedding", action="store_true",
                         help="Ablation: train without model identity embedding")
 
@@ -422,6 +440,7 @@ if __name__ == "__main__":
         model_class=model_class,
         adapter=adapter,
         use_wandb=args.use_wandb,
+        use_amp=args.use_amp,
     )
 
     trainer.train(
