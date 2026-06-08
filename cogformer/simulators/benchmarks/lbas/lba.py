@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit, prange
-from simulators import Model
-from utils.simulator_utils import as_1d
+from cogformer.simulators import Model
+from cogformer.utils.simulator_utils import as_1d
 
 @njit
 def sample_lba_trial(

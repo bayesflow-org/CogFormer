@@ -208,8 +208,8 @@ def evaluate(
             interaction_color=colors["interaction"],
             unfold=False,
         )
-        posterior_fig.savefig(posterior_dir / f"{tag}.pdf", bbox_inches="tight")
-        plt.close(posterior_fig)
+        posterior_fig.figure.savefig(posterior_dir / f"{tag}.pdf", bbox_inches="tight")
+        plt.close(posterior_fig.figure)
 
         coverage_fig = adaptive_coverage(
             true=true_set,

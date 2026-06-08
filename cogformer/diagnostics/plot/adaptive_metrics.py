@@ -106,6 +106,7 @@ def adaptive_metrics(
         if parameter_mask[r, :].any():
             num_rows = r + 1
             break
+    parameter_mask = parameter_mask[:num_rows]
 
     # ------------------------------------------------------------------
     # Pre-compute shared quantities
