@@ -47,10 +47,16 @@ def adaptive_recovery(
     n_design_rows = 1 + (len(regressor_keys) - 1) * (max_num_categories - 1)
     num_rows = min(num_rows, n_design_rows)
 
-    if figsize is None:
-        figsize = (3 * num_cols, 2.8 * num_rows)
+    # Trim trailing rows that are fully masked (e.g. intercept-only designs).
+    for r in range(num_rows - 1, -1, -1):
+        if parameter_mask[r, :].any():
+            num_rows = r + 1
+            break
 
-    fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize)
+    if figsize is None:
+        figsize = (3.2 * num_cols, 2.9 * num_rows)
+
+    fig, axarr = plt.subplots(num_rows, num_cols, figsize=figsize, squeeze=False)
 
     for r in range(num_rows):
         if r > 0:

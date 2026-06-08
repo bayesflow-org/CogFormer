@@ -123,6 +123,16 @@ def adaptive_ecdf(
 
     num_datasets, num_draws, num_rows, num_cols = pred.shape
 
+    regressor_keys = list(design_config.keys())
+    n_design_rows = 1 + (len(regressor_keys) - 1) * (max_num_categories - 1)
+    num_rows = min(num_rows, n_design_rows)
+
+    # Trim trailing rows that are fully masked (e.g. intercept-only designs).
+    for r in range(num_rows - 1, -1, -1):
+        if parameter_mask[r, :].any():
+            num_rows = r + 1
+            break
+
     if figsize is None:
         figsize = (3.2 * num_cols, 2.9 * num_rows)
 

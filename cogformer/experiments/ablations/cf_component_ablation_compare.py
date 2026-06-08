@@ -7,6 +7,8 @@ from pathlib import Path
 
 DATA_DIR = Path("./cogformer/experiments/ablations/component_ablation_data")
 
+CASES = ["intercept_only", "fixed_regressed", "interaction"]
+
 CONDITIONS = ["baseline", "no_sab", "no_mab", "no_film", "no_fourier"]
 
 CONDITION_LABELS = {
@@ -17,6 +19,12 @@ CONDITION_LABELS = {
     "no_fourier": "No Fourier",
 }
 
+CASE_LABELS = {
+    "intercept_only":  "Intercept Only",
+    "fixed_regressed": "Fixed Regressed",
+    "interaction":     "Interaction",
+}
+
 # For each metric: True = higher is better, False = lower is better
 METRIC_DIRECTION = {
     "NRMSE":                False,
@@ -25,10 +33,10 @@ METRIC_DIRECTION = {
 }
 
 
-def load_metrics(data_dir: Path) -> dict[str, pd.DataFrame]:
+def load_metrics(data_dir: Path, case: str) -> dict[str, pd.DataFrame]:
     metrics = {}
     for condition in CONDITIONS:
-        path = data_dir / f"{condition}_metrics.csv"
+        path = data_dir / f"{condition}_{case}_metrics.csv"
         if not path.exists():
             print(f"  Warning: {path} not found, skipping.")
             continue
@@ -58,7 +66,7 @@ def compute_delta(summary: pd.DataFrame) -> pd.DataFrame:
     return delta.drop(index=CONDITION_LABELS["baseline"])
 
 
-def to_latex(summary: pd.DataFrame, delta: pd.DataFrame) -> str:
+def to_latex(summary: pd.DataFrame, delta: pd.DataFrame, case: str) -> str:
     ablation_rows = [r for r in summary.index if r != CONDITION_LABELS["baseline"]]
     all_rows = [CONDITION_LABELS["baseline"]] + ablation_rows
 
@@ -70,7 +78,6 @@ def to_latex(summary: pd.DataFrame, delta: pd.DataFrame) -> str:
             continue
 
         values = summary[metric]
-        # Best value across all conditions (baseline included)
         best = values.max() if higher_is_better else values.min()
 
         cells = []
@@ -79,7 +86,6 @@ def to_latex(summary: pd.DataFrame, delta: pd.DataFrame) -> str:
             cell = f"{v:.4f}"
             if np.isclose(v, best):
                 cell = r"\textbf{" + cell + "}"
-            # Append Δ for ablation conditions
             if cond != CONDITION_LABELS["baseline"] and cond in delta.index:
                 d = delta.loc[cond, metric]
                 sign = "+" if d > 0 else ""
@@ -96,15 +102,16 @@ def to_latex(summary: pd.DataFrame, delta: pd.DataFrame) -> str:
 
     metric_block = "\n".join(metric_lines)
     col_spec = "l" + "c" * len(all_rows)
+    case_label = CASE_LABELS[case]
 
     return rf"""\begin{{table}}[t]
 \centering
-\caption{{Component ablation study on the DDM interaction case. Mean metrics across
+\caption{{Component ablation study — {case_label} case. Mean metrics across
 all active parameters. $\Delta$ (in parentheses) is the change relative to the
 baseline CogFormer. NRMSE and Calibration Error: lower is better ($\downarrow$).
 Posterior Contraction: higher is better ($\uparrow$). Best result per row is
 \textbf{{bolded}}.}}
-\label{{tab:component_ablation}}
+\label{{tab:component_ablation_{case}}}
 \begin{{tabular}}{{{col_spec}}}
 \toprule
 {col_header}
@@ -115,40 +122,48 @@ Posterior Contraction: higher is better ($\uparrow$). Best result per row is
 \end{{table}}"""
 
 
-def main(data_dir: Path):
+def run_case(data_dir: Path, case: str):
+    print(f"\n=== Case: {CASE_LABELS[case]} ===")
     print("Loading per-condition metrics...")
-    metrics = load_metrics(data_dir)
+    metrics = load_metrics(data_dir, case)
 
     if not metrics:
-        print("No metrics files found. Run training or eval first.")
+        print("  No metrics files found for this case. Skipping.")
         return
 
     print("Computing summary and Δ from baseline...")
     summary = summarise(metrics)
-    print("\n--- Mean metrics per condition ---")
+    print(f"\n--- Mean metrics per condition ({case}) ---")
     print(summary.to_string())
 
-    summary.to_csv(data_dir / "component_ablation_summary.csv")
-    print(f"\nSaved summary to {data_dir / 'component_ablation_summary.csv'}")
+    summary.to_csv(data_dir / f"component_ablation_summary_{case}.csv")
+    print(f"\nSaved summary to {data_dir / f'component_ablation_summary_{case}.csv'}")
 
     if CONDITION_LABELS["baseline"] in summary.index:
         delta = compute_delta(summary)
-        print("\n--- Δ from baseline ---")
+        print(f"\n--- Δ from baseline ({case}) ---")
         print(delta.to_string())
-        delta.to_csv(data_dir / "component_ablation_delta.csv")
-        print(f"Saved delta to {data_dir / 'component_ablation_delta.csv'}")
+        delta.to_csv(data_dir / f"component_ablation_delta_{case}.csv")
+        print(f"Saved delta to {data_dir / f'component_ablation_delta_{case}.csv'}")
 
-        latex = to_latex(summary, delta)
-        latex_path = data_dir / "component_ablation_table.tex"
+        latex = to_latex(summary, delta, case)
+        latex_path = data_dir / f"component_ablation_table_{case}.tex"
         latex_path.write_text(latex)
         print(f"Saved LaTeX table to {latex_path}")
     else:
-        print("\nBaseline not found — skipping Δ and LaTeX table.")
+        print("\n  Baseline not found — skipping Δ and LaTeX table.")
+
+
+def main(data_dir: Path, cases: list[str]):
+    for case in cases:
+        run_case(data_dir, case)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Aggregate component ablation metrics into a comparison table")
+    parser = argparse.ArgumentParser(description="Aggregate component ablation metrics into per-case comparison tables")
     parser.add_argument("--data_dir", type=str, default=str(DATA_DIR),
                         help="Directory containing per-condition metrics CSVs")
+    parser.add_argument("--cases", nargs="+", default=CASES, choices=CASES,
+                        help="Which cases to compare (default: all)")
     args = parser.parse_args()
-    main(Path(args.data_dir))
+    main(Path(args.data_dir), args.cases)
