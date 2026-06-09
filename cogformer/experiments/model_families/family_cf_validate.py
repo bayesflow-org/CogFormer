@@ -227,8 +227,8 @@ def main():
         val_params_kwargs = {"free_intrinsics": free_intr, "fixed_intrinsics": fixed_intr, "fixed_values": fixed_vals}
         val_sample_config = {"mask_randomizer_kwargs": val_params_kwargs, "min_num_regressors": 0, "fixed_config": True}
 
-        if args.data_dir is not None:
-            data_path = Path(args.data_dir) / f"{fam_lower}_{cfg_name}_data.npz"
+        data_path = Path(args.data_dir) / f"{fam_lower}_{cfg_name}_data.npz" if args.data_dir else None
+        if data_path is not None and data_path.exists():
             test_samples = load_validation_data(data_path=data_path)
 
             design_matrices = test_samples["design_matrices"]

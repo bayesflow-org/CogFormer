@@ -346,8 +346,8 @@ def main():
                 default_fixed_values=default_fixed_values,
             )
 
-            if args.data_dir is not None:
-                data_path = Path(args.data_dir) / f"{model_name.lower()}_{cfg_name}_data.npz"
+            data_path = Path(args.data_dir) / f"{model_name.lower()}_{cfg_name}_data.npz" if args.data_dir else None
+            if data_path is not None and data_path.exists():
                 max_total_regressors = args.max_num_regressors * (args.max_num_regressors + 1) // 2
                 max_dm_cols = max_total_regressors * (args.max_num_categories - 1) + (1 if args.keep_intercept else 0)
                 test_samples = load_bf_validation_data(

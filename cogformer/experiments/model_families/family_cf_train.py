@@ -29,6 +29,33 @@ from cogformer.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from cogformer.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.training_utils import Prefetcher
+from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
+from cogformer.diagnostics.metric.adaptive_c2st import compute_joint_c2st
+
+
+def infer_free_fixed_intrinsics(design_config, all_intrinsics, default_fixed_values):
+    used = {p for plist in design_config.values() for p in plist}
+    free_intrinsics = [p for p in all_intrinsics if p in used]
+    fixed_intrinsics = [p for p in all_intrinsics if p not in used]
+    fixed_values = {p: default_fixed_values[p] for p in fixed_intrinsics if p in default_fixed_values}
+    return free_intrinsics, fixed_intrinsics, fixed_values
+
+
+def reshape_bf_to_gpt(bf_samples, design_config, intrinsic_params):
+    *leading, num_active = bf_samples.shape
+    num_rows = len(design_config)
+    num_cols = len(intrinsic_params)
+    col_idx = {p: j for j, p in enumerate(intrinsic_params)}
+    result = np.zeros((*leading, num_rows, num_cols))
+    flat_pos = 0
+    for row_i, active_params in enumerate(design_config.values()):
+        ordered = [p for p in intrinsic_params if p in active_params]
+        for p in ordered:
+            result[..., row_i, col_idx[p]] = bf_samples[..., flat_pos]
+            flat_pos += 1
+    assert flat_pos == num_active
+    return result
 
 
 FAMILY_REGISTRY = {
@@ -60,6 +87,15 @@ FAMILY_REGISTRY = {
                 "u_1:u_2": [],
             }),
         ],
+        "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
+        "bf_data_stem": "ddm",
+        "benchmark_design_configs": {
+            "intercept_only":  {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "fixed":           {"1": ["v", "a", "z", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "regressed":       {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
+            "fixed_regressed": {"1": ["v", "a", "z", "tau"], "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
+            "interaction":     {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": ["v", "a", "z", "tau", "s_v"], "u_2": ["v", "a", "z", "tau"], "u_1:u_2": ["v", "a", "z"]},
+        },
     },
     "rdm": {
         "name": "RDM",
@@ -89,6 +125,15 @@ FAMILY_REGISTRY = {
                 "u_1:u_2": [],
             }),
         ],
+        "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
+        "bf_data_stem": "rdm",
+        "benchmark_design_configs": {
+            "intercept_only":  {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "fixed":           {"1": ["v", "v_diff", "a", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "regressed":       {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": ["v_diff", "a"], "u_2": ["v_diff", "a"], "u_1:u_2": []},
+            "fixed_regressed": {"1": ["v", "v_diff", "a", "tau"], "u_1": ["v_diff", "a"], "u_2": ["v_diff", "a"], "u_1:u_2": []},
+            "interaction":     {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": ["v", "v_diff", "a", "tau", "s_v"], "u_2": ["v", "v_diff", "a", "tau"], "u_1:u_2": ["v", "v_diff", "a"]},
+        },
     },
     "cdm": {
         "name": "CDM",
@@ -118,6 +163,15 @@ FAMILY_REGISTRY = {
                 "u_1:u_2": [],
             }),
         ],
+        "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
+        "bf_data_stem": "cdm",
+        "benchmark_design_configs": {
+            "intercept_only":  {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "fixed":           {"1": ["v", "v_theta", "a", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
+            "regressed":       {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []},
+            "fixed_regressed": {"1": ["v", "v_theta", "a", "tau"], "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []},
+            "interaction":     {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": ["v", "v_theta", "a", "tau", "s_v"], "u_2": ["v", "v_theta", "a", "tau"], "u_1:u_2": ["v", "v_theta", "a"]},
+        },
     },
 }
 
@@ -137,11 +191,27 @@ class CogFormerTrainer:
         self.fig_base = reg["fig_base"]
         self.val_scenarios = reg["val_scenarios"]
         self.fam_lower = reg["name"].lower()
+        self.default_fixed_values = reg["default_fixed_values"]
+        self.bf_data_stem = reg["bf_data_stem"]
+        self.benchmark_design_configs = reg["benchmark_design_configs"]
+        self.amortization_history = {case: {"steps": [], "joint_c2st": []} for case in reg["benchmark_design_configs"]}
+
+    def _make_sample_fn(self, config):
+        def sample_fn():
+            return self.model_family.batch_sample(
+                **config["model_family_config"],
+                prior_fun=self.model_family.prior_fun,
+                batch_size=config["batch_size"],
+                flatten_param_outputs=True,
+                link_fun=self.link_fun()
+            )
+        return sample_fn
 
     def train(self, train_config, val_config, checkpoint_path="cogformer_fm.pt", fig_path="fig.pdf"):
         global_step = 0
         optimizer = AdamW(self.cf.parameters(), lr=train_config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
+        prefetcher = Prefetcher(self._make_sample_fn(train_config))
 
         for epoch in range(train_config["epochs"]):
             pbar = tqdm(
@@ -149,8 +219,9 @@ class CogFormerTrainer:
                 desc=f"Epoch {(epoch + 1)}/{train_config['epochs']}",
                 miniters=100,
             )
-            for step in range(train_config["steps_per_epoch"]):
-                loss, current_lr = self.train_step(config=train_config, optimizer=optimizer, scheduler=scheduler)
+            for _ in range(train_config["steps_per_epoch"]):
+                samples = prefetcher.next()
+                loss, current_lr = self.train_step(samples=samples, config=train_config, optimizer=optimizer, scheduler=scheduler)
                 if self.use_wandb:
                     wandb.log({"train/loss": loss, "opt/lr": current_lr, "epoch": epoch + 1}, step=global_step)
                 global_step += 1
@@ -158,25 +229,20 @@ class CogFormerTrainer:
                 pbar.update(1)
 
             if (epoch + 1) % self.val_interval == 0:
-                self.val_step(val_config, global_step, fig_path)
+                # self.val_step(val_config, global_step, fig_path)
+                self.amortization_gap_step(val_config, global_step)
 
             scheduler.step()
             pbar.close()
 
+        prefetcher.shutdown()
+        self.plot_amortization_gap()
         checkpoint_dir = Path(f"./cogformer/experiments/checkpoints/{self.checkpoint_subdir}/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
 
-    def train_step(self, config, optimizer, scheduler):
-        train_samples = self.model_family.batch_sample(
-            **config["model_family_config"],
-            prior_fun=self.model_family.prior_fun,
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-            link_fun=self.link_fun()
-        )
-
-        adapted = self.adapter.adapt(train_samples, intrinsic_params=self.model_family.intrinsic_params)
+    def train_step(self, samples, config, optimizer, scheduler):
+        adapted = self.adapter.adapt(samples, intrinsic_params=self.model_family.intrinsic_params)
         optimizer.zero_grad()
 
         pred_velocity, target_velocity = self.cf(
@@ -303,6 +369,106 @@ class CogFormerTrainer:
                 plt.close(metrics_fig)
 
         self.cf.train()
+
+    @torch.no_grad()
+    def amortization_gap_step(self, config, global_step):
+        if not self.use_wandb:
+            return
+
+        self.cf.eval()
+
+        intrinsic_params = self.intrinsic_params
+        max_num_categories = config["model_family_config"]["max_num_categories"]
+        num_obs = config["val_sample_config"]["num_obs"]
+        batch_size = config["batch_size"]
+        log_dict = {}
+
+        for case_name, design_config in self.benchmark_design_configs.items():
+            free_intr, fixed_intr, fixed_vals = infer_free_fixed_intrinsics(
+                design_config, intrinsic_params, self.default_fixed_values
+            )
+            test_samples = self.model_family.batch_sample(
+                **config["model_family_config"],
+                mask_randomizer_kwargs={"free_intrinsics": free_intr, "fixed_intrinsics": fixed_intr, "fixed_values": fixed_vals},
+                min_num_regressors=0,
+                num_obs=num_obs,
+                fixed_config=True,
+                batch_size=batch_size,
+                flatten_param_outputs=True,
+                design_config=design_config,
+                link_fun=self.link_fun(),
+            )
+
+            adapted = self.adapter.adapt(test_samples, intrinsic_params=intrinsic_params)
+            device = config["device"]
+            for k, v in adapted.items():
+                if torch.is_tensor(v):
+                    adapted[k] = v.to(device)
+
+            pred_set = self.cf.sample(
+                adapted["input_data"], adapted["param_indices"],
+                adapted["regressor_indices"], adapted["param_masks"],
+                steps=config["fm_sample_steps"], num_samples=config["fm_num_samples"],
+            )
+
+            n_cols = len(intrinsic_params)
+            true_set = adapted["param_matrices"].detach().cpu().numpy()
+            n_rows = true_set.shape[1] // n_cols
+            true_set = true_set.reshape(batch_size, n_rows, n_cols)
+            pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, n_cols)
+            params_mask = adapted["param_masks"].detach().cpu().numpy().reshape(batch_size, n_rows, n_cols)[0]
+
+            metrics_df = compute_adaptive_metrics(
+                true=true_set, pred=pred_set, design_config=design_config,
+                intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
+                parameter_mask=params_mask, variable_names=self.param_names,
+                skip_log_gamma=True,
+            )
+            for metric in ["NRMSE", "Calibration Error", "Posterior Contraction"]:
+                if metric in metrics_df.columns:
+                    key = f"val/{case_name}/{metric.lower().replace(' ', '_')}"
+                    log_dict[key] = float(metrics_df[metric].mean())
+
+            bf_path = Path(f"./cogformer/experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
+            if bf_path.exists():
+                bf_data = np.load(bf_path, allow_pickle=True)
+                active_idx = bf_data["param_masks"][0].astype(bool)
+                bf_pred_grid = reshape_bf_to_gpt(
+                    bf_data["pred_set"][:, :, active_idx], design_config, intrinsic_params
+                )
+                joint_score = compute_joint_c2st(
+                    pred_a=pred_set, pred_b=bf_pred_grid,
+                    design_config=design_config, intrinsic_params=intrinsic_params,
+                    max_num_categories=max_num_categories, parameter_mask=params_mask,
+                )
+                log_dict[f"val/{case_name}/joint_c2st"] = joint_score
+                self.amortization_history[case_name]["steps"].append(global_step)
+                self.amortization_history[case_name]["joint_c2st"].append(joint_score)
+
+        if log_dict:
+            wandb.log(log_dict, step=global_step)
+
+        self.cf.train()
+
+    def plot_amortization_gap(self):
+        fig, ax = plt.subplots(figsize=(7, 4))
+        for case_name, data in self.amortization_history.items():
+            if data["steps"]:
+                ax.plot(data["steps"], data["joint_c2st"], marker="o", markersize=3, label=case_name)
+        ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
+        ax.set_xlabel("Training step")
+        ax.set_ylabel("Joint C2ST")
+        ax.set_title(f"{self.fam_lower.upper()} — Amortization Gap")
+        ax.legend(fontsize=8)
+        ax.set_ylim(0.45, 1.0)
+        fig_dir = Path(f"./cogformer/experiments/figures/{self.fig_base}")
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        out_path = fig_dir / f"{self.fam_lower}_amortization_gap.pdf"
+        fig.savefig(out_path, bbox_inches="tight")
+        logging.info(f"[saved] {out_path}")
+        if self.use_wandb:
+            wandb.log({"val/amortization_gap_plot": wandb.Image(fig)})
+        plt.close(fig)
 
     @staticmethod
     def finish():
