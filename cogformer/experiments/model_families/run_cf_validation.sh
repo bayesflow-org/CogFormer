@@ -24,21 +24,24 @@ C2ST_CDM_OUTDIR="./cogformer/experiments/figures/c2st/cdm/"
 # ============================================================
 
 echo "=== [1/6] CF validate: DDM ==="
-python -m cogformer.experiments.model_families.ddm_family_cf_validate \
+python -m cogformer.experiments.model_families.family_cf_validate \
+    --model_family ddm \
     --checkpoint "$DDM_CKPT" \
     --data_dir   "$DATA_DIR" \
     --outdir     "$DDM_OUTDIR" \
     --pred_dir   "$PRED_DIR"
 
 echo "=== [2/6] CF validate: RDM ==="
-python -m cogformer.experiments.model_families.rdm_family_cf_validate \
+python -m cogformer.experiments.model_families.family_cf_validate \
+    --model_family rdm \
     --checkpoint "$RDM_CKPT" \
     --data_dir   "$DATA_DIR" \
     --outdir     "$RDM_OUTDIR" \
     --pred_dir   "$PRED_DIR"
 
 echo "=== [3/6] CF validate: CDM ==="
-python -m cogformer.experiments.model_families.cdm_family_cf_validate \
+python -m cogformer.experiments.model_families.family_cf_validate \
+    --model_family cdm \
     --checkpoint "$CDM_CKPT" \
     --data_dir   "$DATA_DIR" \
     --outdir     "$CDM_OUTDIR" \
@@ -49,19 +52,22 @@ python -m cogformer.experiments.model_families.cdm_family_cf_validate \
 # ============================================================
 
 echo "=== [4/6] C2ST: DDM ==="
-python -m cogformer.experiments.model_families.ddm_family_c2st \
+python -m cogformer.experiments.model_families.family_c2st \
+    --model_family ddm \
     --bf_data_dir  "$DATA_DIR" \
     --cf_pred_dir "$PRED_DIR" \
     --outdir       "$C2ST_DDM_OUTDIR"
 
 echo "=== [5/6] C2ST: RDM ==="
-python -m cogformer.experiments.model_families.rdm_family_c2st \
+python -m cogformer.experiments.model_families.family_c2st \
+    --model_family rdm \
     --bf_data_dir  "$DATA_DIR" \
     --cf_pred_dir "$PRED_DIR" \
     --outdir       "$C2ST_RDM_OUTDIR"
 
 echo "=== [6/6] C2ST: CDM ==="
-python -m cogformer.experiments.model_families.cdm_family_c2st \
+python -m cogformer.experiments.model_families.family_c2st \
+    --model_family cdm \
     --bf_data_dir  "$DATA_DIR" \
     --cf_pred_dir "$PRED_DIR" \
     --outdir       "$C2ST_CDM_OUTDIR"
