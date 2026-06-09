@@ -63,8 +63,12 @@ INTERACTION_DESIGN_CONFIG = {
 
 
 class CogFormerAblationTrainer:
-    def __init__(self, cf, model_family, adapter, ablation, use_wandb=False, use_amp=False):
-        self.cf = cf
+    def __init__(self, cf, model_family, adapter, ablation, use_wandb=False, use_amp=False, num_gpus=1):
+        if num_gpus > 1 and torch.cuda.is_available():
+            device_ids = list(range(min(num_gpus, torch.cuda.device_count())))
+            self.cf = torch.nn.DataParallel(cf, device_ids=device_ids)
+        else:
+            self.cf = cf
         self.model_family = model_family
         self.adapter = adapter
         self.ablation = ablation
@@ -117,7 +121,8 @@ class CogFormerAblationTrainer:
         prefetcher.shutdown()
         checkpoint_dir = Path("./cogformer/experiments/ablations/component_ablation_data/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
+        module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
+        torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
 
     def train_step(self, samples, config, optimizer, scheduler):
         adapted = self.adapter.adapt(
@@ -332,6 +337,8 @@ def parse_args():
     # Inference
     parser.add_argument("--fm_sample_steps", type=int, default=200)
     parser.add_argument("--fm_num_samples", type=int, default=200)
+    parser.add_argument("--num_gpus", type=int, default=1, help="number of GPUs to use")
+    parser.add_argument("--compile", action="store_true", help="enable torch.compile for faster training")
     return parser.parse_args()
 
 
@@ -446,6 +453,8 @@ if __name__ == "__main__":
     )
     adapter = Adapter()
     cf = CogFormer(**cogformer_config).to(device).train()
+    if args.compile:
+        cf = torch.compile(cf)
 
     trainer = CogFormerAblationTrainer(
         model_family=model_family,
@@ -454,6 +463,7 @@ if __name__ == "__main__":
         ablation=args.ablation,
         use_wandb=args.use_wandb,
         use_amp=args.use_amp,
+        num_gpus=args.num_gpus,
     )
 
     trainer.train(

@@ -177,9 +177,15 @@ FAMILY_REGISTRY = {
 
 
 class CogFormerTrainer:
-    def __init__(self, cf, model_family, adapter, reg, use_wandb=False):
+    def __init__(self, cf, model_family, adapter, reg, use_wandb=False, use_amp=False, num_gpus=1):
         super().__init__()
-        self.cf = cf
+        if num_gpus > 1 and torch.cuda.is_available():
+            device_ids = list(range(min(num_gpus, torch.cuda.device_count())))
+            self.cf = torch.nn.DataParallel(cf, device_ids=device_ids)
+        else:
+            self.cf = cf
+        self.use_amp = use_amp and torch.cuda.is_available()
+        self.scaler = torch.amp.GradScaler("cuda") if self.use_amp else None
         self.model_family = model_family
         self.adapter = adapter
         self.use_wandb = use_wandb
@@ -239,30 +245,34 @@ class CogFormerTrainer:
         self.plot_amortization_gap()
         checkpoint_dir = Path(f"./cogformer/experiments/checkpoints/{self.checkpoint_subdir}/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
+        module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
+        torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
 
     def train_step(self, samples, config, optimizer, scheduler):
         adapted = self.adapter.adapt(samples, intrinsic_params=self.model_family.intrinsic_params)
         optimizer.zero_grad()
-
-        pred_velocity, target_velocity = self.cf(
-            adapted["param_matrices"][..., None],
-            adapted["input_data"],
-            adapted["param_indices"],
-            adapted["regressor_indices"],
-            adapted["param_masks"],
-        )
-
-        L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
-        L.backward()
-
-        if config["gradient_clip_norm"] is not None:
-            torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
-
-        optimizer.step()
-        loss = L.detach().item()
-        current_lr = scheduler.get_last_lr()[0]
-        return loss, current_lr
+        with torch.amp.autocast("cuda", enabled=self.use_amp):
+            pred_velocity, target_velocity = self.cf(
+                adapted["param_matrices"][..., None],
+                adapted["input_data"],
+                adapted["param_indices"],
+                adapted["regressor_indices"],
+                adapted["param_masks"],
+            )
+            L = self.cf.compute_loss(pred_velocity, target_velocity, adapted["param_masks"])
+        if self.scaler is not None:
+            self.scaler.scale(L).backward()
+            self.scaler.unscale_(optimizer)
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            self.scaler.step(optimizer)
+            self.scaler.update()
+        else:
+            L.backward()
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            optimizer.step()
+        return L.detach().item(), scheduler.get_last_lr()[0]
 
     def val_step(self, config, global_step, fig_path):
         params = self.intrinsic_params
@@ -501,6 +511,9 @@ def parse_args():
     parser.add_argument("--steps_per_epoch", type=int, default=100)
     parser.add_argument("--fm_sample_steps", type=int, default=200)
     parser.add_argument("--fm_num_samples", type=int, default=200)
+    parser.add_argument("--num_gpus", type=int, default=1, help="number of GPUs to use")
+    parser.add_argument("--use_amp", action="store_true", help="enable automatic mixed precision")
+    parser.add_argument("--compile", action="store_true", help="enable torch.compile for faster training")
     return parser.parse_args()
 
 
@@ -610,6 +623,8 @@ if __name__ == "__main__":
     )
     adapter = Adapter()
     cogformer = CogFormer(**cogformer_config).to(device).train()
+    if args.compile:
+        cogformer = torch.compile(cogformer)
 
     trainer = CogFormerTrainer(
         model_family=model_family,
@@ -617,6 +632,8 @@ if __name__ == "__main__":
         cf=cogformer,
         reg=reg,
         use_wandb=use_wandb,
+        use_amp=args.use_amp,
+        num_gpus=args.num_gpus,
     )
 
     stem = reg["checkpoint_stem"]

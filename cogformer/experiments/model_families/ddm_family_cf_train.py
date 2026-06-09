@@ -23,6 +23,7 @@ from cogformer.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from cogformer.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.training_utils import Prefetcher
 
 
 class CogFormerTrainer:
@@ -35,9 +36,17 @@ class CogFormerTrainer:
         model_family=None,
         adapter=None,
         use_wandb=False,
+        use_amp=False,
+        num_gpus=1,
     ):
         super().__init__()
-        self.cf=cf
+        if num_gpus > 1 and torch.cuda.is_available():
+            device_ids = list(range(min(num_gpus, torch.cuda.device_count())))
+            self.cf = torch.nn.DataParallel(cf, device_ids=device_ids)
+        else:
+            self.cf = cf
+        self.use_amp = use_amp and torch.cuda.is_available()
+        self.scaler = torch.amp.GradScaler("cuda") if self.use_amp else None
         self.model=model
         self.prior_fun=prior_fun
         self.link_fun=link_fun
@@ -63,11 +72,10 @@ class CogFormerTrainer:
         # Define global step
         global_step = 0
 
-        # Define optimizer, scheduler, and loss function from config
         optimizer = AdamW(self.cf.parameters(), lr=train_config["learning_rate"])
         scheduler = CosineAnnealingLR(optimizer, T_max=train_config["epochs"])
+        prefetcher = Prefetcher(self._make_sample_fn(train_config))
 
-        # Training loop
         for epoch in range(train_config["epochs"]):
             pbar = tqdm(
                 total=train_config["steps_per_epoch"],
@@ -75,8 +83,9 @@ class CogFormerTrainer:
                 miniters=100,
             )
             for step in range(train_config["steps_per_epoch"]):
-                # Compute metrics
+                samples = prefetcher.next()
                 loss, current_lr = self.train_step(
+                    samples=samples,
                     config=train_config,
                     optimizer=optimizer,
                     scheduler=scheduler
@@ -102,56 +111,51 @@ class CogFormerTrainer:
             scheduler.step()
             pbar.close()
 
+        prefetcher.shutdown()
         checkpoint_dir = Path("./cogformer/experiments/checkpoints/fm/ddm/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(self.cf.state_dict(), checkpoint_dir / checkpoint_path)
+        module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
+        torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
 
-    def train_step(self, config, optimizer, scheduler):
-        """Training step"""
+    def _make_sample_fn(self, config):
+        def sample_fn():
+            return self.model_family.batch_sample(
+                **config["model_family_config"],
+                prior_fun=self.prior_fun,
+                batch_size=config["batch_size"],
+                flatten_param_outputs=True,
+                link_fun=ddm_link_fun()
+            )
+        return sample_fn
 
-        # Generate training samples
-        train_samples = self.model_family.batch_sample(
-            **config["model_family_config"],
-            prior_fun=self.prior_fun,
-            batch_size=config["batch_size"],
-            flatten_param_outputs=True,
-            link_fun=ddm_link_fun()
-        )
-
-        # Adapt for network
+    def train_step(self, samples, config, optimizer, scheduler):
         adapted = self.adapter.adapt(
-            train_samples,
+            samples,
             intrinsic_params=self.model_family.intrinsic_params
         )
-
-        # Optimizer
         optimizer.zero_grad()
-
-        # Train
-        pred_velocity, target_velocity = self.cf(
-            adapted["param_matrices"][..., None],
-            adapted['input_data'],
-            adapted['param_indices'],
-            adapted['regressor_indices'],
-            adapted['param_masks'],
-        )
-
-        # Compute loss
-        L = self.cf.compute_loss(pred_velocity, target_velocity, adapted['param_masks'])
-        L.backward()
-
-        if config["gradient_clip_norm"] is not None:
-            torch.nn.utils.clip_grad_norm_(
-                self.cf.parameters(),
-                config["gradient_clip_norm"],
+        with torch.amp.autocast("cuda", enabled=self.use_amp):
+            pred_velocity, target_velocity = self.cf(
+                adapted["param_matrices"][..., None],
+                adapted['input_data'],
+                adapted['param_indices'],
+                adapted['regressor_indices'],
+                adapted['param_masks'],
             )
-
-        # Update loss and learning rate
-        optimizer.step()
-        loss = L.detach().item()
-        current_lr = scheduler.get_last_lr()[0]
-
-        return loss, current_lr
+            L = self.cf.compute_loss(pred_velocity, target_velocity, adapted['param_masks'])
+        if self.scaler is not None:
+            self.scaler.scale(L).backward()
+            self.scaler.unscale_(optimizer)
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            self.scaler.step(optimizer)
+            self.scaler.update()
+        else:
+            L.backward()
+            if config["gradient_clip_norm"] is not None:
+                torch.nn.utils.clip_grad_norm_(self.cf.parameters(), config["gradient_clip_norm"])
+            optimizer.step()
+        return L.detach().item(), scheduler.get_last_lr()[0]
 
     def val_step(self, config, global_step, fig_path):
         # Two validation scenarios
@@ -355,6 +359,9 @@ def parse_args():
     # Inference (for FM only)
     parser.add_argument("--fm_sample_steps", type=int, default=200, help="number of fm sample steps")
     parser.add_argument("--fm_num_samples", type=int, default=200, help="number of fm samples")
+    parser.add_argument("--num_gpus", type=int, default=1, help="number of GPUs to use")
+    parser.add_argument("--use_amp", action="store_true", help="enable automatic mixed precision")
+    parser.add_argument("--compile", action="store_true", help="enable torch.compile for faster training")
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -489,6 +496,8 @@ if __name__ == "__main__":
     )
     adapter = Adapter()
     cogformer = CogFormer(**cogformer_config).to(device).train()
+    if args.compile:
+        cogformer = torch.compile(cogformer)
 
     # Pass to trainer
     trainer = CogFormerTrainer(
@@ -496,6 +505,8 @@ if __name__ == "__main__":
         adapter=adapter,
         cf=cogformer,
         use_wandb=use_wandb,
+        use_amp=args.use_amp,
+        num_gpus=args.num_gpus,
     )
 
     # Define checkpoint path
