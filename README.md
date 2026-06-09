@@ -9,3 +9,21 @@ However, the utility of SBI for iterating over varying modeling assumptions rema
 To address these issues, we pilot a meta-amortized framework for cognitive modeling which we nickname the CogFormer.
 Our framework trains a transformer-based architecture that remains valid across a combinatorial number of structurally similar models, allowing for changing data types, parameters, design matrices, and sample sizes.
 We present promising quantitative results across families of decision-making models for binary, multi-alternative, and continuous responses. Our evaluation suggests that CogFormer can accurately estimate parameters across model families with a minimal amortization offset, making it a potentially powerful engine that catalyzes cognitive modeling workflows.
+
+## Installation
+
+Requires Python 3.12+. Clone the repo and install with [uv](https://github.com/astral-sh/uv) (recommended):
+
+```bash
+git clone https://github.com/jerrymhuang/CogFormer.git
+cd CogFormer
+uv sync
+```
+
+Or with pip:
+
+```bash
+git clone https://github.com/jerrymhuang/CogFormer.git
+cd CogFormer
+pip install -e .
+```

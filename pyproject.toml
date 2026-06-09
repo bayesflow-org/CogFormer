@@ -6,11 +6,19 @@ authors = [
     { name = "Jerry Huang", email = "aca.jerryh@gmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "bayesflow>=2.0.2",
-    "notebook>=7.4.1",
-    "ssm-simulators>=0.8.3",
+    "matplotlib>=3.10",
+    "numba>=0.64",
+    "numpy>=2.0",
+    "pandas>=2.0",
+    "scikit-learn>=1.8",
+    "scipy>=1.17",
+    "seaborn>=0.13",
+    "torch>=2.11",
+    "tqdm>=4.67",
+    "wandb>=0.25",
 ]
 
 [project.optional-dependencies]
