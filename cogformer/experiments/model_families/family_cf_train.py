@@ -67,7 +67,7 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "free_intrinsics": ["v", "a", "z", "tau"],
-        "val_interval": 250,
+        "val_interval": 1000,
         "checkpoint_subdir": "fm/ddm",
         "checkpoint_stem": "cogformer_mixed_attn",
         "fig_base": "fm",
@@ -201,6 +201,7 @@ class CogFormerTrainer:
         self.bf_data_stem = reg["bf_data_stem"]
         self.benchmark_design_configs = reg["benchmark_design_configs"]
         self.amortization_history = {case: {"steps": [], "joint_c2st": []} for case in reg["benchmark_design_configs"]}
+        self.device = next(cf.parameters()).device
 
     def _make_sample_fn(self, config):
         def sample_fn():
@@ -410,10 +411,9 @@ class CogFormerTrainer:
             )
 
             adapted = self.adapter.adapt(test_samples, intrinsic_params=intrinsic_params)
-            device = config["device"]
             for k, v in adapted.items():
                 if torch.is_tensor(v):
-                    adapted[k] = v.to(device)
+                    adapted[k] = v.to(self.device)
 
             pred_set = self.cf.sample(
                 adapted["input_data"], adapted["param_indices"],

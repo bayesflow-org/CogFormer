@@ -27,6 +27,18 @@ DESIGN_CONFIGS = {
         "u_2":     [],
         "u_1:u_2": [],
     },
+    "fixed": {
+        "1":       ["v", "a", "z", "tau"],
+        "u_1":     [],
+        "u_2":     [],
+        "u_1:u_2": [],
+    },
+    "regressed": {
+        "1":       ["v", "a", "z", "tau", "s_v", "s_tau"],
+        "u_1":     ["v", "a", "z"],
+        "u_2":     ["v", "a", "z"],
+        "u_1:u_2": [],
+    },
     "fixed_regressed": {
         "1":       ["v", "a", "z", "tau"],
         "u_1":     ["v", "a", "z"],
@@ -91,6 +103,7 @@ def evaluate(
     seed_dim: int,
     time_embedding_dim: int,
     pos_embedding_dim: int,
+    cases: list[str] | None = None,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -148,7 +161,10 @@ def evaluate(
     ecdf_dir      = fig_base / "ecdf";           ecdf_dir.mkdir(parents=True, exist_ok=True)
     metrics_dir   = fig_base / "metrics";        metrics_dir.mkdir(parents=True, exist_ok=True)
 
+    cases_to_run = cases if cases else list(DESIGN_CONFIGS.keys())
     for case, design_config in DESIGN_CONFIGS.items():
+        if case not in cases_to_run:
+            continue
         print(f"\n--- Evaluating condition={condition}, case={case} ---")
 
         test_samples = model_family.batch_sample(
@@ -285,6 +301,8 @@ if __name__ == "__main__":
     parser.add_argument("--seed_dim", type=int, default=64)
     parser.add_argument("--time_embedding_dim", type=int, default=32)
     parser.add_argument("--pos_embedding_dim", type=int, default=32)
+    parser.add_argument("--cases", nargs="+", default=None, choices=list(DESIGN_CONFIGS.keys()),
+                        help="Which cases to evaluate (default: all)")
     args = parser.parse_args()
 
     evaluate(
@@ -300,4 +318,5 @@ if __name__ == "__main__":
         seed_dim=args.seed_dim,
         time_embedding_dim=args.time_embedding_dim,
         pos_embedding_dim=args.pos_embedding_dim,
+        cases=args.cases,
     )

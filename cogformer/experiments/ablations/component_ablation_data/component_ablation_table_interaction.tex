@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Component ablation study — Interaction case. Mean metrics across
+all active parameters. $\Delta$ (in parentheses) is the change relative to the
+baseline CogFormer. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Best result per row is
+\textbf{bolded}.}
+\label{tab:component_ablation_interaction}
+\begin{tabular}{lccccc}
+\toprule
+ & Baseline & No SAB & No MAB & No FiLM & No Fourier \\
+\midrule
+NRMSE $\downarrow$ & 0.1025 & 0.1029 \small{(+0.0003)} & 0.2679 \small{(+0.1653)} & 0.0993 \small{(-0.0032)} & \textbf{0.0942} \small{(-0.0083)} \\
+Cal.\ Error $\downarrow$ & \textbf{0.0167} & 0.0283 \small{(+0.0116)} & 0.0182 \small{(+0.0016)} & 0.0199 \small{(+0.0032)} & 0.0253 \small{(+0.0087)} \\
+Post.\ Contr. $\uparrow$ & 0.8219 & 0.8335 \small{(+0.0116)} & 0.0286 \small{(-0.7933)} & 0.8383 \small{(+0.0165)} & \textbf{0.8491} \small{(+0.0272)} \\
+\bottomrule
+\end{tabular}
+\end{table}

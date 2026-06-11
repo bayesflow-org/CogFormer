@@ -7,7 +7,7 @@ from pathlib import Path
 
 DATA_DIR = Path("./cogformer/experiments/ablations/component_ablation_data")
 
-CASES = ["intercept_only", "fixed_regressed", "interaction"]
+CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
 
 CONDITIONS = ["baseline", "no_sab", "no_mab", "no_film", "no_fourier"]
 
@@ -21,6 +21,8 @@ CONDITION_LABELS = {
 
 CASE_LABELS = {
     "intercept_only":  "Intercept Only",
+    "fixed":           "Fixed",
+    "regressed":       "Regressed",
     "fixed_regressed": "Fixed Regressed",
     "interaction":     "Interaction",
 }

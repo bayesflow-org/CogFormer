@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Component ablation study — Intercept Only case. Mean metrics across
+all active parameters. $\Delta$ (in parentheses) is the change relative to the
+baseline CogFormer. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Best result per row is
+\textbf{bolded}.}
+\label{tab:component_ablation_intercept_only}
+\begin{tabular}{lccccc}
+\toprule
+ & Baseline & No SAB & No MAB & No FiLM & No Fourier \\
+\midrule
+NRMSE $\downarrow$ & 0.0955 & 0.1023 \small{(+0.0069)} & 0.2492 \small{(+0.1538)} & \textbf{0.0865} \small{(-0.0090)} & 0.0901 \small{(-0.0053)} \\
+Cal.\ Error $\downarrow$ & 0.0250 & 0.0217 \small{(-0.0032)} & 0.0259 \small{(+0.0010)} & 0.0219 \small{(-0.0030)} & \textbf{0.0193} \small{(-0.0057)} \\
+Post.\ Contr. $\uparrow$ & 0.8329 & 0.8248 \small{(-0.0080)} & 0.0772 \small{(-0.7557)} & \textbf{0.8446} \small{(+0.0118)} & 0.8196 \small{(-0.0132)} \\
+\bottomrule
+\end{tabular}
+\end{table}

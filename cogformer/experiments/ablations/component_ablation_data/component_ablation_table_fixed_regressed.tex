@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Component ablation study — Fixed Regressed case. Mean metrics across
+all active parameters. $\Delta$ (in parentheses) is the change relative to the
+baseline CogFormer. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Best result per row is
+\textbf{bolded}.}
+\label{tab:component_ablation_fixed_regressed}
+\begin{tabular}{lccccc}
+\toprule
+ & Baseline & No SAB & No MAB & No FiLM & No Fourier \\
+\midrule
+NRMSE $\downarrow$ & 0.0715 & 0.0772 \small{(+0.0057)} & 0.2634 \small{(+0.1919)} & 0.0705 \small{(-0.0010)} & \textbf{0.0673} \small{(-0.0043)} \\
+Cal.\ Error $\downarrow$ & 0.0202 & 0.0183 \small{(-0.0019)} & \textbf{0.0161} \small{(-0.0042)} & 0.0226 \small{(+0.0024)} & 0.0269 \small{(+0.0067)} \\
+Post.\ Contr. $\uparrow$ & 0.9376 & 0.9254 \small{(-0.0123)} & 0.0300 \small{(-0.9077)} & 0.9463 \small{(+0.0087)} & \textbf{0.9465} \small{(+0.0089)} \\
+\bottomrule
+\end{tabular}
+\end{table}
