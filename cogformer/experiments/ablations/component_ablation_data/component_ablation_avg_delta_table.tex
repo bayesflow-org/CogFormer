@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\caption{Average change in metrics relative to the baseline CogFormer, averaged
+across all five design conditions (Fixed, Intercept Only, Fixed+Regressed, Regressed,
+Interaction). NRMSE and Calibration Error: negative $\Delta$ indicates improvement
+($\downarrow$). Posterior Contraction: positive $\Delta$ indicates improvement
+($\uparrow$). Bold indicates best per column among non-degenerate variants;
+No MAB is excluded from Cal.\ Error bolding as its near-zero $\Delta$ reflects
+posterior collapse rather than genuine calibration.}
+\label{tab:component_ablation_avg_delta}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+\toprule
+Variant & $\Delta$NRMSE $\downarrow$ & $\Delta$Cal.\ Error $\downarrow$ & $\Delta$Post.\ Contr.\ $\uparrow$ \\
+\midrule
+No SAB     & $+0.0030$ & $+0.0053$          & $-0.0068$ \\
+No MAB     & $+0.1780$ & $+0.0006$          & $-0.8386$ \\
+No FiLM    & $-0.0047$ & \textbf{$+0.0011$} & \textbf{$+0.0093$} \\
+No Fourier & \textbf{$-0.0055$} & $+0.0028$ & $+0.0065$ \\
+\bottomrule
+\end{tabularx}
+\end{table}

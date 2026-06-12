@@ -1,0 +1,49 @@
+\begin{table}[t]
+\centering
+\caption{Component ablation metrics across all design conditions, ordered by number of
+active parameters. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Bold indicates best per metric
+within each condition group. $^\dagger$No MAB collapses Posterior Contraction
+across all conditions; its Cal.\ Error optimum is not meaningful.}
+\label{tab:component_ablation_raw}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}l >{\centering\arraybackslash}X >{\centering\arraybackslash}X >{\centering\arraybackslash}X}
+\toprule
+Condition & Variant & NRMSE $\downarrow$ & Cal.\ Error $\downarrow$ & Post.\ Contr.\ $\uparrow$ \\
+\midrule
+\multirow{5}{*}{\shortstack[l]{Fixed\\{\small ($n=4$)}}}
+ & Baseline   & 0.0576 & \textbf{0.0168} & 0.9656 \\
+ & No SAB     & 0.0578 & 0.0387          & 0.9435 \\
+ & No MAB     & 0.2554 & 0.0170          & 0.0367 \\
+ & No FiLM    & 0.0547 & 0.0214          & \textbf{0.9660} \\
+ & No Fourier & \textbf{0.0527} & 0.0233 & 0.9654 \\
+\midrule
+\multirow{5}{*}{\shortstack[l]{Intercept Only\\{\small ($n=6$)}}}
+ & Baseline   & 0.0955 & 0.0250          & 0.8329 \\
+ & No SAB     & 0.1023 & 0.0217          & 0.8248 \\
+ & No MAB     & 0.2492 & 0.0259          & 0.0772 \\
+ & No FiLM    & \textbf{0.0865} & 0.0219 & \textbf{0.8446} \\
+ & No Fourier & 0.0901 & \textbf{0.0193} & 0.8196 \\
+\midrule
+\multirow{5}{*}{\shortstack[l]{Fixed + Regressed\\{\small ($n=10$)}}}
+ & Baseline   & 0.0715 & 0.0202          & 0.9376 \\
+ & No SAB     & 0.0772 & 0.0183          & 0.9254 \\
+ & No MAB$^\dagger$ & 0.2634 & 0.0161   & 0.0300 \\
+ & No FiLM    & 0.0705 & 0.0226          & 0.9463 \\
+ & No Fourier & \textbf{0.0673} & 0.0269 & \textbf{0.9465} \\
+\midrule
+\multirow{5}{*}{\shortstack[l]{Regressed\\{\small ($n=12$)}}}
+ & Baseline   & 0.0805 & 0.0225          & 0.8940 \\
+ & No SAB     & 0.0824 & 0.0207          & 0.8909 \\
+ & No MAB     & 0.2616 & 0.0267          & 0.0862 \\
+ & No FiLM    & \textbf{0.0733} & 0.0207 & 0.9031 \\
+ & No Fourier & 0.0760 & \textbf{0.0203} & \textbf{0.9037} \\
+\midrule
+\multirow{5}{*}{\shortstack[l]{Interaction\\{\small ($n=18$)}}}
+ & Baseline   & 0.1025 & \textbf{0.0167} & 0.8219 \\
+ & No SAB     & 0.1029 & 0.0283          & 0.8335 \\
+ & No MAB     & 0.2679 & 0.0182          & 0.0286 \\
+ & No FiLM    & 0.0993 & 0.0199          & 0.8383 \\
+ & No Fourier & \textbf{0.0942} & 0.0253 & \textbf{0.8491} \\
+\bottomrule
+\end{tabularx}
+\end{table}

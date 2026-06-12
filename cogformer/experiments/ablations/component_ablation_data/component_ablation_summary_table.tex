@@ -1,0 +1,48 @@
+\begin{table}[t]
+\centering
+\caption{Summary of component ablation variants: architectural role of each component,
+the ablation applied, and the observed effect on posterior approximation quality
+averaged across all five design conditions.
+Parenthetical deltas refer to mean $\Delta$ relative to the baseline CogFormer
+(see Table~\ref{tab:component_ablation_avg_delta}).}
+\label{tab:component_ablation_summary}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}l >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+Variant & Component Role & Observed Effect \\
+\midrule
+No SAB
+  & Self-attention across parameter tokens; allows parameters to coordinate
+    with one another during the denoising pass.
+  & Marginal degradation on all metrics ($\Delta$NRMSE $= {+0.003}$,
+    $\Delta$Post.\ Contr.\ $= {-0.007}$). The effect is small and
+    inconsistent across conditions, indicating SAB provides only a modest
+    inductive benefit. \\[4pt]
+No MAB
+  & Cross-attention from parameter tokens to the encoder summary; the primary
+    pathway through which the decoder reads the observed data.
+  & Catastrophic collapse of posterior contraction across all conditions
+    ($\Delta$Post.\ Contr.\ $= {-0.839}$, $\Delta$NRMSE $= {+0.178}$).
+    Without MAB, the decoder is effectively blind to the data, and the
+    near-zero $\Delta$Cal.\ Error is an artifact of degenerate, uninformative
+    posteriors rather than genuine calibration. \\[4pt]
+No FiLM
+  & Feature-wise linear modulation (FiLM) of the output projection,
+    conditioned on the current diffusion timestep; scales and shifts the
+    final representation before predicting velocity.
+  & Small consistent improvement in recovery and posterior contraction
+    ($\Delta$NRMSE $= {-0.005}$, $\Delta$Post.\ Contr.\ $= {+0.009}$).
+    Removing FiLM slightly reduces noise in the output stage, suggesting the
+    time-conditioned modulation introduces marginal over-parameterisation at
+    this scale. \\[4pt]
+No Fourier
+  & Learnable Fourier random-feature embedding of the diffusion timestep
+    \citep{tancik2020fourier}; projects the scalar $t$ into a
+    high-dimensional frequency space before concatenation.
+  & Consistent small improvement in NRMSE and posterior contraction
+    ($\Delta$NRMSE $= {-0.006}$, $\Delta$Post.\ Contr.\ $= {+0.006}$)
+    at the cost of slightly worse calibration ($\Delta$Cal.\ Error $= {+0.003}$).
+    The learnable frequency projection offers no meaningful advantage over a
+    fixed sinusoidal embedding for this task. \\
+\bottomrule
+\end{tabularx}
+\end{table}
