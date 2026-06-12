@@ -253,6 +253,8 @@ def parse_args():
     p.add_argument("--model_embed_dim", type=int, default=8)
     p.add_argument("--time_embedding_dim", type=int, default=32)
     p.add_argument("--pos_embedding_dim", type=int, default=32)
+    p.add_argument("--no_model_embedding", action="store_true", default=False,
+                   help="Load a checkpoint trained without model identity embeddings")
 
     return p.parse_args()
 
@@ -283,6 +285,8 @@ def main():
         keep_intercept=args.keep_intercept,
     )
 
+    num_models = None if args.no_model_embedding else model_class.num_models
+
     cogformer = CogFormer(
         encoder_input_dim=encoder_input_dim,
         encoder_num_layers=args.encoder_num_layers,
@@ -296,7 +300,7 @@ def main():
         layer_dropout=args.layer_dropout,
         time_embedding_dim=args.time_embedding_dim,
         pos_embedding_dim=args.pos_embedding_dim,
-        num_models=model_class.num_models,
+        num_models=num_models,
         model_embed_dim=args.model_embed_dim,
         decoder_layer_design="mixed_attention",
         decoder_layer_kwargs={"mab_first": True},
@@ -397,7 +401,7 @@ def main():
                 adapted["param_masks"],
                 steps=args.num_sample_steps,
                 num_samples=args.num_samples,
-                model_ids=adapted["model_ids"],
+                model_ids=None if args.no_model_embedding else adapted["model_ids"],
             )
 
             global_indices = model_class.local_to_global[model_name]
