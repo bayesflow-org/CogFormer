@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Model embedding ablation — DDM / Regressed. Mean metrics across
+all active parameters. $\Delta$ (in parentheses) is the change relative to the
+with-embedding baseline. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Best result per row is
+\textbf{bolded}.}
+\label{tab:embed_ablation_ddm_regressed}
+\begin{tabular}{lcc}
+\toprule
+ & With Embedding & No Embedding \\
+\midrule
+NRMSE $\downarrow$ & 0.0843 & \textbf{0.0818} \small{(-0.0025)} \\
+Cal.\ Error $\downarrow$ & \textbf{0.0305} & 0.0305 \small{(+0.0000)} \\
+Post.\ Contr. $\uparrow$ & \textbf{0.8860} & 0.8838 \small{(-0.0022)} \\
+\bottomrule
+\end{tabular}
+\end{table}

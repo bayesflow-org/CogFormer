@@ -1,0 +1,18 @@
+\begin{table}[t]
+\centering
+\caption{Model embedding ablation — DDM / Intercept Only. Mean metrics across
+all active parameters. $\Delta$ (in parentheses) is the change relative to the
+with-embedding baseline. NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$). Best result per row is
+\textbf{bolded}.}
+\label{tab:embed_ablation_ddm_intercept_only}
+\begin{tabular}{lcc}
+\toprule
+ & With Embedding & No Embedding \\
+\midrule
+NRMSE $\downarrow$ & \textbf{0.0994} & 0.1042 \small{(+0.0048)} \\
+Cal.\ Error $\downarrow$ & 0.0421 & \textbf{0.0331} \small{(-0.0090)} \\
+Post.\ Contr. $\uparrow$ & \textbf{0.8271} & 0.7942 \small{(-0.0329)} \\
+\bottomrule
+\end{tabular}
+\end{table}
