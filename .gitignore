@@ -194,3 +194,6 @@ bayesgpt/wandb
 # config.yaml
 config.yaml
 
+# Real-data application scripts (used in separate repo)
+cogformer/experiments/model_families/ddm_family_cf_application_1.py
+
