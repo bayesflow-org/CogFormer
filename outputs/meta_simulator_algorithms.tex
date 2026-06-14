@@ -1,0 +1,104 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[margin=1in]{geometry}
+
+\title{Meta-Simulator: Model Family and Model Class}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Overview}
+
+The meta-simulator operates at two levels of abstraction.
+A \textbf{Model Family} ($\texttt{NestedModelFamily}$) encapsulates a single
+cognitive model together with a context-conditioned data-generating process:
+it samples a random regression structure, draws coefficient matrices from a
+prior, computes per-trial intrinsic parameters via a link function, and
+simulates behavioral data.
+A \textbf{Model Class} ($\texttt{ModelClass}$) acts as a meta-simulator over a
+collection of model families: it randomly selects a family per batch element,
+delegates simulation to that family, and lifts all outputs into a shared global
+parameter space so that a single amortized inference network can train across
+all families simultaneously.
+
+\bigskip
+
+\begin{algorithm}[H]
+\caption{Model Family Simulator}
+\label{alg:model-family}
+\begin{algorithmic}[1]
+\Require Model $\mathcal{M}$, prior $p(\mathbf{B})$, intrinsic params $\boldsymbol{\theta}$, link function $g$
+\Require Number of observations $N$, number of regressors $R$
+
+\State \textbf{Sample design configuration} $\mathcal{D}$:
+    assign each regressor (intercept $+$ main effects $+$ interactions)
+    to a random subset of intrinsic parameters
+
+\State \textbf{Build parameter mask} $\mathbf{M} \in \{0,1\}^{C \times P}$
+    from $\mathcal{D}$, where $C$ = number of design columns, $P$ = number of intrinsic parameters
+
+\State \textbf{Build design matrix} $\mathbf{X} \in \mathbb{R}^{N \times C}$:
+    sample continuous or discrete regressor values per trial
+
+\State \textbf{Sample parameter matrix} $\mathbf{B} \in \mathbb{R}^{C \times P}$
+    from $p(\mathbf{B})$, zeroing masked-out entries via $\mathbf{M}$
+
+\State \textbf{Compute per-trial parameters}:
+\[
+    \boldsymbol{\Theta} = g(\mathbf{X}\mathbf{B}) \in \mathbb{R}^{N \times P}
+\]
+
+\State \textbf{Simulate trial data} $\mathbf{y} \sim \mathcal{M}(\boldsymbol{\Theta})$
+
+\State \Return $\{\mathbf{X},\, \mathbf{B},\, \mathbf{M},\, \boldsymbol{\Theta},\, \mathbf{y}\}$
+\end{algorithmic}
+\end{algorithm}
+
+\bigskip
+
+\begin{algorithm}[H]
+\caption{Model Class Meta-Simulator}
+\label{alg:model-class}
+\begin{algorithmic}[1]
+\Require Model families $\{\mathcal{F}_k\}_{k=1}^{K}$, sampling weights $\mathbf{w}$
+\Require Global parameter space $\Omega = \bigcup_k \boldsymbol{\theta}^{(k)}$
+\Require Batch size $S$, observation range $[N_{\min}, N_{\max}]$, regressor range $[R_{\min}, R_{\max}]$
+
+\State Sample $N \sim \mathrm{Uniform}(N_{\min}, N_{\max})$
+
+\For{$i = 1, \ldots, S$}
+    \State Sample model family index $k_i \sim \mathrm{Categorical}(\mathbf{w})$
+    \State Sample number of regressors $R_i \sim \mathrm{Uniform}(R_{\min}, R_{\max})$
+    \State Run \textbf{Algorithm~\ref{alg:model-family}} with $\mathcal{F}_{k_i}$, $N$, $R_i$
+        to obtain $\{\mathbf{X}_i, \mathbf{B}_i, \mathbf{M}_i, \boldsymbol{\Theta}_i, \mathbf{y}_i\}$
+    \State \textbf{Lift} $\mathbf{B}_i$, $\mathbf{M}_i$ to global space $\Omega$:
+        insert local parameter columns at their global indices,
+        pad with zeros for parameters absent in $\mathcal{F}_{k_i}$
+\EndFor
+
+\State \textbf{Collate} batch: zero-pad all arrays to maximum dimensions
+
+\State \Return $\bigl\{\mathbf{X}_i,\, \mathbf{B}_i^{\Omega},\, \mathbf{M}_i^{\Omega},\, \mathbf{y}_i,\, k_i\bigr\}_{i=1}^{S}$
+\end{algorithmic}
+\end{algorithm}
+
+\bigskip
+\noindent\textbf{Notation.}
+$C$ denotes the number of design columns (intercept plus regressor blocks,
+expanded for categorical levels); $P$ denotes the number of intrinsic
+parameters for the active family; $|\Omega|$ denotes the size of the global
+parameter space across all families.
+The lift step (Algorithm~\ref{alg:model-class}, line~6) re-indexes
+model-local parameter columns to their global positions, so that the collated
+batch has a consistent layout regardless of which family was sampled.
+The link function $g$ is applied column-wise, with a separate function per
+intrinsic parameter (e.g.\ softplus).
+
+\end{document}
