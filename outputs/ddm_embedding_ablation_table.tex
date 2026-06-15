@@ -1,0 +1,47 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage[margin=1in]{geometry}
+
+\begin{document}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Model embedding ablation for the DDM across all five design conditions.
+Mean metrics across all active parameters.
+$\Delta$ (in parentheses) is the change relative to the with-embedding baseline.
+NRMSE and Calibration Error: lower is better ($\downarrow$).
+Posterior Contraction: higher is better ($\uparrow$).
+Best result per condition per metric is \textbf{bolded}.}
+\label{tab:ddm_embedding_ablation}
+\begin{tabular}{l l ccc}
+\toprule
+Design Condition & & NRMSE $\downarrow$ & Cal.\ Error $\downarrow$ & Post.\ Contr.\ $\uparrow$ \\
+\midrule
+\multirow{2}{*}{Intercept Only}
+ & Without Embedding & 0.1042 \small{(+0.0048)} & \textbf{0.0331} \small{(-0.0090)} & 0.7942 \small{(-0.0329)} \\
+ & With Embedding    & \textbf{0.0994}           & 0.0421                            & \textbf{0.8271}           \\
+\midrule
+\multirow{2}{*}{Fixed}
+ & Without Embedding & 0.0677 \small{(+0.0074)} & \textbf{0.0436} \small{(-0.0191)} & 0.9473 \small{(-0.0062)} \\
+ & With Embedding    & \textbf{0.0604}           & 0.0627                            & \textbf{0.9535}           \\
+\midrule
+\multirow{2}{*}{Regressed}
+ & Without Embedding & \textbf{0.0818} \small{(-0.0025)} & 0.0305 \small{(+0.0000)} & 0.8838 \small{(-0.0022)} \\
+ & With Embedding    & 0.0843                            & \textbf{0.0305}          & \textbf{0.8860}           \\
+\midrule
+\multirow{2}{*}{Fixed Regressed}
+ & Without Embedding & 0.0787 \small{(+0.0012)} & \textbf{0.0245} \small{(-0.0107)} & 0.9193 \small{(-0.0029)} \\
+ & With Embedding    & \textbf{0.0775}           & 0.0352                            & \textbf{0.9222}           \\
+\midrule
+\multirow{2}{*}{Interaction}
+ & Without Embedding & \textbf{0.1054} \small{(-0.0017)} & \textbf{0.0242} \small{(-0.0016)} & \textbf{0.8112} \small{(+0.0056)} \\
+ & With Embedding    & 0.1071                            & 0.0258                            & 0.8056                            \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}
