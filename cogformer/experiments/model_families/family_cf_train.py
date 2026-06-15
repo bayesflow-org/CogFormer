@@ -200,7 +200,10 @@ class CogFormerTrainer:
         self.default_fixed_values = reg["default_fixed_values"]
         self.bf_data_stem = reg["bf_data_stem"]
         self.benchmark_design_configs = reg["benchmark_design_configs"]
-        self.amortization_history = {case: {"steps": [], "joint_c2st": []} for case in reg["benchmark_design_configs"]}
+        self.amortization_history = {
+            case: {"steps": [], "joint_c2st": []}
+            for case in reg["benchmark_design_configs"]
+        }
         self.device = next(cf.parameters()).device
 
     def _make_sample_fn(self, config):
@@ -383,32 +386,49 @@ class CogFormerTrainer:
 
     @torch.no_grad()
     def amortization_gap_step(self, config, global_step):
-        if not self.use_wandb:
-            return
-
         self.cf.eval()
 
         intrinsic_params = self.intrinsic_params
         max_num_categories = config["model_family_config"]["max_num_categories"]
+        max_num_regressors = config["model_family_config"]["max_num_regressors"]
         num_obs = config["val_sample_config"]["num_obs"]
-        batch_size = config["batch_size"]
         log_dict = {}
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            free_intr, fixed_intr, fixed_vals = infer_free_fixed_intrinsics(
-                design_config, intrinsic_params, self.default_fixed_values
-            )
-            test_samples = self.model_family.batch_sample(
-                **config["model_family_config"],
-                mask_randomizer_kwargs={"free_intrinsics": free_intr, "fixed_intrinsics": fixed_intr, "fixed_values": fixed_vals},
-                min_num_regressors=0,
-                num_obs=num_obs,
-                fixed_config=True,
-                batch_size=batch_size,
-                flatten_param_outputs=True,
-                design_config=design_config,
-                link_fun=self.link_fun(),
-            )
+            bf_path = Path(f"./cogformer/experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
+
+            # Pair CogFormer with BayesFlow by conditioning both on the SAME datasets.
+            # When the BayesFlow npz exists, reconstruct the adapter input from its stored
+            # observations (rts/choices/design_matrices) so CogFormer answers the exact
+            # questions BayesFlow answered. Only then is a per-dataset C2ST meaningful.
+            if bf_path.exists():
+                bf_data = np.load(bf_path, allow_pickle=True)
+                test_samples = {
+                    "design_matrices": bf_data["design_matrices"],
+                    "sim_data": {"rts": bf_data["rts"], "choices": bf_data["choices"]},
+                    "param_masks": bf_data["param_masks"],
+                    "param_matrices": bf_data["true_set"],
+                    "max_num_regressors": max_num_regressors,
+                    "max_num_categories": max_num_categories,
+                }
+            else:
+                # No BayesFlow baseline for this case: fall back to fresh simulation and
+                # report CogFormer's own metrics only (no C2ST without a paired baseline).
+                bf_data = None
+                free_intr, fixed_intr, fixed_vals = infer_free_fixed_intrinsics(
+                    design_config, intrinsic_params, self.default_fixed_values
+                )
+                test_samples = self.model_family.batch_sample(
+                    **config["model_family_config"],
+                    mask_randomizer_kwargs={"free_intrinsics": free_intr, "fixed_intrinsics": fixed_intr, "fixed_values": fixed_vals},
+                    min_num_regressors=0,
+                    num_obs=num_obs,
+                    fixed_config=True,
+                    batch_size=config["batch_size"],
+                    flatten_param_outputs=True,
+                    design_config=design_config,
+                    link_fun=self.link_fun(),
+                )
 
             adapted = self.adapter.adapt(test_samples, intrinsic_params=intrinsic_params)
             for k, v in adapted.items():
@@ -423,6 +443,7 @@ class CogFormerTrainer:
 
             n_cols = len(intrinsic_params)
             true_set = adapted["param_matrices"].detach().cpu().numpy()
+            batch_size = true_set.shape[0]
             n_rows = true_set.shape[1] // n_cols
             true_set = true_set.reshape(batch_size, n_rows, n_cols)
             pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, n_cols)
@@ -439,9 +460,9 @@ class CogFormerTrainer:
                     key = f"val/{case_name}/{metric.lower().replace(' ', '_')}"
                     log_dict[key] = float(metrics_df[metric].mean())
 
-            bf_path = Path(f"./cogformer/experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
-            if bf_path.exists():
-                bf_data = np.load(bf_path, allow_pickle=True)
+            if bf_data is not None:
+                # BayesFlow stores the full flat grid; select active cells and scatter
+                # them back onto the (n_rows, n_cols) grid, aligned with CogFormer.
                 active_idx = bf_data["param_masks"][0].astype(bool)
                 bf_pred_grid = reshape_bf_to_gpt(
                     bf_data["pred_set"][:, :, active_idx], design_config, intrinsic_params
@@ -455,20 +476,23 @@ class CogFormerTrainer:
                 self.amortization_history[case_name]["steps"].append(global_step)
                 self.amortization_history[case_name]["joint_c2st"].append(joint_score)
 
-        if log_dict:
+        if log_dict and self.use_wandb:
             wandb.log(log_dict, step=global_step)
 
         self.cf.train()
 
     def plot_amortization_gap(self):
         fig, ax = plt.subplots(figsize=(7, 4))
+        all_steps = [s for data in self.amortization_history.values() for s in data["steps"]]
+        max_step = max(all_steps) if all_steps else 1
         for case_name, data in self.amortization_history.items():
             if data["steps"]:
-                ax.plot(data["steps"], data["joint_c2st"], marker="o", markersize=3, label=case_name)
+                norm_steps = np.asarray(data["steps"]) / max_step
+                ax.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3, label=case_name)
         ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
-        ax.set_xlabel("Training step")
+        ax.set_xlabel("Normalized training step")
         ax.set_ylabel("Joint C2ST")
-        ax.set_title(f"{self.fam_lower.upper()} — Amortization Gap")
+        ax.set_xlim(0.0, 1.0)
         ax.legend(fontsize=8)
         ax.set_ylim(0.45, 1.0)
         fig_dir = Path(f"./cogformer/experiments/figures/{self.fig_base}")
