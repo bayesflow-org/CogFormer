@@ -246,6 +246,12 @@ def cogformer_mc_colors():
 
     return colors
 
+def interpolate_palette(colors_dict, n):
+    """Return n colors by interpolating intercept → main_effect → interaction."""
+    anchors = [colors_dict["intercept"], colors_dict["main_effect"], colors_dict["interaction"]]
+    cmap = mcolors.LinearSegmentedColormap.from_list("palette", anchors)
+    return [cmap(i / max(n - 1, 1)) for i in range(n)]
+
 def staedtler_fineliner():
     colors = {
         "bf": bf_colors(),

@@ -28,7 +28,7 @@ from cogformer.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from cogformer.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from cogformer.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
-from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.plot_utils import cogformer_fm_colors, interpolate_palette
 from cogformer.utils.training_utils import Prefetcher
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.diagnostics.metric.adaptive_c2st import compute_joint_c2st
@@ -485,10 +485,11 @@ class CogFormerTrainer:
         fig, ax = plt.subplots(figsize=(7, 4))
         all_steps = [s for data in self.amortization_history.values() for s in data["steps"]]
         max_step = max(all_steps) if all_steps else 1
-        for case_name, data in self.amortization_history.items():
+        palette = interpolate_palette(cogformer_fm_colors(), len(self.amortization_history))
+        for (case_name, data), color in zip(self.amortization_history.items(), palette):
             if data["steps"]:
                 norm_steps = np.asarray(data["steps"]) / max_step
-                ax.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3, label=case_name)
+                ax.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3, label=case_name, color=color)
         ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
         ax.set_xlabel("Normalized training step")
         ax.set_ylabel("Joint C2ST")
