@@ -391,6 +391,9 @@ class CogFormerTrainer:
         intrinsic_params = self.intrinsic_params
         max_num_categories = config["model_family_config"]["max_num_categories"]
         max_num_regressors = config["model_family_config"]["max_num_regressors"]
+        keep_intercept = config["model_family_config"]["keep_intercept"]
+        max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
+        expected_dm_cols = max_total_regressors * (max_num_categories - 1) + (1 if keep_intercept else 0)
         num_obs = config["val_sample_config"]["num_obs"]
         log_dict = {}
 
@@ -403,11 +406,22 @@ class CogFormerTrainer:
             # questions BayesFlow answered. Only then is a per-dataset C2ST meaningful.
             if bf_path.exists():
                 bf_data = np.load(bf_path, allow_pickle=True)
+                dm = bf_data["design_matrices"]
+                if dm.shape[-1] < expected_dm_cols:
+                    dm = np.pad(dm, ((0,0),(0,0),(0, expected_dm_cols - dm.shape[-1])), constant_values=0.0)
+                # BF stores 1-row grids for intercept_only/fixed; pad to full n_rows×n_cols
+                full_grid = len(design_config) * len(intrinsic_params)
+                true_set = bf_data["true_set"]
+                param_masks = bf_data["param_masks"]
+                if true_set.shape[1] < full_grid:
+                    pad = full_grid - true_set.shape[1]
+                    true_set = np.pad(true_set, ((0,0),(0,pad)), constant_values=0.0)
+                    param_masks = np.pad(param_masks, ((0,0),(0,pad)), constant_values=0.0)
                 test_samples = {
-                    "design_matrices": bf_data["design_matrices"],
+                    "design_matrices": dm,
                     "sim_data": {"rts": bf_data["rts"], "choices": bf_data["choices"]},
-                    "param_masks": bf_data["param_masks"],
-                    "param_matrices": bf_data["true_set"],
+                    "param_masks": param_masks,
+                    "param_matrices": true_set,
                     "max_num_regressors": max_num_regressors,
                     "max_num_categories": max_num_categories,
                 }

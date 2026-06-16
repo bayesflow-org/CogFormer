@@ -309,6 +309,9 @@ class CogFormerTrainer:
         model_family_config = config["model_family_config"]
         max_num_regressors = model_family_config["max_num_regressors"]
         max_num_categories = model_family_config["max_num_categories"]
+        keep_intercept = model_family_config["keep_intercept"]
+        max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
+        expected_dm_cols = max_total_regressors * (max_num_categories - 1) + (1 if keep_intercept else 0)
         log_dict = {}
 
         for model_name, model_cfg in MODEL_CONFIGS.items():
@@ -324,12 +327,22 @@ class CogFormerTrainer:
 
                 if bf_path.exists():
                     bf_data = np.load(bf_path, allow_pickle=True)
+                    dm = bf_data["design_matrices"]
+                    if dm.shape[-1] < expected_dm_cols:
+                        dm = np.pad(dm, ((0,0),(0,0),(0, expected_dm_cols - dm.shape[-1])), constant_values=0.0)
+                    full_grid = len(design_config) * len(intrinsic_params)
+                    true_set = bf_data["true_set"]
+                    bf_masks = bf_data["param_masks"]
+                    if true_set.shape[1] < full_grid:
+                        pad = full_grid - true_set.shape[1]
+                        true_set = np.pad(true_set, ((0,0),(0,pad)), constant_values=0.0)
+                        bf_masks = np.pad(bf_masks, ((0,0),(0,pad)), constant_values=0.0)
                     lifted_params, lifted_masks = self.model_class.lift_to_global_space(
-                        model_name, bf_data["true_set"], bf_data["param_masks"],
+                        model_name, true_set, bf_masks,
                     )
                     batch_size = lifted_params.shape[0]
                     test_samples = {
-                        "design_matrices": bf_data["design_matrices"],
+                        "design_matrices": dm,
                         "sim_data": {"rts": bf_data["rts"], "choices": bf_data["choices"]},
                         "param_masks": lifted_masks,
                         "param_matrices": lifted_params,
