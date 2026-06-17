@@ -496,20 +496,35 @@ class CogFormerTrainer:
         self.cf.train()
 
     def plot_amortization_gap(self):
-        fig, ax = plt.subplots(figsize=(7, 4))
+        import seaborn as sns
+        import pandas as pd
+
         all_steps = [s for data in self.amortization_history.values() for s in data["steps"]]
         max_step = max(all_steps) if all_steps else 1
-        palette = interpolate_palette(cogformer_fm_colors(), len(self.amortization_history))
-        for (case_name, data), color in zip(self.amortization_history.items(), palette):
+
+        cases = list(self.amortization_history.keys())
+        palette = interpolate_palette(cogformer_fm_colors(), len(cases))
+        regressed_idx = cases.index("regressed") if "regressed" in cases else len(cases) // 2
+        agg_color = palette[regressed_idx]
+
+        rows = []
+        for case_name, data in self.amortization_history.items():
             if data["steps"]:
                 norm_steps = np.asarray(data["steps"]) / max_step
-                ax.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3, label=case_name, color=color)
+                for step, score in zip(norm_steps, data["joint_c2st"]):
+                    rows.append({"norm_step": step, "joint_c2st": score})
+        df = pd.DataFrame(rows)
+
+        fig, ax = plt.subplots(figsize=(7, 4))
+        sns.lineplot(data=df, x="norm_step", y="joint_c2st", ax=ax,
+                     color=agg_color, errorbar="sd", marker="o", markersize=3,
+                     label="mean ± SD (all cases)")
         ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
         ax.set_xlabel("Normalized training step")
         ax.set_ylabel("Joint C2ST")
-        ax.set_xlim(0.0, 1.0)
-        ax.legend(fontsize=8)
+        ax.set_xlim(0.1, 1.1)
         ax.set_ylim(0.45, 1.0)
+        ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
         fig_dir = Path(f"./cogformer/experiments/figures/{self.fig_base}")
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / f"{self.fam_lower}_amortization_gap.pdf"
