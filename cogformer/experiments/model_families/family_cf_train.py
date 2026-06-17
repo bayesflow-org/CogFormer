@@ -247,6 +247,7 @@ class CogFormerTrainer:
 
         prefetcher.shutdown()
         self.plot_amortization_gap()
+        self.save_fm_predictions(val_config)
         checkpoint_dir = Path(f"./cogformer/experiments/checkpoints/{self.checkpoint_subdir}/")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
@@ -508,6 +509,66 @@ class CogFormerTrainer:
 
         self.cf.train()
 
+    @torch.no_grad()
+    def save_fm_predictions(self, config):
+        self.cf.eval()
+        intrinsic_params = self.intrinsic_params
+        max_num_categories = config["model_family_config"]["max_num_categories"]
+        max_num_regressors = config["model_family_config"]["max_num_regressors"]
+        keep_intercept = config["model_family_config"]["keep_intercept"]
+        max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
+        expected_dm_cols = max_total_regressors * (max_num_categories - 1) + (1 if keep_intercept else 0)
+        out_dir = Path("./cogformer/experiments/data")
+
+        for case_name, design_config in self.benchmark_design_configs.items():
+            bf_path = Path(f"./cogformer/experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
+            if not bf_path.exists():
+                logging.warning(f"No BF data for '{case_name}', skipping FM pred save.")
+                continue
+
+            bf_data = np.load(bf_path, allow_pickle=True)
+            dm = bf_data["design_matrices"]
+            if dm.shape[-1] < expected_dm_cols:
+                dm = np.pad(dm, ((0,0),(0,0),(0, expected_dm_cols - dm.shape[-1])), constant_values=0.0)
+            full_grid = len(design_config) * len(intrinsic_params)
+            true_set = bf_data["true_set"]
+            param_masks = bf_data["param_masks"]
+            if true_set.shape[1] < full_grid:
+                pad = full_grid - true_set.shape[1]
+                true_set = np.pad(true_set, ((0,0),(0,pad)), constant_values=0.0)
+                param_masks = np.pad(param_masks, ((0,0),(0,pad)), constant_values=0.0)
+
+            test_samples = {
+                "design_matrices": dm,
+                "sim_data": {"rts": bf_data["rts"], "choices": bf_data["choices"]},
+                "param_masks": param_masks,
+                "param_matrices": true_set,
+                "max_num_regressors": max_num_regressors,
+                "max_num_categories": max_num_categories,
+            }
+            adapted = self.adapter.adapt(test_samples, intrinsic_params=intrinsic_params)
+            for k, v in adapted.items():
+                if torch.is_tensor(v):
+                    adapted[k] = v.to(self.device)
+
+            pred_set = self.cf.sample(
+                adapted["input_data"], adapted["param_indices"],
+                adapted["regressor_indices"], adapted["param_masks"],
+                steps=config["fm_sample_steps"], num_samples=config["fm_num_samples"],
+            )
+
+            n_cols = len(intrinsic_params)
+            batch_size = adapted["param_matrices"].shape[0]
+            n_rows = adapted["param_matrices"].shape[1] // n_cols
+            pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, n_cols)
+            params_mask = adapted["param_masks"].detach().cpu().numpy().reshape(batch_size, n_rows, n_cols)[0]
+
+            out_path = out_dir / f"{self.bf_data_stem}_family_{case_name}_cf_pred.npz"
+            np.savez(out_path, pred_set=pred_set, params_mask=params_mask)
+            logging.info(f"[saved] {out_path}")
+
+        self.cf.train()
+
     def plot_amortization_gap(self):
         all_steps = [s for data in self.amortization_history.values() for s in data["steps"]]
         max_step = max(all_steps) if all_steps else 1
@@ -532,7 +593,8 @@ class CogFormerTrainer:
             ax.set_xlabel("Normalized training step")
             ax.set_xlim(0.0, 1.0)
             ax.set_ylim(0.45, 1.0)
-            ax.legend(fontsize=8)
+            ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
+                      ncol=len(self.amortization_history) + 1)
             ax.set_title(title)
 
         ax_bf.set_ylabel("Joint C2ST")

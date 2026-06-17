@@ -402,18 +402,17 @@ class CogFormerTrainer:
                         log_dict[key] = float(metrics_df[metric].mean())
 
                 if bf_data is not None:
-                    active_idx = bf_data["param_masks"][0].astype(bool)
-                    bf_pred_grid = reshape_bf_to_gpt(
-                        bf_data["pred_set"][:, :, active_idx], design_config, intrinsic_params
-                    )
-                    joint_score = compute_joint_c2st(
-                        pred_a=pred_set, pred_b=bf_pred_grid,
-                        design_config=design_config, intrinsic_params=intrinsic_params,
-                        max_num_categories=max_num_categories, parameter_mask=params_mask,
-                    )
-                    log_dict[f"val/{model_name}/{case_name}/joint_c2st"] = joint_score
-                    self.amortization_history[model_name][case_name]["steps"].append(global_step)
-                    self.amortization_history[model_name][case_name]["joint_c2st"].append(joint_score)
+                    fm_pred_path = Path(f"./cogformer/experiments/data/{model_lower}_family_{case_name}_cf_pred.npz")
+                    if fm_pred_path.exists():
+                        fm_data = np.load(fm_pred_path, allow_pickle=True)
+                        joint_score = compute_joint_c2st(
+                            pred_a=pred_set, pred_b=fm_data["pred_set"],
+                            design_config=design_config, intrinsic_params=intrinsic_params,
+                            max_num_categories=max_num_categories, parameter_mask=params_mask,
+                        )
+                        log_dict[f"val/{model_name}/{case_name}/joint_c2st"] = joint_score
+                        self.amortization_history[model_name][case_name]["steps"].append(global_step)
+                        self.amortization_history[model_name][case_name]["joint_c2st"].append(joint_score)
 
         if log_dict and self.use_wandb:
             wandb.log(log_dict, step=global_step)
@@ -421,11 +420,11 @@ class CogFormerTrainer:
         self.cf.train()
 
     def plot_amortization_gap(self):
-        fig, ax = plt.subplots(figsize=(7, 4))
         ddm_history = self.amortization_history["DDM"]
         all_steps = [s for data in ddm_history.values() for s in data["steps"]]
         max_step = max(all_steps) if all_steps else 1
         palette = interpolate_palette(cogformer_mc_colors(), len(ddm_history))
+        fig, ax = plt.subplots(figsize=(7, 4))
         for (case_name, data), color in zip(ddm_history.items(), palette):
             if data["steps"]:
                 norm_steps = np.asarray(data["steps"]) / max_step
@@ -433,9 +432,9 @@ class CogFormerTrainer:
         ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
         ax.set_xlabel("Normalized training step")
         ax.set_ylabel("Joint C2ST")
-        ax.set_xlim(0.0, 1.0)
+        ax.set_xlim(0.1, 1.1)
         ax.set_ylim(0.45, 1.0)
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=len(ddm_history) + 1)
         fig_dir = Path("./cogformer/experiments/figures/fm/model_class")
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / "model_class_amortization_gap.pdf"
