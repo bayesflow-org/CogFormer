@@ -201,7 +201,7 @@ class CogFormerTrainer:
         self.bf_data_stem = reg["bf_data_stem"]
         self.benchmark_design_configs = reg["benchmark_design_configs"]
         self.amortization_history = {
-            case: {"steps": [], "joint_c2st": [], "mc_joint_c2st": []}
+            case: {"steps": [], "joint_c2st": []}
             for case in reg["benchmark_design_configs"]
         }
         self.device = next(cf.parameters()).device
@@ -491,19 +491,6 @@ class CogFormerTrainer:
                 self.amortization_history[case_name]["steps"].append(global_step)
                 self.amortization_history[case_name]["joint_c2st"].append(joint_score)
 
-                mc_path = Path(f"./cogformer/experiments/data/model_class/{self.bf_data_stem}_{case_name}_cf_pred.npz")
-                if mc_path.exists():
-                    mc_data = np.load(mc_path, allow_pickle=True)
-                    mc_pred_set = mc_data["pred_set"]
-                    mc_params_mask = mc_data["params_mask"]
-                    mc_joint_score = compute_joint_c2st(
-                        pred_a=mc_pred_set, pred_b=pred_set,
-                        design_config=design_config, intrinsic_params=intrinsic_params,
-                        max_num_categories=max_num_categories, parameter_mask=mc_params_mask,
-                    )
-                    log_dict[f"val/{case_name}/mc_joint_c2st"] = mc_joint_score
-                    self.amortization_history[case_name]["mc_joint_c2st"].append(mc_joint_score)
-
         if log_dict and self.use_wandb:
             wandb.log(log_dict, step=global_step)
 
@@ -573,31 +560,21 @@ class CogFormerTrainer:
         all_steps = [s for data in self.amortization_history.values() for s in data["steps"]]
         max_step = max(all_steps) if all_steps else 1
         palette = interpolate_palette(cogformer_fm_colors(), len(self.amortization_history))
-        has_mc = any(data["mc_joint_c2st"] for data in self.amortization_history.values())
 
-        fig, axes = plt.subplots(1, 2 if has_mc else 1, figsize=(14 if has_mc else 7, 4), sharey=True)
-        ax_bf = axes[0] if has_mc else axes
-        ax_mc = axes[1] if has_mc else None
-
+        fig, ax = plt.subplots(figsize=(7, 4))
         for (case_name, data), color in zip(self.amortization_history.items(), palette):
             if data["steps"]:
                 norm_steps = np.asarray(data["steps"]) / max_step
-                ax_bf.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3,
-                           label=case_name, color=color)
-                if ax_mc is not None and data["mc_joint_c2st"]:
-                    ax_mc.plot(norm_steps, data["mc_joint_c2st"], marker="o", markersize=3,
-                               label=case_name, color=color)
+                ax.plot(norm_steps, data["joint_c2st"], marker="o", markersize=3,
+                        label=case_name, color=color)
 
-        for ax, title in [(ax_bf, "FM vs BF")] + ([(ax_mc, "MC vs FM")] if ax_mc is not None else []):
-            ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
-            ax.set_xlabel("Normalized training step")
-            ax.set_xlim(0.0, 1.0)
-            ax.set_ylim(0.45, 1.0)
-            ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
-                      ncol=len(self.amortization_history) + 1)
-            ax.set_title(title)
-
-        ax_bf.set_ylabel("Joint C2ST")
+        ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
+        ax.set_xlabel("Normalized training step")
+        ax.set_ylabel("Joint C2ST")
+        ax.set_xlim(0.1, 1.1)
+        ax.set_ylim(0.45, 1.0)
+        ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
+                  ncol=len(self.amortization_history) + 1)
         fig_dir = Path(f"./cogformer/experiments/figures/{self.fig_base}")
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / f"{self.fam_lower}_amortization_gap.pdf"
