@@ -496,7 +496,7 @@ class CogFormerTrainer:
                     mc_pred_set = mc_data["pred_set"]
                     mc_params_mask = mc_data["params_mask"]
                     mc_joint_score = compute_joint_c2st(
-                        pred_a=pred_set, pred_b=mc_pred_set,
+                        pred_a=mc_pred_set, pred_b=pred_set,
                         design_config=design_config, intrinsic_params=intrinsic_params,
                         max_num_categories=max_num_categories, parameter_mask=mc_params_mask,
                     )
@@ -527,7 +527,7 @@ class CogFormerTrainer:
                     ax_mc.plot(norm_steps, data["mc_joint_c2st"], marker="o", markersize=3,
                                label=case_name, color=color)
 
-        for ax, title in [(ax_bf, "FM vs BF")] + ([(ax_mc, "FM vs MC")] if ax_mc is not None else []):
+        for ax, title in [(ax_bf, "FM vs BF")] + ([(ax_mc, "MC vs FM")] if ax_mc is not None else []):
             ax.axhline(0.5, color="gray", linestyle="--", linewidth=0.8, label="chance (0.5)")
             ax.set_xlabel("Normalized training step")
             ax.set_xlim(0.0, 1.0)
