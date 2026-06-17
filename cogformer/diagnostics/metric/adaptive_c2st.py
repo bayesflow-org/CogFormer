@@ -82,7 +82,7 @@ def compute_c2st_accuracy(
         clf.fit(X[train_idx], y[train_idx])
         scores.append(clf.score(X[val_idx], y[val_idx]))
 
-    return float(np.mean(scores))
+    return float(max(np.mean(scores), 0.5))
 
 
 def compute_joint_c2st(
@@ -99,16 +99,19 @@ def compute_joint_c2st(
     random_state: int = 0,
 ) -> float:
     """
-    Global joint C2ST accuracy over all active parameters simultaneously.
+    Joint C2ST accuracy for a single dataset's posterior samples.
 
-    Pools posterior samples from all datasets and all active parameter dimensions
-    into a single classifier, testing whether the full joint posterior matches
-    between the two approximators.
+    Mirrors the interface of adaptive_posterior: takes one dataset at a time
+    (num_draws, num_rows, num_cols). Averaging over multiple datasets is the
+    caller's responsibility, using the same dataset indices as the posterior
+    pair plots.
 
     Parameters
     ----------
-    pred_a : np.ndarray of shape (batch_size, num_draws, num_rows, num_cols)
-    pred_b : np.ndarray of shape (batch_size, num_draws, num_rows, num_cols)
+    pred_a : np.ndarray of shape (num_draws, num_rows, num_cols)
+        Posterior samples from approximator A (e.g. CogFormer) for one dataset.
+    pred_b : np.ndarray of shape (num_draws, num_rows, num_cols)
+        Posterior samples from approximator B (e.g. BayesFlow) for the same dataset.
     design_config : dict
     intrinsic_params : list[str]
     max_num_categories : int
@@ -122,7 +125,7 @@ def compute_joint_c2st(
     Returns
     -------
     float
-        Single C2ST accuracy value for the joint distribution over all active parameters.
+        C2ST accuracy for the joint distribution over all active parameters.
     """
     if parameter_mask is None:
         cm = ContextManager()
@@ -136,15 +139,10 @@ def compute_joint_c2st(
         parameter_mask = parameter_mask[0]
 
     active = parameter_mask == 1.0
-    num_active = int(active.sum())
-
-    # (batch, draws, num_active) → (batch*draws, num_active)
-    samples_a = pred_a[:, :, active].reshape(-1, num_active)
-    samples_b = pred_b[:, :, active].reshape(-1, num_active)
 
     return compute_c2st_accuracy(
-        samples_a=samples_a,
-        samples_b=samples_b,
+        samples_a=pred_a[:, active],
+        samples_b=pred_b[:, active],
         n_splits=n_splits,
         hidden_layer_sizes=hidden_layer_sizes,
         max_iter=max_iter,

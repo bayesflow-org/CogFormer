@@ -481,11 +481,17 @@ class CogFormerTrainer:
                 bf_pred_grid = reshape_bf_to_gpt(
                     bf_data["pred_set"][:, :, active_idx], design_config, intrinsic_params
                 )
-                joint_score = compute_joint_c2st(
-                    pred_a=pred_set, pred_b=bf_pred_grid,
-                    design_config=design_config, intrinsic_params=intrinsic_params,
-                    max_num_categories=max_num_categories, parameter_mask=params_mask,
-                )
+                # Per-posterior C2ST over the same 10 datasets used for pair plots.
+                n_plot = min(10, pred_set.shape[0], bf_pred_grid.shape[0])
+                c2st_scores = [
+                    compute_joint_c2st(
+                        pred_a=pred_set[i], pred_b=bf_pred_grid[i],
+                        design_config=design_config, intrinsic_params=intrinsic_params,
+                        max_num_categories=max_num_categories, parameter_mask=params_mask,
+                    )
+                    for i in range(n_plot)
+                ]
+                joint_score = float(np.mean(c2st_scores))
                 log_dict[f"val/{case_name}/joint_c2st"] = joint_score
                 self.amortization_history[case_name]["steps"].append(global_step)
                 self.amortization_history[case_name]["joint_c2st"].append(joint_score)
