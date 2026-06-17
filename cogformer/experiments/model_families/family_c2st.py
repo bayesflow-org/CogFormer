@@ -98,16 +98,11 @@ def load_cf_pred(pred_path):
 
 def run_comparison(pred_a, pred_b, design_config, intrinsic_params, variable_names,
                    colors, max_num_categories, params_mask, outdir, file_prefix):
-    n_plot = min(10, pred_a.shape[0], pred_b.shape[0])
-    c2st_scores = [
-        compute_joint_c2st(
-            pred_a=pred_a[i], pred_b=pred_b[i], design_config=design_config,
-            intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
-            parameter_mask=params_mask,
-        )
-        for i in range(n_plot)
-    ]
-    joint_score = float(np.mean(c2st_scores))
+    joint_score = compute_joint_c2st(
+        pred_a=pred_a, pred_b=pred_b, design_config=design_config,
+        intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,
+        parameter_mask=params_mask,
+    )
     c2st_df = compute_adaptive_c2st(
         pred_a=pred_a, pred_b=pred_b, design_config=design_config,
         intrinsic_params=intrinsic_params, max_num_categories=max_num_categories,

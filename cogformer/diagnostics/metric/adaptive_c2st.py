@@ -92,6 +92,7 @@ def compute_joint_c2st(
     intrinsic_params: list[str],
     max_num_categories: int,
     parameter_mask: np.ndarray = None,
+    n_datasets: int = 10,
     n_splits: int = 5,
     hidden_layer_sizes: tuple | str = "auto",
     max_iter: int = 1000,
@@ -99,23 +100,23 @@ def compute_joint_c2st(
     random_state: int = 0,
 ) -> float:
     """
-    Joint C2ST accuracy for a single dataset's posterior samples.
+    Joint C2ST accuracy averaged over the first n_datasets posterior datasets.
 
-    Mirrors the interface of adaptive_posterior: takes one dataset at a time
-    (num_draws, num_rows, num_cols). Averaging over multiple datasets is the
-    caller's responsibility, using the same dataset indices as the posterior
-    pair plots.
+    Computes C2ST per dataset (matching the convention of posterior pair plots)
+    and returns the mean over the first n_datasets.
 
     Parameters
     ----------
-    pred_a : np.ndarray of shape (num_draws, num_rows, num_cols)
-        Posterior samples from approximator A (e.g. CogFormer) for one dataset.
-    pred_b : np.ndarray of shape (num_draws, num_rows, num_cols)
-        Posterior samples from approximator B (e.g. BayesFlow) for the same dataset.
+    pred_a : np.ndarray of shape (batch_size, num_draws, num_rows, num_cols)
+        Posterior samples from approximator A (e.g. CogFormer).
+    pred_b : np.ndarray of shape (batch_size, num_draws, num_rows, num_cols)
+        Posterior samples from approximator B (e.g. BayesFlow).
     design_config : dict
     intrinsic_params : list[str]
     max_num_categories : int
     parameter_mask : np.ndarray of shape (num_rows, num_cols), optional
+    n_datasets : int, optional, default: 10
+        Number of leading datasets to evaluate (same first-N as posterior pair plots).
     n_splits : int, optional, default: 5
     hidden_layer_sizes : tuple or "auto", optional, default: "auto"
     max_iter : int, optional, default: 1000
@@ -125,7 +126,7 @@ def compute_joint_c2st(
     Returns
     -------
     float
-        C2ST accuracy for the joint distribution over all active parameters.
+        Mean per-dataset C2ST accuracy over the joint active-parameter distribution.
     """
     if parameter_mask is None:
         cm = ContextManager()
@@ -139,16 +140,21 @@ def compute_joint_c2st(
         parameter_mask = parameter_mask[0]
 
     active = parameter_mask == 1.0
+    n = min(n_datasets, pred_a.shape[0], pred_b.shape[0])
 
-    return compute_c2st_accuracy(
-        samples_a=pred_a[:, active],
-        samples_b=pred_b[:, active],
-        n_splits=n_splits,
-        hidden_layer_sizes=hidden_layer_sizes,
-        max_iter=max_iter,
-        patience=patience,
-        random_state=random_state,
-    )
+    scores = [
+        compute_c2st_accuracy(
+            samples_a=pred_a[i][:, active],
+            samples_b=pred_b[i][:, active],
+            n_splits=n_splits,
+            hidden_layer_sizes=hidden_layer_sizes,
+            max_iter=max_iter,
+            patience=patience,
+            random_state=random_state,
+        )
+        for i in range(n)
+    ]
+    return float(np.mean(scores))
 
 
 def adaptive_c2st(
