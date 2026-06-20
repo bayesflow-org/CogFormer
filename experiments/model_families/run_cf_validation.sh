@@ -9,20 +9,20 @@ cd "$PROJECT_ROOT"
 # ============================================================
 # Paths
 # ============================================================
-DATA_DIR="./experiments/data"
-PRED_DIR="./experiments/data"
+DATA_DIR="./outputs/data/predictions"
+PRED_DIR="./outputs/data/predictions"
 
-DDM_CKPT="./experiments/checkpoints/fm/ddm/cogformer_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
-RDM_CKPT="./experiments/checkpoints/fm/rdm/cogformer_rdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
-CDM_CKPT="./experiments/checkpoints/fm/cdm/cogformer_cdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
+DDM_CKPT="./outputs/checkpoints/model_family/ddm/cogformer_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
+RDM_CKPT="./outputs/checkpoints/model_family/rdm/cogformer_rdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
+CDM_CKPT="./outputs/checkpoints/model_family/cdm/cogformer_cdm_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
 
-DDM_OUTDIR="./experiments/figures/fm/ddm/"
-RDM_OUTDIR="./experiments/figures/fm/rdm/"
-CDM_OUTDIR="./experiments/figures/fm/cdm/"
+DDM_OUTDIR="./outputs/figures/model_family/cf/ddm/"
+RDM_OUTDIR="./outputs/figures/model_family/cf/rdm/"
+CDM_OUTDIR="./outputs/figures/model_family/cf/cdm/"
 
-C2ST_DDM_OUTDIR="./experiments/figures/c2st/ddm/"
-C2ST_RDM_OUTDIR="./experiments/figures/c2st/rdm/"
-C2ST_CDM_OUTDIR="./experiments/figures/c2st/cdm/"
+C2ST_DDM_OUTDIR="./outputs/figures/model_family/c2st/ddm/"
+C2ST_RDM_OUTDIR="./outputs/figures/model_family/c2st/rdm/"
+C2ST_CDM_OUTDIR="./outputs/figures/model_family/c2st/cdm/"
 
 # ============================================================
 # Step 1: CF validation (all 6 cases per model, using BF data)

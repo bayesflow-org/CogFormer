@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import argparse
 import logging
 from pathlib import Path
@@ -36,7 +37,7 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/ddm/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "ddm")),
         "pred_stem": "ddm_family",
         "fig_stem": "ddm_family",
         "benchmark_design_configs": {
@@ -56,7 +57,7 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/rdm/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "rdm")),
         "pred_stem": "rdm_families",
         "fig_stem": "rdm_family",
         "benchmark_design_configs": {
@@ -76,7 +77,7 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/cdm/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "cdm")),
         "pred_stem": "cdm_families",
         "fig_stem": "cdm_family",
         "benchmark_design_configs": {
@@ -121,8 +122,8 @@ def parse_args():
     p.add_argument("--model_family", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str, default=None, help="Output directory (defaults per family)")
-    p.add_argument("--pred_dir", type=str, default="./experiments/data/")
-    p.add_argument("--data_dir", type=str, default="./experiments/data/")
+    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("predictions")))
+    p.add_argument("--data_dir", type=str, default=str(paths.data_dir("predictions")))
     p.add_argument("--batch_size", type=int, default=200)
     p.add_argument("--num_obs", type=int, default=500)
     p.add_argument("--max_num_regressors", type=int, default=2)

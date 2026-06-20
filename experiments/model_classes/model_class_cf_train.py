@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import torch
 import wandb
 import logging
@@ -169,7 +170,7 @@ class CogFormerTrainer:
 
         prefetcher.shutdown()
         self.plot_amortization_gap()
-        checkpoint_dir = Path("./experiments/checkpoints/fm/model_class/")
+        checkpoint_dir = paths.checkpoints_dir("model_class")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -218,7 +219,7 @@ class CogFormerTrainer:
         max_num_params = self.model_class.max_num_params
         colors = cogformer_fm_colors()
 
-        figures_dir = Path("./experiments/figures/fm/model_class/recovery")
+        figures_dir = paths.figures_dir("model_class", "cf", "recovery")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
         for model_name, model_cfg in MODEL_CONFIGS.items():
@@ -323,7 +324,7 @@ class CogFormerTrainer:
             global_indices = self.model_class.local_to_global[model_name]
 
             for case_name, design_config in model_cfg["benchmark_design_configs"].items():
-                bf_path = Path(f"./experiments/data/{model_lower}_{case_name}_data.npz")
+                bf_path = paths.data_dir("predictions", f"{model_lower}_{case_name}_data.npz")
 
                 if bf_path.exists():
                     bf_data = np.load(bf_path, allow_pickle=True)
@@ -402,7 +403,7 @@ class CogFormerTrainer:
                         log_dict[key] = float(metrics_df[metric].mean())
 
                 if bf_data is not None:
-                    fm_pred_path = Path(f"./experiments/data/{model_lower}_family_{case_name}_cf_pred.npz")
+                    fm_pred_path = paths.data_dir("predictions", f"{model_lower}_family_{case_name}_cf_pred.npz")
                     if fm_pred_path.exists():
                         fm_data = np.load(fm_pred_path, allow_pickle=True)
                         joint_score = compute_joint_c2st(
@@ -435,7 +436,7 @@ class CogFormerTrainer:
         ax.set_xlim(0.1, 1.1)
         ax.set_ylim(0.45, 1.0)
         ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=len(ddm_history) + 1)
-        fig_dir = Path("./experiments/figures/fm/model_class")
+        fig_dir = paths.figures_dir("model_class", "cf")
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / "model_class_amortization_gap.pdf"
         fig.savefig(out_path, bbox_inches="tight")

@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import argparse
 import logging
 from pathlib import Path
@@ -17,7 +18,7 @@ FAMILY_REGISTRY = {
         "name": "DDM",
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": "./experiments/figures/c2st/ddm/",
+        "outdir_default": str(paths.figures_dir("model_family", "c2st", "ddm")),
         "bf_data_stem": "ddm",
         "cf_pred_stem": "ddm_family",
         "c2st_prefix": "ddm_families",
@@ -35,7 +36,7 @@ FAMILY_REGISTRY = {
         "name": "RDM",
         "intrinsic_params": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": "./experiments/figures/c2st/rdm/",
+        "outdir_default": str(paths.figures_dir("model_family", "c2st", "rdm")),
         "bf_data_stem": "rdm",
         "cf_pred_stem": "rdm_families",
         "c2st_prefix": "rdm_families",
@@ -53,7 +54,7 @@ FAMILY_REGISTRY = {
         "name": "CDM",
         "intrinsic_params": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": "./experiments/figures/c2st/cdm/",
+        "outdir_default": str(paths.figures_dir("model_family", "c2st", "cdm")),
         "bf_data_stem": "cdm",
         "cf_pred_stem": "cdm_families",
         "c2st_prefix": "cdm_families",
@@ -132,9 +133,9 @@ def run_comparison(pred_a, pred_b, design_config, intrinsic_params, variable_nam
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--model_family", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
-    p.add_argument("--bf_data_dir", type=str, default="./experiments/data")
-    p.add_argument("--cf_pred_dir", type=str, default="./experiments/data")
-    p.add_argument("--mc_pred_dir", type=str, default="./experiments/data/model_class",
+    p.add_argument("--bf_data_dir", type=str, default=str(paths.data_dir("predictions")))
+    p.add_argument("--cf_pred_dir", type=str, default=str(paths.data_dir("predictions")))
+    p.add_argument("--mc_pred_dir", type=str, default=str(paths.data_dir("predictions", "model_class")),
                    help="Directory with CogFormer ModelClass pred files; if set, also runs Class vs Family C2ST")
     p.add_argument("--outdir", type=str, default=None, help="Output directory (defaults per family)")
     p.add_argument("--max_num_categories", type=int, default=2)

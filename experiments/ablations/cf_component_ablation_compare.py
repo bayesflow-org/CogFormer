@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import argparse
 import numpy as np
 import pandas as pd
@@ -5,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 
 
-DATA_DIR = Path("./experiments/ablations/component_ablation_data")
+DATA_DIR = paths.tables_dir("ablations", "component")
 
 CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
 

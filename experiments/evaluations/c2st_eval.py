@@ -5,14 +5,15 @@ Aggregates per-case C2ST summary CSVs across DDM, RDM, CDM and produces:
     c2st_table.csv  — mean ± SEM across cases per (model, scenario)
     c2st_table.tex  — LaTeX summary table
 """
+from cogformer.utils import paths
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 
-C2ST_DIR = Path("./experiments/figures/c2st")
-OUT_DIR = Path("./experiments/evaluations")
+C2ST_DIR = paths.figures_dir("model_family", "c2st")
+OUT_DIR = paths.tables_dir("evaluations")
 
 MODELS = ["DDM", "RDM", "CDM"]
 SCENARIOS = ["Family_vs_BF", "Class_vs_Family"]

@@ -41,11 +41,11 @@ FM_SAMPLES=200
 
 # Derived checkpoint name (mirrors the naming in model_class_cf_train.py)
 CKPT_NAME="cogformer_model_class_fm_l${DECODER_LAYERS}_h${DECODER_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS}.pt"
-CKPT_DIR="./experiments/checkpoints/fm/model_class"
+CKPT_DIR="./outputs/checkpoints/model_class"
 CKPT="${CKPT_DIR}/${CKPT_NAME}"
 
-OUTDIR="./experiments/figures/fm/model_class"
-PRED_DIR="./experiments/data/model_class"
+OUTDIR="./outputs/figures/model_class/cf"
+PRED_DIR="./outputs/data/predictions/model_class"
 
 # ============================================================
 # Step 1: Train

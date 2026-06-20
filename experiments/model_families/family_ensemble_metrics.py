@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import argparse
 import logging
 from pathlib import Path
@@ -33,7 +34,7 @@ FAMILY_REGISTRY = {
         "free_params": ["v", "a", "z", "tau"],
         "fixed_params": ["s_v", "s_tau"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/ddm/ensemble/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "ddm", "ensemble")),
         "fig_stem": "ddm",
     },
     "rdm": {
@@ -46,7 +47,7 @@ FAMILY_REGISTRY = {
         "free_params": ["v", "v_diff", "a", "tau"],
         "fixed_params": ["s_v", "s_tau"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/rdm/ensemble/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "rdm", "ensemble")),
         "fig_stem": "rdm",
     },
     "cdm": {
@@ -59,7 +60,7 @@ FAMILY_REGISTRY = {
         "free_params": ["v", "v_theta", "a", "tau"],
         "fixed_params": ["s_v", "s_tau"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "outdir_default": "./experiments/figures/fm/cdm/ensemble/",
+        "outdir_default": str(paths.figures_dir("model_family", "cf", "cdm", "ensemble")),
         "fig_stem": "cdm",
     },
 }

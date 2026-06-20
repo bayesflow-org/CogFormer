@@ -18,14 +18,15 @@ Outputs:
     amortization_gap_table.tex     — LaTeX table
 """
 
+from cogformer.utils import paths
 from pathlib import Path
 
 import pandas as pd
 import numpy as np
 
 
-BASE = Path("./experiments/figures")
-OUT_DIR = Path("./experiments/evaluations")
+BASE = paths.FIGURES
+OUT_DIR = paths.tables_dir("evaluations")
 
 MODELS = ["DDM", "RDM", "CDM"]
 CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
@@ -44,17 +45,17 @@ METRIC_LABELS = {
 
 def bf_path(model: str, case: str) -> Path:
     m = model.lower()
-    return BASE / "bf" / m / case / f"{m}_family_{case}_bf_metrics.csv"
+    return paths.figures_dir("model_family", "bf", m, case) / f"{m}_family_{case}_bf_metrics.csv"
 
 
 def fm_family_path(model: str, case: str) -> Path:
     m = model.lower()
-    return BASE / "fm" / m / case / f"{m}_family_{case}_fm_mixed_metrics.csv"
+    return paths.figures_dir("model_family", "cf", m, case) / f"{m}_family_{case}_fm_mixed_metrics.csv"
 
 
 def fm_model_class_path(model: str, case: str) -> Path:
     m = model.lower()
-    return BASE / "fm" / "model_class" / m / case / f"{m}_{case}_fm_metrics.csv"
+    return paths.figures_dir("model_class", "cf", m, case) / f"{m}_{case}_fm_metrics.csv"
 
 
 def load_metrics(path: Path) -> pd.DataFrame | None:

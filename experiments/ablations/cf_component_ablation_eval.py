@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import torch
 import argparse
 import numpy as np
@@ -151,8 +152,8 @@ def evaluate(
 
     stem = Path(checkpoint).stem
 
-    fig_base = Path("./experiments/ablations/component_ablation_figures")
-    data_dir = Path("./experiments/ablations/component_ablation_data")
+    fig_base = paths.figures_dir("ablations", "component")
+    data_dir = paths.tables_dir("ablations", "component")
     data_dir.mkdir(parents=True, exist_ok=True)
 
     recovery_dir  = fig_base / "recovery";       recovery_dir.mkdir(parents=True, exist_ok=True)

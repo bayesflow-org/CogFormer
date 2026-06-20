@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
@@ -120,7 +121,7 @@ def train(network_name: str, epochs: int, steps_per_epoch: int, batch_size: int)
     )
     inference_net = NETWORK_MAP[network_name]()
 
-    checkpoint_path = f"./experiments/checkpoints/ddm_baseline_{network_name}"
+    checkpoint_path = str(paths.checkpoints_dir("ablations", "baselines", f"ddm_baseline_{network_name}"))
 
     workflow = bf.BasicWorkflow(
         simulator=simulator,
@@ -140,11 +141,11 @@ def train(network_name: str, epochs: int, steps_per_epoch: int, batch_size: int)
 def evaluate(network_name: str, batch_size: int, num_samples: int):
     simulator = DDMInteractionSimulator()
 
-    checkpoint_path = f"./experiments/checkpoints/ddm_baseline_{network_name}/model.keras"
+    checkpoint_path = str(paths.checkpoints_dir("ablations", "baselines", f"ddm_baseline_{network_name}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
 
-    data_dir = Path("./experiments/ablations/baselines_data")
-    figures_dir = Path(f"./experiments/ablations/baselines_figures/{network_name}")
+    data_dir = paths.tables_dir("ablations", "baselines")
+    figures_dir = paths.figures_dir("ablations", "baselines", network_name)
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
 

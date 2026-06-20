@@ -1,10 +1,11 @@
 """Generate absolute metrics summary table (mean ± SEM) for all three methods."""
+from cogformer.utils import paths
 from pathlib import Path
 import numpy as np
 import pandas as pd
 
-BASE = Path("./experiments/figures")
-OUT_DIR = Path("./experiments/evaluations")
+BASE = paths.FIGURES
+OUT_DIR = paths.tables_dir("evaluations")
 MODELS = ["DDM", "RDM", "CDM"]
 CASES = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
 METRICS = ["NRMSE", "Calibration Error", "Posterior Contraction"]
@@ -36,9 +37,9 @@ def main():
     for model in MODELS:
         m = model.lower()
         for case in CASES:
-            bf = load(BASE / "bf" / m / case / f"{m}_family_{case}_bf_metrics.csv")
-            fm_fam = load(BASE / "fm" / m / case / f"{m}_family_{case}_fm_mixed_metrics.csv")
-            fm_cls = load(BASE / "fm" / "model_class" / m / case / f"{m}_{case}_fm_metrics.csv")
+            bf = load(paths.figures_dir("model_family", "bf", m, case) / f"{m}_family_{case}_bf_metrics.csv")
+            fm_fam = load(paths.figures_dir("model_family", "cf", m, case) / f"{m}_family_{case}_fm_mixed_metrics.csv")
+            fm_cls = load(paths.figures_dir("model_class", "cf", m, case) / f"{m}_{case}_fm_metrics.csv")
             for source, df in [("BayesFlow", bf), ("CogFormer_Family", fm_fam), ("CogFormer_ModelClass", fm_cls)]:
                 if df is None:
                     continue

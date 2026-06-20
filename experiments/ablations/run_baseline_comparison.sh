@@ -9,8 +9,8 @@ cd "$PROJECT_ROOT"
 # ============================================================
 # BayesFlow baseline comparison: coupling_flow, diffusion_model,
 #   flow_matching, stable_consistency on DDM interaction case.
-# Outputs: experiments/ablations/baselines_data/
-#          experiments/ablations/baselines_figures/
+# Outputs: outputs/tables/ablations/baselines/
+#          outputs/figures/ablations/baselines/
 # ============================================================
 
 EPOCHS=1000

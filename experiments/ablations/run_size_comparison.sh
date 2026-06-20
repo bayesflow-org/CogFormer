@@ -8,8 +8,8 @@ cd "$PROJECT_ROOT"
 
 # ============================================================
 # Size comparison ablation: s → m → l → xl
-# Outputs: experiments/ablations/size_comparison_data/
-#          experiments/ablations/size_comparison_figures/
+# Outputs: outputs/checkpoints/ablations/size/ + outputs/data/predictions/ablations/size/
+#          outputs/figures/ablations/size/
 # ============================================================
 
 USE_WANDB=--use_wandb   # set USE_WANDB=--use_wandb to enable

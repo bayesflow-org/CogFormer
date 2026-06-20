@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import torch
 import wandb
 import logging
@@ -248,7 +249,7 @@ class CogFormerTrainer:
         prefetcher.shutdown()
         self.plot_amortization_gap()
         self.save_fm_predictions(val_config)
-        checkpoint_dir = Path(f"./experiments/checkpoints/{self.checkpoint_subdir}/")
+        checkpoint_dir = paths.checkpoints_dir("model_family", self.fam_lower)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -284,7 +285,7 @@ class CogFormerTrainer:
         param_names = self.param_names
         colors = cogformer_fm_colors()
         max_num_categories = config["model_family_config"]["max_num_categories"]
-        fig_base = Path(f"./experiments/figures/{self.fig_base}")
+        fig_base = paths.figures_dir("model_family", "cf", self.fam_lower)
 
         recovery_dir = fig_base / "recovery"
         posterior_dir = fig_base / "test_posterior"
@@ -399,7 +400,7 @@ class CogFormerTrainer:
         log_dict = {}
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = Path(f"./experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
+            bf_path = paths.data_dir("predictions", f"{self.bf_data_stem}_{case_name}_data.npz")
 
             # Pair CogFormer with BayesFlow by conditioning both on the SAME datasets.
             # When the BayesFlow npz exists, reconstruct the adapter input from its stored
@@ -505,10 +506,10 @@ class CogFormerTrainer:
         keep_intercept = config["model_family_config"]["keep_intercept"]
         max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
         expected_dm_cols = max_total_regressors * (max_num_categories - 1) + (1 if keep_intercept else 0)
-        out_dir = Path("./experiments/data")
+        out_dir = paths.data_dir("predictions")
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = Path(f"./experiments/data/{self.bf_data_stem}_{case_name}_data.npz")
+            bf_path = paths.data_dir("predictions", f"{self.bf_data_stem}_{case_name}_data.npz")
             if not bf_path.exists():
                 logging.warning(f"No BF data for '{case_name}', skipping FM pred save.")
                 continue
@@ -575,7 +576,7 @@ class CogFormerTrainer:
         ax.set_ylim(0.45, 1.0)
         ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
                   ncol=len(self.amortization_history) + 1)
-        fig_dir = Path(f"./experiments/figures/{self.fig_base}")
+        fig_dir = paths.figures_dir("model_family", "cf", self.fam_lower)
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / f"{self.fam_lower}_amortization_gap.pdf"
         fig.savefig(out_path, bbox_inches="tight")

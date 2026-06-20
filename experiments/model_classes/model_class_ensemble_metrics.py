@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import argparse
 import logging
 from pathlib import Path
@@ -51,7 +52,7 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str,
-                   default="./experiments/figures/fm/model_class/ensemble/")
+                   default=str(paths.figures_dir("model_class", "cf", "ensemble")))
     p.add_argument("--n_configs", type=int, default=50)
     p.add_argument("--batch_size", type=int, default=200)
     p.add_argument("--num_obs", type=int, default=500)

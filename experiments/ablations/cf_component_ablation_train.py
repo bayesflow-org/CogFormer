@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import torch
 import wandb
 import logging
@@ -119,7 +120,7 @@ class CogFormerAblationTrainer:
             pbar.close()
 
         prefetcher.shutdown()
-        checkpoint_dir = Path("./experiments/ablations/component_ablation_data/")
+        checkpoint_dir = paths.checkpoints_dir("ablations", "component")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -162,7 +163,7 @@ class CogFormerAblationTrainer:
         colors = cogformer_fm_colors()
         max_num_categories = config["model_family_config"]["max_num_categories"]
 
-        fig_base = Path("./experiments/ablations/component_ablation_figures")
+        fig_base = paths.figures_dir("ablations", "component")
         stem = Path(fig_path).stem
 
         recovery_dir = fig_base / "recovery";        recovery_dir.mkdir(parents=True, exist_ok=True)
@@ -170,7 +171,7 @@ class CogFormerAblationTrainer:
         coverage_dir  = fig_base / "coverage";       coverage_dir.mkdir(parents=True, exist_ok=True)
         ecdf_dir      = fig_base / "ecdf";           ecdf_dir.mkdir(parents=True, exist_ok=True)
         metrics_dir   = fig_base / "metrics";        metrics_dir.mkdir(parents=True, exist_ok=True)
-        pred_dir      = Path("./experiments/ablations/component_ablation_data")
+        pred_dir      = paths.data_dir("predictions", "ablations", "component")
         pred_dir.mkdir(parents=True, exist_ok=True)
 
         self.cf.eval()

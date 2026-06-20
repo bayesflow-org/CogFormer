@@ -22,7 +22,7 @@ from cogformer.simulators.benchmarks.ddms.ddm_link_fun import ddm_link_fun
 from cogformer.adapters import Adapter
 from cogformer.networks.transformers.cf.cogformer import CogFormer
 
-CKPT = "experiments/checkpoints/fm/ddm/cogformer_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
+CKPT = "outputs/checkpoints/model_family/ddm/cogformer_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt"
 INTRINSIC = ["v", "a", "z", "tau", "s_v", "s_tau"]
 DESIGN_CONFIG = {
     "1":       ["v", "a", "z", "tau", "s_v", "s_tau"],

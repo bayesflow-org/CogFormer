@@ -1,7 +1,8 @@
 """Generate LaTeX summary table for benchmark design configurations."""
+from cogformer.utils import paths
 from pathlib import Path
 
-OUT_DIR = Path("./experiments/evaluations")
+OUT_DIR = paths.tables_dir("evaluations")
 
 CONFIGS = ["intercept_only", "fixed", "regressed", "fixed_regressed", "interaction"]
 CONFIG_LABELS = {

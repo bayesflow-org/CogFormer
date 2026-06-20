@@ -9,8 +9,8 @@ cd "$PROJECT_ROOT"
 # ============================================================
 # Component ablation study: baseline → no_sab → no_mab →
 #   no_film → no_fourier on DDM interaction case.
-# Outputs: experiments/ablations/component_ablation_data/
-#          experiments/ablations/component_ablation_figures/
+# Outputs: outputs/{checkpoints,tables}/ablations/component/
+#          outputs/figures/ablations/component/
 # ============================================================
 
 EPOCHS=5000

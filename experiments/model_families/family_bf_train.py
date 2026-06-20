@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
@@ -476,7 +477,7 @@ def main(
     )
     inference_net = bf.networks.FlowMatching()
 
-    checkpoint_path = f"./experiments/checkpoints/{reg['checkpoint_prefix']}_{case}"
+    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}"))
 
     workflow = bf.BasicWorkflow(
         simulator=simulator,

@@ -1,0 +1,23 @@
+\begin{table}[ht]
+\centering
+\small
+\caption{Absolute metric values (mean $\pm$ SEM) averaged across design configurations and parameters, providing context for the amortization gap percentages.}
+\label{tab:absolute-metrics}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Model} & \textbf{Method} & NRMSE & Cal.\ Error & Post.\ Contr. \\
+\midrule
+\textbf{DDM} & \textsc{BayesFlow} & $0.077 \pm 0.007$ & $0.020 \pm 0.002$ & $0.904 \pm 0.022$ \\
+ & \textsc{CogFormer}\textsubscript{Family} & $0.085 \pm 0.007$ & $0.021 \pm 0.002$ & $0.885 \pm 0.024$ \\
+ & \textsc{CogFormer}\textsubscript{Class} & $0.091 \pm 0.007$ & $0.034 \pm 0.003$ & $0.863 \pm 0.025$ \\
+\midrule
+\textbf{RDM} & \textsc{BayesFlow} & $0.106 \pm 0.008$ & $0.024 \pm 0.002$ & $0.808 \pm 0.030$ \\
+ & \textsc{CogFormer}\textsubscript{Family} & $0.113 \pm 0.008$ & $0.025 \pm 0.002$ & $0.790 \pm 0.032$ \\
+ & \textsc{CogFormer}\textsubscript{Class} & $0.125 \pm 0.009$ & $0.075 \pm 0.015$ & $0.754 \pm 0.032$ \\
+\midrule
+\textbf{CDM} & \textsc{BayesFlow} & $0.065 \pm 0.008$ & $0.023 \pm 0.002$ & $0.909 \pm 0.031$ \\
+ & \textsc{CogFormer}\textsubscript{Family} & $0.074 \pm 0.008$ & $0.023 \pm 0.002$ & $0.890 \pm 0.033$ \\
+ & \textsc{CogFormer}\textsubscript{Class} & $0.150 \pm 0.015$ & $0.096 \pm 0.015$ & $0.750 \pm 0.044$ \\
+\bottomrule
+\end{tabular}
+\end{table}

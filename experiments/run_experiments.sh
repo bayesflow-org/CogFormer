@@ -21,10 +21,10 @@ cd "$PROJECT_ROOT"
 #      c. Comparison tables (LaTeX)
 #
 # Outputs:
-#   Checkpoints : experiments/checkpoints/
-#   Figures     : experiments/figures/
-#   Data        : experiments/data/
-#   Ablations   : experiments/ablations/component_ablation_{data,figures}/
+#   Checkpoints : outputs/checkpoints/
+#   Figures     : outputs/figures/
+#   Data        : outputs/data/predictions/
+#   Ablations   : outputs/{checkpoints,tables,figures}/ablations/component/
 #
 # Usage:
 #   bash experiments/run_experiments.sh
@@ -55,16 +55,16 @@ POS_EMB_DIM=32
 
 CASES="intercept_only fixed regressed fixed_regressed interaction"
 
-DATA_DIR="./experiments/data"
+DATA_DIR="./outputs/data/predictions"
 
 # ── Checkpoint name helpers ──────────────────────────────────
 family_cf_checkpoint() {
     local STEM=$1
-    echo "./experiments/checkpoints/fm/${2}/${STEM}_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_o${NUM_OBS}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
+    echo "./outputs/checkpoints/model_family/${2}/${STEM}_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_o${NUM_OBS}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
 }
 
 model_class_checkpoint() {
-    echo "./experiments/checkpoints/fm/model_class/cogformer_model_class_fm_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
+    echo "./outputs/checkpoints/model_class/cogformer_model_class_fm_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
 }
 
 # ── 1. MODEL FAMILY EXPERIMENTS ──────────────────────────────
@@ -190,7 +190,7 @@ echo "============================================================"
 echo " Component ablation study (DDM family)"
 echo "============================================================"
 
-ABL_DATA="./experiments/ablations/component_ablation_data"
+ABL_DATA="./outputs/checkpoints/ablations/component"
 
 run_ablation() {
     local ABLATION=$1

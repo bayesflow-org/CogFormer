@@ -1,3 +1,4 @@
+from cogformer.utils import paths
 import os
 os.environ["KERAS_BACKEND"] = "jax"
 
@@ -333,7 +334,7 @@ def test(family: str, case: str):
     print(f"  [Check] Params zero where masked: {'OK' if zero_where_masked else 'FAIL'}")
     assert zero_where_masked, "Non-zero param values found at masked-out positions"
 
-    checkpoint_path = f"./experiments/checkpoints/{reg['checkpoint_prefix']}_{case}/model.keras"
+    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
     print("Loaded model")
 
@@ -363,12 +364,12 @@ def main(family: str, case: str, batch_size: int = 200, num_samples: int = 200, 
 
     simulator = ModelFamilyBF(family=family, case=case)
 
-    checkpoint_path = f"./experiments/checkpoints/{reg['checkpoint_prefix']}_{case}/model.keras"
+    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
 
-    data_dir = Path("./experiments/data")
-    figures_dir = Path(f"./experiments/figures/bf/{fam_lower}/{case}")
-    evals_dir = Path("./experiments/evaluations")
+    data_dir = paths.data_dir("predictions")
+    figures_dir = paths.figures_dir("model_family", "bf", fam_lower, case)
+    evals_dir = paths.tables_dir("evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
     evals_dir.mkdir(parents=True, exist_ok=True)

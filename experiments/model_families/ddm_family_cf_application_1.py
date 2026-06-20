@@ -26,6 +26,7 @@ Outputs
 - ddm_application_1_group_params.pdf   : group-level parameter distributions
 """
 
+from cogformer.utils import paths
 import argparse
 import logging
 from pathlib import Path
@@ -59,7 +60,7 @@ def parse_args():
     p.add_argument("--data", type=str, default="data/data_application_1.csv",
                    help="Path to the CSV data file")
     p.add_argument("--outdir", type=str,
-                   default="./experiments/figures/fm/ddm/application_1/",
+                   default=str(paths.figures_dir("model_family", "cf", "ddm", "application_1")),
                    help="Output directory for figures and results")
     p.add_argument("--num_obs", type=int, default=500,
                    help="Number of trials per participant (bootstrap resampled to this N)")
