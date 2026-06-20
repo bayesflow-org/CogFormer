@@ -1,0 +1,65 @@
+% Notation table for CogFormer manuscript.
+% Single source of truth for symbols; extend as new sections are written.
+% Requires: \usepackage{booktabs}, \usepackage{multirow}, \usepackage{tabularx},
+% and a \rm... matrix macro family (\rmB, \rmM, \rmX, \rmY, \rmS, \rmZ, \rvs).
+\begin{table}[t]
+\centering
+\caption{Summary of notation.}
+\label{tab:notation}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\linewidth}{@{}p{2.4cm} l >{\raggedright\arraybackslash}X@{}}
+\toprule
+Category & Symbol & Meaning \\
+\midrule
+\multirow{4}{=}{\textit{Amortization scopes}}
+ & $\mathcal{C}$ & Model class (root; e.g.\ sequential sampling models) \\
+ & $\mathcal{F}$ & Model family (shared computational structure) \\
+ & $\mathcal{M}$ & Model instance / observation model (fully specified) \\
+ & $\mathcal{D}$ & Design configuration over the intrinsic parameters \\
+\midrule
+\multirow{7}{=}{\textit{Generative objects}}
+ & $\theta_{\mathcal{F}}$ & Intrinsic parameters of family $\mathcal{F}$ \\
+ & $\rmB$ & Coefficient matrix, $\rmB \in \mathbb{R}^{R \times D_{\mathcal{F}}}$ (inference target) \\
+ & $\rmM$ & Binary parameter mask, $\rmM \in \{0,1\}^{R \times D_{\mathcal{F}}}$; entries $M_{i,j}$ \\
+ & $\rmX$ & Design matrix, $\rmX \in \mathbb{R}^{N \times R}$ \\
+ & $\Theta$ & Realized parameter matrix, $\Theta = g(\rmX(\rmM \odot \rmB)) \in \mathbb{R}^{N \times D_{\mathcal{F}}}$ \\
+ & $\rmY$ & Model observables, $\rmY \in \mathbb{R}^{N \times O_{\mathcal{F}}}$ \\
+ & $\mathrm{RNG}$ & Source of stochastic variation in the observation model \\
+\midrule
+\multirow{8}{=}{\textit{Dimensions and indices}}
+ & $N$ & Number of trials (observations) per dataset \\
+ & $D_{\mathcal{F}}$ & Number of intrinsic parameters in family $\mathcal{F}$ \\
+ & $O_{\mathcal{F}}$ & Number of observable dimensions in family $\mathcal{F}$ \\
+ & $I$ & Number of regressors \\
+ & $R$ & Number of design-matrix columns, $R = I\,(C_{\mathrm{max}}-1)+1$ \\
+ & $R_{\mathrm{max}}$ & Maximum column capacity (zero-padding target) \\
+ & $C_{\mathrm{max}}$ & Maximum number of categories per regressor \\
+ & $i,\,j$ & Row (regressor/design column) and column (parameter) indices of $\rmB,\rmM$ \\
+\midrule
+\multirow{4}{=}{\textit{Functions and parameters}}
+ & $\mathcal{G}=\{g_d\}$ & Per-parameter link functions; $g$ denotes column-wise application \\
+ & $\beta_{i,j}$ & Regression weight (entry of $\rmB$); $\beta_{0,j}$ is the intercept \\
+ & $x_c$ & Covariate $c$ \\
+ & $\vartheta,\,a,\,z,\,\tau,\,s_{\vartheta},\,s_{\tau}$ & DDM intrinsic parameters (drift, threshold, bias, NDT, variabilities) \\
+\midrule
+\multirow{9}{=}{\textit{Flow matching and inference}}
+ & $\mathcal{A}$ & Conditioning set, $\mathcal{A}=(\rmY,\rmX,\rmM,\mathcal{F})$ \\
+ & $\hat{u}$ & Learned conditional velocity field, $\hat{u}(\rmZ_t;\mathcal{A},t)$ \\
+ & $\rmZ_t$ & Flow state at time $t$, $\rmZ_t=(1-t)\rmB+t\rmZ_1$ \\
+ & $\rmZ_0$ & Target endpoint, $\rmZ_0 \equiv \rmB$ \\
+ & $\rmZ_1$ & Gaussian latent, $\rmZ_1\sim\mathcal{N}(\mathbf{0},\mathbf{I})$ \\
+ & $t$ & Flow time, $t\in[0,1]$ \\
+ & $\omega_t$ & Optional time-dependent loss weight \\
+ & $\mathcal{L}_{\mathrm{FM}}$ & Conditional flow matching loss \\
+ & $q(\rmB\mid\mathcal{A},\hat{u})$ & Approximate posterior induced by $\hat{u}$ \\
+\midrule
+\multirow{6}{=}{\textit{Architecture}}
+ & $\rmS$ & Encoder summary representations, $\rmS=(\rvs_1,\dots,\rvs_L)$ \\
+ & $\rvs_{\ell}$ & Summary vector, $\rvs_{\ell}\in\mathbb{R}^{S}$ \\
+ & $L$ & Number of summary tokens (encoder seeds) \\
+ & $S$ & Summary-representation dimension \\
+ & $B_{i,j}$ & Decoder token for coefficient cell $(i,j)$ \\
+ & $f$ & Integer index of family $\mathcal{F}$ (model-family embedding) \\
+\bottomrule
+\end{tabularx}
+\end{table}
