@@ -31,6 +31,14 @@ dev = [
     "ruff>=0.11.7",
 ]
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+# Only ``cogformer`` is an installable package; experiments/ and outputs/ are not.
+include = ["cogformer*"]
+
 [tool.ruff.lint.per-file-ignores]
 # __init__.py files re-export the package's public API; unused-import is expected.
 "__init__.py" = ["F401"]
