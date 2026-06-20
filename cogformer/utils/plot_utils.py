@@ -1,4 +1,3 @@
-import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -195,9 +194,6 @@ def _add_mask_legend(
     return strip_h_fig
 
 
-def hex_code():
-    return "#{:06x}".format(random.randint(0, 0xFFFFFF))
-
 def bf_colors():
     colors = {
         # BF
@@ -214,16 +210,6 @@ def cogformer_cm_colors():
         "main_effect": "#007396",
         "interaction": "#3EB1C8",
     }
-    return colors
-
-def cogformer_vi_colors():
-    colors = {
-        # CogFormer-VI
-        "intercept": "#4E2A84",
-        "main_effect": "#6969FF",
-        "interaction": "#47b5ff",
-    }
-
     return colors
 
 def cogformer_mf_colors():
@@ -251,12 +237,3 @@ def interpolate_palette(colors_dict, n):
     anchors = [colors_dict["intercept"], colors_dict["main_effect"], colors_dict["interaction"]]
     cmap = mcolors.LinearSegmentedColormap.from_list("palette", anchors)
     return [cmap(i / max(n - 1, 1)) for i in range(n)]
-
-def staedtler_fineliner():
-    colors = {
-        "bf": bf_colors(),
-        "vi": cogformer_vi_colors(),
-        "mf": cogformer_mf_colors(),
-        "cm": cogformer_cm_colors()
-    }
-    return colors

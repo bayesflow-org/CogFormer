@@ -38,8 +38,8 @@ SCENARIO_LABELS = {
 }
 METRIC_LABELS = {
     "NRMSE": "NRMSE",
-    "Calibration Error": "Cal.\ Error",
-    "Posterior Contraction": "Post.\ Contr.",
+    "Calibration Error": r"Cal.\ Error",
+    "Posterior Contraction": r"Post.\ Contr.",
 }
 
 

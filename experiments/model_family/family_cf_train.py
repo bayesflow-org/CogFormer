@@ -70,9 +70,7 @@ FAMILY_REGISTRY = {
         "param_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "free_intrinsics": ["v", "a", "z", "tau"],
         "val_interval": 1000,
-        "checkpoint_subdir": "fm/ddm",
         "checkpoint_stem": "cogformer_mf",
-        "fig_base": "fm",
         "wandb_project": "cogformer-fm-ddm",
         "wandb_tags": ["CogFormer", "ModelFamily", "Designer"],
         "val_scenarios": [
@@ -108,9 +106,7 @@ FAMILY_REGISTRY = {
         "param_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "free_intrinsics": ["v", "v_diff", "a", "tau"],
         "val_interval": 1000,
-        "checkpoint_subdir": "fm/rdm",
         "checkpoint_stem": "cogformer_rdm_mf",
-        "fig_base": "fm/rdm",
         "wandb_project": "cogformer-fm-rdm",
         "wandb_tags": ["CogFormer", "RDM", "ModelFamily", "Designer"],
         "val_scenarios": [
@@ -146,9 +142,7 @@ FAMILY_REGISTRY = {
         "param_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "free_intrinsics": ["v", "v_theta", "a", "tau"],
         "val_interval": 1000,
-        "checkpoint_subdir": "fm/cdm",
         "checkpoint_stem": "cogformer_cdm_mf",
-        "fig_base": "fm/cdm",
         "wandb_project": "cogformer-fm-cdm",
         "wandb_tags": ["CogFormer", "CDM", "ModelFamily"],
         "val_scenarios": [
@@ -195,8 +189,6 @@ class CogFormerTrainer:
         self.intrinsic_params = reg["intrinsic_params"]
         self.param_names = reg["param_names"]
         self.val_interval = reg["val_interval"]
-        self.checkpoint_subdir = reg["checkpoint_subdir"]
-        self.fig_base = reg["fig_base"]
         self.val_scenarios = reg["val_scenarios"]
         self.fam_lower = reg["name"].lower()
         self.default_fixed_values = reg["default_fixed_values"]

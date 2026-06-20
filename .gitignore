@@ -174,13 +174,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# wandb
+# wandb (run artifacts/media; never track — matches wandb/ at any depth)
 *.wandb
 */data
 wandb-metadata.json
 wandb-summary.json
-bayesgpt/wandb
-/wandb
+wandb/
 
 # Checkpoints and model weights
 *.ckpt
