@@ -1,6 +1,5 @@
 """Generate LaTeX hyperparameter summary table for CogFormer models."""
 from cogformer.utils import paths
-from pathlib import Path
 
 OUT_DIR = paths.tables_dir("evaluations")
 

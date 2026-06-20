@@ -3,7 +3,6 @@ import argparse
 import logging
 from pathlib import Path
 
-import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
@@ -23,7 +22,6 @@ from cogformer.simulators.context_manager import ContextManager
 from cogformer.diagnostics.plot.ensemble_recovery import ensemble_recovery
 from cogformer.diagnostics.plot.ensemble_coverage import ensemble_coverage
 from cogformer.diagnostics.plot.ensemble_ecdf import ensemble_ecdf
-from cogformer.utils.plot_utils import cogformer_fm_colors
 
 
 FAMILY_REGISTRY = {

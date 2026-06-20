@@ -1,7 +1,6 @@
 from cogformer.utils import paths
 import torch
 import argparse
-import numpy as np
 import matplotlib.pyplot as plt
 
 from pathlib import Path

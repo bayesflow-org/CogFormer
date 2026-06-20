@@ -187,6 +187,12 @@ bayesgpt/wandb
 *.pt
 *.keras
 
+# Generated figures under outputs/ (regenerate from scripts; not tracked in git).
+# Small summary tables (*.csv, *.tex) under outputs/ are intentionally kept tracked.
+outputs/**/*.pdf
+outputs/**/*.png
+outputs/checkpoints/
+
 # Data files
 *.npz
 *.npy

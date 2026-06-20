@@ -146,7 +146,7 @@ class LBA(Model):
         if isinstance(batch_size, tuple):
             batch_size = batch_size[0]
             
-        if context == None:
+        if context is None:
             context = self.build_context(num_obs, num_alternatives)
 
         parameters = []

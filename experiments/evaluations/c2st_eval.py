@@ -6,7 +6,6 @@ Aggregates per-case C2ST summary CSVs across DDM, RDM, CDM and produces:
     c2st_table.tex  — LaTeX summary table
 """
 from cogformer.utils import paths
-from pathlib import Path
 
 import numpy as np
 import pandas as pd

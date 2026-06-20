@@ -1,4 +1,4 @@
-from cogformer.utils.simulator_utils import exponential, sigmoid, shifted_softplus
+from cogformer.utils.simulator_utils import shifted_softplus
 
 def rdm_link_fun():
     return {

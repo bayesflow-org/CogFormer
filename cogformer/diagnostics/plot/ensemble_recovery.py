@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from collections.abc import Callable
 
 from cogformer.simulators.context_manager import ContextManager
-from cogformer.utils.plot_utils import credible_interval, cogformer_cm_colors, _add_mask_legend
+from cogformer.utils.plot_utils import credible_interval, _add_mask_legend
 
 
 def ensemble_recovery(

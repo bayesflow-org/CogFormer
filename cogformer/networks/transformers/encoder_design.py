@@ -1,7 +1,6 @@
 import torch.nn as nn
 
 from .attention_layers import (
-    cross_attention_layers,
     self_attention_layers,
     mixed_attention_layers,
     custom_attention_layers

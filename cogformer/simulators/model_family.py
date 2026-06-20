@@ -7,7 +7,7 @@ from collections.abc import Callable
 from .model import Model
 from .context_manager import ContextManager
 
-from ..utils.simulator_utils import shifted_softplus, softplus, inspect
+from ..utils.simulator_utils import softplus, inspect
 
 
 class NestedModelFamily:

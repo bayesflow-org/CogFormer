@@ -1,6 +1,5 @@
 import numpy as np
 from numba import njit, prange
-from scipy.stats import halfnorm
 
 from .ddm_priors import ddm_priors
 

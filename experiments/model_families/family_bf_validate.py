@@ -9,7 +9,6 @@ import pandas as pd
 import bayesflow as bf
 import matplotlib.pyplot as plt
 
-from pathlib import Path
 
 from cogformer.simulators.model_family import NestedModelFamily
 from cogformer.simulators.benchmarks.ddms.ddm import DDM

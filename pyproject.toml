@@ -28,6 +28,9 @@ test = [
 dev = [
     "jupyter>=1.1.1",
     "jupyterlab>=4.4.1",
-    "pre-commit>=4.2.0",
     "ruff>=0.11.7",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# __init__.py files re-export the package's public API; unused-import is expected.
+"__init__.py" = ["F401"]

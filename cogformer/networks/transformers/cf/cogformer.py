@@ -7,7 +7,6 @@ from tqdm.auto import tqdm
 from ..encoder_design import Encoder
 from ..decoder_fm_design import Decoder
 
-from cogformer.utils.tensor_utils import broadcast_right
 
 
 class CogFormer(nn.Module):

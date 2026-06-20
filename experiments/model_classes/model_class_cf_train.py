@@ -3,14 +3,12 @@ import torch
 import wandb
 import logging
 import argparse
-from pathlib import Path
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
 import matplotlib.pyplot as plt
-np.set_printoptions(suppress=True)
 
 from cogformer.simulators import NestedModelFamily, ModelClass
 from cogformer.simulators.benchmarks import DDM, RDM, CDM
@@ -27,6 +25,8 @@ from cogformer.utils.plot_utils import cogformer_fm_colors, cogformer_mc_colors,
 from cogformer.utils.training_utils import Prefetcher
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.diagnostics.metric.adaptive_c2st import compute_joint_c2st
+
+np.set_printoptions(suppress=True)
 
 
 def reshape_bf_to_gpt(bf_samples, design_config, intrinsic_params):

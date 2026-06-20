@@ -11,7 +11,6 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
 import matplotlib.pyplot as plt
-np.set_printoptions(suppress=True)
 
 from cogformer.simulators import NestedModelFamily
 from cogformer.simulators.benchmarks.ddms.ddm import DDM
@@ -33,6 +32,8 @@ from cogformer.utils.plot_utils import cogformer_fm_colors, interpolate_palette
 from cogformer.utils.training_utils import Prefetcher
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.diagnostics.metric.adaptive_c2st import compute_joint_c2st
+
+np.set_printoptions(suppress=True)
 
 
 def infer_free_fixed_intrinsics(design_config, all_intrinsics, default_fixed_values):

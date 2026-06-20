@@ -8,7 +8,6 @@ import pandas as pd
 import bayesflow as bf
 import matplotlib.pyplot as plt
 
-from pathlib import Path
 
 from cogformer.simulators.model_family import NestedModelFamily
 from cogformer.simulators.benchmarks.ddms.ddm import DDM
@@ -18,7 +17,6 @@ from cogformer.diagnostics.plot.adaptive_recovery import adaptive_recovery
 from cogformer.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from cogformer.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
-from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.utils.plot_utils import bf_colors
 
 

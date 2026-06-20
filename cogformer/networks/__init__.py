@@ -1,1 +1,1 @@
-from .transformers import CogFormer, CogFormerv1
+from .transformers import CogFormer

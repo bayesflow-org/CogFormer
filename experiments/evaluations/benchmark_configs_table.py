@@ -1,6 +1,5 @@
 """Generate LaTeX summary table for benchmark design configurations."""
 from cogformer.utils import paths
-from pathlib import Path
 
 OUT_DIR = paths.tables_dir("evaluations")
 

@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from cogformer.simulators.model_family import NestedModelFamily
-from cogformer.simulators.context_manager import ContextManager
 from cogformer.simulators.benchmarks.ddms.ddm import DDM
 from cogformer.simulators.benchmarks.ddms.ddm_priors import ddm_baseline_priors
 

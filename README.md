@@ -27,3 +27,18 @@ git clone https://github.com/jerrymhuang/CogFormer.git
 cd CogFormer
 pip install -e .
 ```
+
+## Artifacts and checkpoints
+
+The repository tracks **code and small summary tables** (`outputs/tables/`, `outputs/docs/`)
+so results are reproducible from the scripts in `experiments/`. Generated **figures**
+(`outputs/figures/*.pdf`, `*.png`) and **model checkpoints** (`outputs/checkpoints/*.pt`)
+are *not* tracked in git — regenerate figures by re-running the experiment scripts.
+
+Trained checkpoints are hosted on the Hugging Face Hub:
+`<HF_REPO_ID>` (TODO: publish). Load them at runtime with:
+
+```python
+from huggingface_hub import hf_hub_download
+ckpt = hf_hub_download(repo_id="<HF_REPO_ID>", filename="cogformer_mixed_attn_l8_h8_p256_s32_d64_o500_b64_e5000_t100.pt")
+```

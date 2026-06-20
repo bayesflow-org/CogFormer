@@ -133,7 +133,7 @@ def run(with_embed_dir: Path, no_embed_dir: Path, out_dir: Path):
 
             if CONDITION_LABELS["with_embed"] in summary.index and CONDITION_LABELS["no_embed"] in summary.index:
                 delta = compute_delta(summary)
-                print(f"\nΔ from with-embedding baseline:")
+                print("\nΔ from with-embedding baseline:")
                 print(delta.to_string())
                 delta.to_csv(out_dir / f"{stem}_embedding_delta.csv")
 

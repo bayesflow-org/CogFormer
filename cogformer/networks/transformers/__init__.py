@@ -1,1 +1,1 @@
-from .cf import CogFormer, CogFormerv1
+from .cf import CogFormer

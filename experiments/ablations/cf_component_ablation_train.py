@@ -1,7 +1,6 @@
 from cogformer.utils import paths
 import torch
 import wandb
-import logging
 import argparse
 
 from pathlib import Path
@@ -11,7 +10,6 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 
 import numpy as np
 import matplotlib.pyplot as plt
-np.set_printoptions(suppress=True)
 
 from cogformer.simulators import NestedModelFamily
 from cogformer.simulators.benchmarks import DDM
@@ -26,6 +24,8 @@ from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
 from cogformer.utils.plot_utils import cogformer_fm_colors
 from cogformer.utils.training_utils import Prefetcher
+
+np.set_printoptions(suppress=True)
 
 
 ABLATION_CONFIGS = {
