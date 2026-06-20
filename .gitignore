@@ -201,5 +201,5 @@ outputs/checkpoints/
 config.yaml
 
 # Real-data application scripts (used in separate repo)
-experiments/model_families/ddm_family_cf_application_1.py
+experiments/model_family/ddm_family_cf_application_1.py
 

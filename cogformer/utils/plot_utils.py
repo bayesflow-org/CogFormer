@@ -226,9 +226,9 @@ def cogformer_vi_colors():
 
     return colors
 
-def cogformer_fm_colors():
+def cogformer_mf_colors():
     colors = {
-        # CogFormer-FM
+        # CogFormer model family (magenta/red hue)
         "intercept": "#59315F",
         "main_effect": "#EC008C",
         "interaction": "#FF6969",
@@ -238,7 +238,7 @@ def cogformer_fm_colors():
 
 def cogformer_mc_colors():
     colors = {
-        # CogFormer-VI
+        # CogFormer model class (purple/blue hue)
         "intercept": "#4E2A84",
         "main_effect": "#6969FF",
         "interaction": "#47b5ff",
@@ -256,7 +256,7 @@ def staedtler_fineliner():
     colors = {
         "bf": bf_colors(),
         "vi": cogformer_vi_colors(),
-        "fm": cogformer_fm_colors(),
+        "mf": cogformer_mf_colors(),
         "cm": cogformer_cm_colors()
     }
     return colors

@@ -24,7 +24,7 @@ from cogformer.diagnostics.plot.adaptive_coverage import adaptive_coverage
 from cogformer.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
-from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.plot_utils import cogformer_mf_colors
 from cogformer.utils.training_utils import Prefetcher
 
 np.set_printoptions(suppress=True)
@@ -138,7 +138,7 @@ class CogFormerAblationTrainer:
     def val_step(self, config, global_step, fig_path):
         params = ["v", "a", "z", "tau", "s_v", "s_tau"]
         param_names = [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"]
-        colors = cogformer_fm_colors()
+        colors = cogformer_mf_colors()
         max_num_categories = config["model_family_config"]["max_num_categories"]
 
         fig_base = paths.figures_dir("ablations", "size")
@@ -265,7 +265,7 @@ class CogFormerAblationTrainer:
             parameter_mask=params_mask,
             variable_names=param_names,
         )
-        metrics_df.to_csv(metrics_dir / f"{stem}_interaction_metrics.csv")
+        metrics_df.to_csv(paths.metrics_mirror(metrics_dir, make=True) / f"{stem}_interaction_metrics.csv")
 
         if self.use_wandb:
             wandb.log(

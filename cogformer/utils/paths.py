@@ -7,7 +7,8 @@ file's location), so they are independent of the current working directory.
 Layout::
 
     outputs/
-    ├── figures/      # .pdf/.png (+ co-located per-cell metric .csv)
+    ├── figures/      # .pdf/.png plots
+    ├── metrics/      # per-cell metric .csv (mirrors the figures/ layout)
     ├── checkpoints/  # model weights (.pt / keras dirs)
     ├── data/         # raw prediction arrays (.npz)
     ├── tables/       # publication tables (.tex + summary .csv)
@@ -26,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUTS = REPO_ROOT / "outputs"
 
 FIGURES = OUTPUTS / "figures"
+METRICS = OUTPUTS / "metrics"
 CHECKPOINTS = OUTPUTS / "checkpoints"
 DATA = OUTPUTS / "data"
 TABLES = OUTPUTS / "tables"
@@ -42,6 +44,31 @@ def _build(root: Path, parts, make: bool) -> Path:
 def figures_dir(*parts, make: bool = False) -> Path:
     """Path under ``outputs/figures`` (e.g. ``figures_dir('model_family', 'cf', 'ddm')``)."""
     return _build(FIGURES, parts, make)
+
+
+def metrics_dir(*parts, make: bool = False) -> Path:
+    """Path under ``outputs/metrics`` (per-cell metric CSVs, mirrors ``figures/``)."""
+    return _build(METRICS, parts, make)
+
+
+def metrics_mirror(path, make: bool = False) -> Path:
+    """Map a path under ``outputs/figures`` to the parallel ``outputs/metrics`` tree.
+
+    Metric CSVs live in their own tree that mirrors the figures layout, keeping
+    figure directories free of data files. Accepts either a directory or a file
+    path; anything not under ``outputs/figures`` is returned unchanged. When
+    ``make`` is set, the resolved directory (the path itself, or the parent for a
+    file path) is created.
+    """
+    path = Path(path)
+    try:
+        rel = path.relative_to(FIGURES)
+    except ValueError:
+        return path
+    mapped = METRICS / rel
+    if make:
+        (mapped.parent if mapped.suffix else mapped).mkdir(parents=True, exist_ok=True)
+    return mapped
 
 
 def checkpoints_dir(*parts, make: bool = False) -> Path:

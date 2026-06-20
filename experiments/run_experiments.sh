@@ -64,14 +64,14 @@ family_cf_checkpoint() {
 }
 
 model_class_checkpoint() {
-    echo "./outputs/checkpoints/model_class/cogformer_model_class_fm_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
+    echo "./outputs/checkpoints/model_class/cogformer_model_class_mc_l${NUM_LAYERS}_h${NUM_HEADS}_p${PROJ_DIM}_s${NUM_SEEDS}_d${SEED_DIM}_b${TRAIN_BATCH}_e${EPOCHS}_t${STEPS_PER_EPOCH}.pt"
 }
 
 # ── 1. MODEL FAMILY EXPERIMENTS ──────────────────────────────
 
 run_family() {
     local FAM=$1        # ddm | rdm | cdm
-    local STEM=$2       # checkpoint stem (e.g. cogformer_mixed_attn)
+    local STEM=$2       # checkpoint stem (e.g. cogformer_mf)
 
     echo ""
     echo "============================================================"
@@ -81,7 +81,7 @@ run_family() {
     # BayesFlow baseline: train + validate (5 cases)
     for CASE in $CASES; do
         echo "--- BF train  [${FAM^^}] case=${CASE} ---"
-        python experiments/model_families/family_bf_train.py \
+        python experiments/model_family/family_bf_train.py \
             --model_family "$FAM" \
             --case         "$CASE" \
             --epochs       "$EPOCHS" \
@@ -89,7 +89,7 @@ run_family() {
             --batch_size   "$TRAIN_BATCH"
 
         echo "--- BF validate [${FAM^^}] case=${CASE} ---"
-        python experiments/model_families/family_bf_validate.py \
+        python experiments/model_family/family_bf_validate.py \
             --model_family "$FAM" \
             --case         "$CASE" \
             --batch_size   "$VAL_BATCH" \
@@ -99,7 +99,7 @@ run_family() {
 
     # CogFormer: train
     echo "--- CF train [${FAM^^}] ---"
-    python experiments/model_families/family_cf_train.py \
+    python experiments/model_family/family_cf_train.py \
         --model_family      "$FAM" \
         --epochs            "$EPOCHS" \
         --steps_per_epoch   "$STEPS_PER_EPOCH" \
@@ -127,7 +127,7 @@ run_family() {
     CKPT=$(family_cf_checkpoint "$STEM" "$FAM")
 
     echo "--- CF validate [${FAM^^}] ---"
-    python experiments/model_families/family_cf_validate.py \
+    python experiments/model_family/family_cf_validate.py \
         --model_family  "$FAM" \
         --checkpoint    "$CKPT" \
         --data_dir      "$DATA_DIR" \
@@ -139,9 +139,9 @@ run_family() {
     echo "=== Done: ${FAM^^} family ==="
 }
 
-run_family ddm "cogformer_mixed_attn"
-run_family cdm "cogformer_cdm_mixed_attn"
-run_family rdm "cogformer_rdm_mixed_attn"
+run_family ddm "cogformer_mf"
+run_family cdm "cogformer_cdm_mf"
+run_family rdm "cogformer_rdm_mf"
 
 # ── 2. MODEL CLASS EXPERIMENT ─────────────────────────────────
 
@@ -224,7 +224,7 @@ run_ablation no_film
 run_ablation no_fourier
 
 # Evaluate baseline + all ablations across all 5 cases
-DDM_CKPT=$(family_cf_checkpoint "cogformer_mixed_attn" "ddm")
+DDM_CKPT=$(family_cf_checkpoint "cogformer_mf" "ddm")
 
 for CONDITION in baseline no_sab no_mab no_film no_fourier; do
     if [ "$CONDITION" = "baseline" ]; then

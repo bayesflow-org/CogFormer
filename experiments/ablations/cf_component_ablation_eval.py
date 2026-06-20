@@ -17,7 +17,7 @@ from cogformer.diagnostics.plot.adaptive_ecdf import adaptive_ecdf
 from cogformer.diagnostics.plot.adaptive_metrics import adaptive_metrics as plot_adaptive_metrics
 from cogformer.diagnostics.plot.adaptive_posterior import adaptive_posterior
 from cogformer.diagnostics.metric.adaptive_metrics import adaptive_metrics as compute_adaptive_metrics
-from cogformer.utils.plot_utils import cogformer_fm_colors
+from cogformer.utils.plot_utils import cogformer_mf_colors
 
 
 DESIGN_CONFIGS = {
@@ -147,7 +147,7 @@ def evaluate(
         mask_randomizer_kwargs=val_params_kwargs,
     )
     adapter = Adapter()
-    colors = cogformer_fm_colors()
+    colors = cogformer_mf_colors()
 
     stem = Path(checkpoint).stem
 
