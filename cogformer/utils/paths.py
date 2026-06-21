@@ -33,6 +33,22 @@ DATA = OUTPUTS / "data"
 TABLES = OUTPUTS / "tables"
 DOCS = OUTPUTS / "docs"
 
+# Weights & Biases run logs live in ``<repo>/wandb``. wandb appends a ``wandb/``
+# subfolder to whatever is passed as ``dir=``, so the value handed to ``wandb.init``
+# is the repo root itself (see ``wandb_init_dir``). Anchoring here keeps every run
+# in one place regardless of the current working directory.
+WANDB = REPO_ROOT / "wandb"
+
+
+def wandb_init_dir() -> str:
+    """Value to pass as ``dir=`` to ``wandb.init`` so runs land in ``<repo>/wandb``.
+
+    wandb writes runs to ``<dir>/wandb/run-*``, appending the ``wandb/`` subfolder
+    itself, so this returns the repo root rather than ``WANDB``. Using it makes the
+    run location independent of where the experiment script is launched from.
+    """
+    return str(REPO_ROOT)
+
 
 def _build(root: Path, parts, make: bool) -> Path:
     p = root.joinpath(*[str(x) for x in parts]) if parts else root

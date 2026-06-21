@@ -445,6 +445,7 @@ if __name__ == "__main__":
             name=f"cogformer-{args.ablation}",
             tags=["CogFormer", "ComponentAblation", args.ablation],
             config={**train_config, "cogformer": cogformer_config},
+            dir=paths.wandb_init_dir(),
         )
 
     model_family = NestedModelFamily(

@@ -612,6 +612,7 @@ if __name__ == "__main__":
             name=run_name,
             tags=tags,
             config={**train_config, "cogformer": cogformer_config},
+            dir=paths.wandb_init_dir(),
         )
 
     embed_tag = "_no_embed" if args.no_model_embedding else ""

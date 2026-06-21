@@ -28,6 +28,16 @@ cd CogFormer
 pip install -e .
 ```
 
+## Citation
+```text
+@article{huang2026cogformer,
+  title={CogFormer: Learn All Your Models Once},
+  author={Huang, Jerry M and Schumacher, Lukas and Stevenson, Niek and Radev, Stefan T},
+  journal={arXiv preprint arXiv:2603.20520},
+  year={2026}
+}
+```
+
 ## Artifacts and checkpoints
 
 The repository tracks **code and small summary tables** (`outputs/tables/`, `outputs/docs/`)

@@ -707,6 +707,7 @@ if __name__ == "__main__":
             name=None,
             tags=reg["wandb_tags"],
             config={**train_config, **{"cogformer": cogformer_config}},
+            dir=paths.wandb_init_dir(),
         )
 
     model_family = NestedModelFamily(
