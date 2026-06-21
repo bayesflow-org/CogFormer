@@ -1,5 +1,7 @@
 # CogFormer
-Learn All Your Models Once
+**Learn All Your Models Once**
+
+Jerry M. Huang, Lukas Schumacher, Niek Stevenson, and Stefan T. Radev
 
 ![CogFormer Architecture](cogformer/architecture.png)
 
