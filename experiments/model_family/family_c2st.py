@@ -19,11 +19,6 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "outdir_default": str(paths.figures_dir("model_family", "c2st", "ddm")),
-        "bf_data_stem": "ddm",
-        "cf_pred_stem": "ddm_family",
-        "c2st_prefix": "ddm_families",
-        "mc_pred_stem": "ddm",
-        "summary_name": "ddm_c2st_summary.csv",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
@@ -37,11 +32,6 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "outdir_default": str(paths.figures_dir("model_family", "c2st", "rdm")),
-        "bf_data_stem": "rdm",
-        "cf_pred_stem": "rdm_families",
-        "c2st_prefix": "rdm_families",
-        "mc_pred_stem": "rdm",
-        "summary_name": "rdm_c2st_summary.csv",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": ["v_diff", "a"], "u_2": ["v_diff", "a"], "u_1:u_2": []},
@@ -55,11 +45,6 @@ FAMILY_REGISTRY = {
         "intrinsic_params": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "outdir_default": str(paths.figures_dir("model_family", "c2st", "cdm")),
-        "bf_data_stem": "cdm",
-        "cf_pred_stem": "cdm_families",
-        "c2st_prefix": "cdm_families",
-        "mc_pred_stem": "cdm",
-        "summary_name": "cdm_c2st_summary.csv",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []},
@@ -145,6 +130,7 @@ def parse_args():
 def main():
     args = parse_args()
     reg = FAMILY_REGISTRY[args.model_family]
+    model = args.model_family
     intrinsic_params = reg["intrinsic_params"]
     variable_names = reg["variable_names"]
     colors = cogformer_mf_colors()
@@ -153,8 +139,8 @@ def main():
     summary_rows = []
 
     for cfg_name, design_config in benchmark.items():
-        bf_data_path = Path(args.bf_data_dir) / f"{reg['bf_data_stem']}_{cfg_name}_data.npz"
-        cf_pred_path = Path(args.cf_pred_dir) / f"{reg['cf_pred_stem']}_{cfg_name}_cf_pred.npz"
+        bf_data_path = Path(args.bf_data_dir) / f"{model}_{cfg_name}_data.npz"
+        cf_pred_path = Path(args.cf_pred_dir) / f"{model}_family_{cfg_name}_cf_pred.npz"
 
         if not bf_data_path.exists():
             logging.warning(f"No BF data for '{cfg_name}', skipping.")
@@ -176,19 +162,19 @@ def main():
         mean_acc, joint = run_comparison(
             cf_pred_set, bf_pred_reshaped, design_config, intrinsic_params,
             variable_names, colors, args.max_num_categories, params_mask,
-            outdir, f"{reg['c2st_prefix']}_{cfg_name}",
+            outdir, f"{model}_family_{cfg_name}",
         )
         summary_rows.append({"model": reg["name"], "case": cfg_name, "scenario": "Family_vs_BF",
                               "mean_accuracy": mean_acc, "joint_c2st": joint})
 
         if args.mc_pred_dir is not None:
-            mc_pred_path = Path(args.mc_pred_dir) / f"{reg['mc_pred_stem']}_{cfg_name}_cf_pred.npz"
+            mc_pred_path = Path(args.mc_pred_dir) / f"{model}_{cfg_name}_cf_pred.npz"
             if mc_pred_path.exists():
                 mc_pred_set, _ = load_cf_pred(mc_pred_path)
                 mean_acc_mc, joint_mc = run_comparison(
                     mc_pred_set, cf_pred_set, design_config, intrinsic_params,
                     variable_names, colors, args.max_num_categories, params_mask,
-                    outdir, f"{reg['mc_pred_stem']}_{cfg_name}_mc",
+                    outdir, f"{model}_{cfg_name}_mc",
                 )
                 summary_rows.append({"model": reg["name"], "case": cfg_name, "scenario": "Class_vs_Family",
                                       "mean_accuracy": mean_acc_mc, "joint_c2st": joint_mc})
@@ -196,7 +182,7 @@ def main():
                 logging.warning(f"No MC pred for '{cfg_name}' at {mc_pred_path}, skipping.")
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_path = paths.metrics_mirror(Path(outdir_root), make=True) / reg["summary_name"]
+    summary_path = paths.metrics_mirror(Path(outdir_root), make=True) / f"{model}_c2st_summary.csv"
     summary_df.to_csv(summary_path, index=False)
     logging.info(f"[saved] {summary_path}")
     logging.info("Done.")

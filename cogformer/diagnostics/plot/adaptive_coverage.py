@@ -329,9 +329,6 @@ if __name__ == "__main__":
         sigma = 0.5
         pred = true[:, None, :, :] + np.random.normal(0.0, sigma, size=(batch_size, num_draws, num_rows, num_cols))
 
-        print("true:", true.shape)
-        print("pred:", pred.shape)
-        print("mask:", parameter_mask.shape)
 
         fig = adaptive_coverage(
             true=true,
@@ -351,4 +348,3 @@ if __name__ == "__main__":
         )
 
         fig.savefig("test_adaptive_coverage.pdf")
-        print("Saved test_adaptive_coverage.pdf")

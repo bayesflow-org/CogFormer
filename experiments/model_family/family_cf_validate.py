@@ -38,7 +38,6 @@ FAMILY_REGISTRY = {
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
         "outdir_default": str(paths.figures_dir("model_family", "cf", "ddm")),
-        "pred_stem": "ddm_family",
         "fig_stem": "ddm",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -58,7 +57,6 @@ FAMILY_REGISTRY = {
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
         "outdir_default": str(paths.figures_dir("model_family", "cf", "rdm")),
-        "pred_stem": "rdm_families",
         "fig_stem": "rdm",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -78,7 +76,6 @@ FAMILY_REGISTRY = {
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
         "outdir_default": str(paths.figures_dir("model_family", "cf", "cdm")),
-        "pred_stem": "cdm_families",
         "fig_stem": "cdm",
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -160,7 +157,7 @@ def main():
     variable_names = reg["variable_names"]
     default_fixed_values = reg["default_fixed_values"]
     outdir_root = args.outdir if args.outdir is not None else reg["outdir_default"]
-    pred_stem = reg["pred_stem"]
+    pred_stem = f"{args.model_family}_family"
     fig_stem = reg["fig_stem"]
     fam_lower = reg["name"].lower()
 

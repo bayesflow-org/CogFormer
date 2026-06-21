@@ -108,7 +108,6 @@ def adaptive_c2st(
             row_labels.append(r"$1$")
             row_colors.append(intercept_color)
         else:
-            category_id = (r - 1) % (max_num_categories - 1) + 1
             regressor_id = (r - 1) // (max_num_categories - 1) + 1
             regressor_key = regressor_keys[regressor_id]
             row_labels.append(fr"${regressor_key}$")
@@ -231,9 +230,6 @@ if __name__ == "__main__":
     pred_a = true[:, None, :, :] + np.random.normal(0.0, 0.5, (batch_size, num_draws, num_rows, num_cols))
     pred_b = true[:, None, :, :] + np.random.normal(0.2, 0.6, (batch_size, num_draws, num_rows, num_cols))
 
-    print("pred_a:", pred_a.shape)
-    print("pred_b:", pred_b.shape)
-    print("mask:", parameter_mask.shape)
 
     fig = adaptive_c2st(
         pred_a=pred_a,
@@ -251,4 +247,3 @@ if __name__ == "__main__":
     )
 
     fig.savefig("test_adaptive_c2st.pdf", bbox_inches="tight")
-    print("Saved test_adaptive_c2st.pdf")

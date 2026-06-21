@@ -71,7 +71,7 @@ FAMILY_REGISTRY = {
         "free_intrinsics": ["v", "a", "z", "tau"],
         "val_interval": 1000,
         "checkpoint_stem": "cogformer_mf",
-        "wandb_project": "cogformer-fm-ddm",
+        "wandb_project": "cogformer-mf-ddm",
         "wandb_tags": ["CogFormer", "ModelFamily", "Designer"],
         "val_scenarios": [
             ("interaction", {
@@ -88,7 +88,6 @@ FAMILY_REGISTRY = {
             }),
         ],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "bf_data_stem": "ddm",
         "benchmark_design_configs": {
             "intercept_only":  {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "fixed":           {"1": ["v", "a", "z", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -107,7 +106,7 @@ FAMILY_REGISTRY = {
         "free_intrinsics": ["v", "v_diff", "a", "tau"],
         "val_interval": 1000,
         "checkpoint_stem": "cogformer_rdm_mf",
-        "wandb_project": "cogformer-fm-rdm",
+        "wandb_project": "cogformer-mf-rdm",
         "wandb_tags": ["CogFormer", "RDM", "ModelFamily", "Designer"],
         "val_scenarios": [
             ("interaction", {
@@ -124,7 +123,6 @@ FAMILY_REGISTRY = {
             }),
         ],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "bf_data_stem": "rdm",
         "benchmark_design_configs": {
             "intercept_only":  {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "fixed":           {"1": ["v", "v_diff", "a", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -143,7 +141,7 @@ FAMILY_REGISTRY = {
         "free_intrinsics": ["v", "v_theta", "a", "tau"],
         "val_interval": 1000,
         "checkpoint_stem": "cogformer_cdm_mf",
-        "wandb_project": "cogformer-fm-cdm",
+        "wandb_project": "cogformer-mf-cdm",
         "wandb_tags": ["CogFormer", "CDM", "ModelFamily"],
         "val_scenarios": [
             ("interaction", {
@@ -160,7 +158,6 @@ FAMILY_REGISTRY = {
             }),
         ],
         "default_fixed_values": {"s_v": 0.0, "s_tau": 0.0},
-        "bf_data_stem": "cdm",
         "benchmark_design_configs": {
             "intercept_only":  {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "fixed":           {"1": ["v", "v_theta", "a", "tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
@@ -192,7 +189,6 @@ class CogFormerTrainer:
         self.val_scenarios = reg["val_scenarios"]
         self.fam_lower = reg["name"].lower()
         self.default_fixed_values = reg["default_fixed_values"]
-        self.bf_data_stem = reg["bf_data_stem"]
         self.benchmark_design_configs = reg["benchmark_design_configs"]
         self.amortization_history = {
             case: {"steps": [], "joint_c2st": []}
@@ -393,7 +389,7 @@ class CogFormerTrainer:
         log_dict = {}
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = paths.data_dir("predictions", f"{self.bf_data_stem}_{case_name}_data.npz")
+            bf_path = paths.data_dir("predictions", f"{self.fam_lower}_{case_name}_data.npz")
 
             # Pair CogFormer with BayesFlow by conditioning both on the SAME datasets.
             # When the BayesFlow npz exists, reconstruct the adapter input from its stored
@@ -502,7 +498,7 @@ class CogFormerTrainer:
         out_dir = paths.data_dir("predictions")
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = paths.data_dir("predictions", f"{self.bf_data_stem}_{case_name}_data.npz")
+            bf_path = paths.data_dir("predictions", f"{self.fam_lower}_{case_name}_data.npz")
             if not bf_path.exists():
                 logging.warning(f"No BF data for '{case_name}', skipping FM pred save.")
                 continue
@@ -544,7 +540,7 @@ class CogFormerTrainer:
             pred_set = pred_set.reshape(batch_size, config["fm_num_samples"], n_rows, n_cols)
             params_mask = adapted["param_masks"].detach().cpu().numpy().reshape(batch_size, n_rows, n_cols)[0]
 
-            out_path = out_dir / f"{self.bf_data_stem}_family_{case_name}_cf_pred.npz"
+            out_path = out_dir / f"{self.fam_lower}_family_{case_name}_cf_pred.npz"
             np.savez(out_path, pred_set=pred_set, params_mask=params_mask)
             logging.info(f"[saved] {out_path}")
 

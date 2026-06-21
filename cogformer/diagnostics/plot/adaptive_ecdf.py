@@ -280,9 +280,6 @@ if __name__ == "__main__":
     true = np.random.normal(0.0, 1.0, size=(batch_size, num_rows, num_cols))
     pred = np.random.normal(0.0, 1.0, size=(batch_size, num_draws, num_rows, num_cols))
 
-    print("true:", true.shape)
-    print("pred:", pred.shape)
-    print("mask:", parameter_mask.shape)
 
     fig = adaptive_ecdf(
         true=true,
@@ -299,4 +296,3 @@ if __name__ == "__main__":
     )
 
     fig.savefig("test_adaptive_ecdf.pdf")
-    print("Saved test_adaptive_ecdf.pdf")

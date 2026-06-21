@@ -116,7 +116,6 @@ def _add_mask_legend(
     # Fixed thumbnail width: n=12 fills ~full width (0.95)
     thumb_w_fig  = (0.95 - 11 * gap) / 12 * thumb_scale
     avail_w_fig  = n * thumb_w_fig + (n - 1) * gap
-    total_gaps   = gap * (n - 1)
     # Centre the thumbnail strip horizontally
     left_margin  = (1.0 - avail_w_fig) / 2
     thumb_w_in   = thumb_w_fig * figW

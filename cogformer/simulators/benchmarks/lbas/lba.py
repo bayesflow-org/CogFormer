@@ -15,8 +15,6 @@ def sample_lba_trial(
 
     n_choices = v.shape[0]
     threshold = A + b
-    rt = -1
-    choice = -1
 
     while True:
         min_t = 1e25

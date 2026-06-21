@@ -396,7 +396,6 @@ if __name__ == "__main__":
     # posterior over the full unfolded matrix
     prior_samples = np.random.normal(0.0, 5.0, (num_draws, R, C))
     posterior_samples = np.random.normal(0.0, 1.0, (num_draws, R, C))
-    print(posterior_samples.shape)
 
     g = adaptive_posterior(
         samples=posterior_samples,  # (N, R, C) or (N, R*C)
@@ -409,4 +408,3 @@ if __name__ == "__main__":
         show_upper_scatter=False
     )
     g.savefig(f"posterior_pairplot{'_unfolded' if unfold else ''}.pdf")
-    print("awesome")

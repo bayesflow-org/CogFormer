@@ -71,7 +71,6 @@ if __name__ == "__main__":
     rts = ddm_samples["sim_data"]["rts"]
     rts_min, rts_mean, rts_max = rts.min(axis=1), rts.mean(axis=1), rts.max(axis=1)
     rts_stat = np.hstack([rts_min, rts_mean, rts_max])
-    print(rts_stat.shape)
 
     f, ax = plt.subplots(1, 3, figsize=(15, 5))
     for i, a in enumerate(ax):
@@ -88,4 +87,3 @@ if __name__ == "__main__":
         variable_names = variable_names
     )
     fig.savefig("test_pushforward_check.pdf")
-    print("groovy")

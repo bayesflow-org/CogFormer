@@ -155,11 +155,13 @@ def evaluate(
     data_dir = paths.tables_dir("ablations", "component")
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    recovery_dir  = fig_base / "recovery";       recovery_dir.mkdir(parents=True, exist_ok=True)
-    posterior_dir = fig_base / "test_posterior"; posterior_dir.mkdir(parents=True, exist_ok=True)
-    coverage_dir  = fig_base / "coverage";       coverage_dir.mkdir(parents=True, exist_ok=True)
-    ecdf_dir      = fig_base / "ecdf";           ecdf_dir.mkdir(parents=True, exist_ok=True)
-    metrics_dir   = fig_base / "metrics";        metrics_dir.mkdir(parents=True, exist_ok=True)
+    recovery_dir  = fig_base / "recovery"
+    posterior_dir = fig_base / "test_posterior"
+    coverage_dir  = fig_base / "coverage"
+    ecdf_dir      = fig_base / "ecdf"
+    metrics_dir   = fig_base / "metrics"
+    for d in (recovery_dir, posterior_dir, coverage_dir, ecdf_dir, metrics_dir):
+        d.mkdir(parents=True, exist_ok=True)
 
     cases_to_run = cases if cases else list(DESIGN_CONFIGS.keys())
     for case, design_config in DESIGN_CONFIGS.items():

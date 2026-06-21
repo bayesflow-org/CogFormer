@@ -169,7 +169,6 @@ class ModelClass:
 
         for i, b in enumerate(list_batch):
             model_name = b["model_name"]
-            num_params = len(self.model_families[model_name].intrinsic_params)
 
             model_names_out.append(model_name)
             design_configs.append(b["design_config"])

@@ -23,7 +23,7 @@ FAMILY_REGISTRY = {
         "model_cls": DDM,
         "prior_fun": ddm_priors,
         "link_fun": ddm_link_fun,
-        "checkpoint_prefix": "ddm_families_bf",
+        "checkpoint_prefix": "ddm_family_bf",
         "case_configs": {
             "intercept_only": {
                 "free_intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"],
@@ -126,7 +126,7 @@ FAMILY_REGISTRY = {
         "model_cls": RDM,
         "prior_fun": rdm_priors,
         "link_fun": rdm_link_fun,
-        "checkpoint_prefix": "rdm_families_bf",
+        "checkpoint_prefix": "rdm_family_bf",
         "case_configs": {
             "intercept_only": {
                 "free_intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
@@ -229,7 +229,7 @@ FAMILY_REGISTRY = {
         "model_cls": CDM,
         "prior_fun": cdm_priors,
         "link_fun": cdm_link_fun,
-        "checkpoint_prefix": "cdm_families_bf",
+        "checkpoint_prefix": "cdm_family_bf",
         "case_configs": {
             "intercept_only": {
                 "free_intrinsics": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],

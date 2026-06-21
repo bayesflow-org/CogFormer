@@ -289,4 +289,3 @@ if __name__ == "__main__":
         labels=labels,
     )
     fig.savefig("test_ensemble_recovery.pdf")
-    print("done")

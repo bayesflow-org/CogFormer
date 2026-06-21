@@ -319,13 +319,6 @@ def main():
             mc["benchmarks"] = {k: v for k, v in mc["benchmarks"].items() if k != "full"}
     max_num_params = model_class.max_num_params
 
-    model_family_config = {
-        "max_num_regressors": args.max_num_regressors,
-        "max_num_categories": args.max_num_categories,
-        "keep_intercept": args.keep_intercept,
-        "add_interaction": args.add_interaction,
-    }
-
     pred_dir = Path(args.pred_dir)
     pred_dir.mkdir(parents=True, exist_ok=True)
 
@@ -337,7 +330,6 @@ def main():
         intrinsic_params = model_cfg["intrinsic_params"]
         variable_names = model_cfg["variable_names"]
         default_fixed_values = model_cfg["default_fixed_values"]
-        n_cols = len(intrinsic_params)
 
         for cfg_name, design_config in model_cfg["benchmarks"].items():
             print(f"Validating {model_name} / {cfg_name}")

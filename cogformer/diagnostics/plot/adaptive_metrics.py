@@ -295,4 +295,3 @@ if __name__ == "__main__":
     )
 
     fig.savefig("test_adaptive_metrics.pdf", bbox_inches="tight")
-    print("Saved test_adaptive_metrics.pdf")

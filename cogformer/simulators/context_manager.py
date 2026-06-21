@@ -256,7 +256,10 @@ class ContextManager:
                     # print("Identified SciPy priors")
                     scale = spec.std()
                     # scale = spec.mean()
-                    sampler = lambda rv=spec: rv.rvs()
+
+                    def sampler(rv=spec):
+                        return rv.rvs()
+
                     priors[k] = {
                         "intercept": sampler,
                         "slope": lambda std=scale: np.random.normal(0.0, 1.0)
@@ -576,8 +579,6 @@ class ContextManager:
         has_intercept = keep_intercept and parameter_mask[0].any()
 
         for design_index in range(num_regressors):
-            is_intercept_row = has_intercept and (design_index == 0)
-
             for param_index, intrinsic_param in enumerate(intrinsic_params):
                 # Sample prior if parameter or regressor is not masked
                 if parameter_mask[design_index, param_index] == 1.0:

@@ -35,7 +35,7 @@ FAMILY_REGISTRY = {
         "model_cls": DDM,
         "prior_fun": ddm_priors,
         "link_fun": ddm_link_fun,
-        "checkpoint_prefix": "ddm_families_bf",
+        "checkpoint_prefix": "ddm_family_bf",
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "benchmark_design_configs": {
@@ -98,7 +98,7 @@ FAMILY_REGISTRY = {
         "model_cls": RDM,
         "prior_fun": rdm_priors,
         "link_fun": rdm_link_fun,
-        "checkpoint_prefix": "rdm_families_bf",
+        "checkpoint_prefix": "rdm_family_bf",
         "intrinsic_params": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "benchmark_design_configs": {
@@ -164,7 +164,7 @@ FAMILY_REGISTRY = {
         "model_cls": CDM,
         "prior_fun": cdm_priors,
         "link_fun": cdm_link_fun,
-        "checkpoint_prefix": "cdm_families_bf",
+        "checkpoint_prefix": "cdm_family_bf",
         "intrinsic_params": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
         "benchmark_design_configs": {
@@ -426,7 +426,7 @@ def main(family: str, case: str, batch_size: int = 200, num_samples: int = 200, 
         metrics_dict[log_gamma["metric_name"]] = log_gamma["values"]
 
     metrics = pd.DataFrame(metrics_dict)
-    metrics.to_csv(evals_dir / f"{fam_lower}_families_bf_{case}_evaluations.csv", sep=";")
+    metrics.to_csv(evals_dir / f"{fam_lower}_family_bf_{case}_evaluations.csv", sep=";")
     logging.info("Metric evaluation is now finished.")
 
     intrinsic_params_all = reg["intrinsic_params"]

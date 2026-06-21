@@ -294,4 +294,3 @@ if __name__ == "__main__":
         labels=labels,
     )
     fig.savefig("test_ensemble_ecdf.pdf")
-    print("done")

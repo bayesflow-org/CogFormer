@@ -166,13 +166,14 @@ class CogFormerAblationTrainer:
         fig_base = paths.figures_dir("ablations", "component")
         stem = Path(fig_path).stem
 
-        recovery_dir = fig_base / "recovery";        recovery_dir.mkdir(parents=True, exist_ok=True)
-        posterior_dir = fig_base / "test_posterior"; posterior_dir.mkdir(parents=True, exist_ok=True)
-        coverage_dir  = fig_base / "coverage";       coverage_dir.mkdir(parents=True, exist_ok=True)
-        ecdf_dir      = fig_base / "ecdf";           ecdf_dir.mkdir(parents=True, exist_ok=True)
-        metrics_dir   = fig_base / "metrics";        metrics_dir.mkdir(parents=True, exist_ok=True)
+        recovery_dir  = fig_base / "recovery"
+        posterior_dir = fig_base / "test_posterior"
+        coverage_dir  = fig_base / "coverage"
+        ecdf_dir      = fig_base / "ecdf"
+        metrics_dir   = fig_base / "metrics"
         pred_dir      = paths.data_dir("predictions", "ablations", "component")
-        pred_dir.mkdir(parents=True, exist_ok=True)
+        for d in (recovery_dir, posterior_dir, coverage_dir, ecdf_dir, metrics_dir, pred_dir):
+            d.mkdir(parents=True, exist_ok=True)
 
         self.cf.eval()
 
@@ -440,7 +441,7 @@ if __name__ == "__main__":
 
     if args.use_wandb:
         wandb.init(
-            project="cogformer-fm-ddm-ablation",
+            project="cogformer-mf-ddm-ablation",
             name=f"cogformer-{args.ablation}",
             tags=["CogFormer", "ComponentAblation", args.ablation],
             config={**train_config, "cogformer": cogformer_config},

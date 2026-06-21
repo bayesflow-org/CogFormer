@@ -151,7 +151,6 @@ if __name__ == "__main__":
         batch_size = 10
         true = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
         pred = np.random.normal(1, 1, (batch_size, num_regressors * (num_categories - 1) + 1, num_params))
-        print(true.shape, pred.shape)
 
         fig = adaptive_recovery(
             true,
@@ -167,4 +166,3 @@ if __name__ == "__main__":
             label_fontsize=14,
         )
         fig.savefig("test_recovery.pdf")
-        print("groovy")

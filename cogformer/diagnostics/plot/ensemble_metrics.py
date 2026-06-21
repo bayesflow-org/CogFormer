@@ -344,4 +344,3 @@ if __name__ == "__main__":
         num_null_draws=200,
     )
     fig.savefig("test_ensemble_metrics.pdf", bbox_inches="tight")
-    print("done")

@@ -345,7 +345,6 @@ class NestedModelFamily:
 
             # Pad design_matrix, param_mask, param_matrix, and regressor_mask to max_num_regressors
             num_obs = b["num_obs"]
-            num_regressors = b["num_regressors"]
             num_cols = b["design_matrix"].shape[1]
 
             design_matrices[i, :num_obs, :num_cols] = b["design_matrix"]
