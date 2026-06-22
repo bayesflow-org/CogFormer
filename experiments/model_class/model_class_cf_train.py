@@ -170,7 +170,7 @@ class CogFormerTrainer:
 
         prefetcher.shutdown()
         self.plot_amortization_gap()
-        checkpoint_dir = paths.checkpoints_dir("mc")
+        checkpoint_dir = paths.checkpoints_dir("mc", "cf")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -324,7 +324,7 @@ class CogFormerTrainer:
             global_indices = self.model_class.local_to_global[model_name]
 
             for case_name, design_config in model_cfg["benchmark_design_configs"].items():
-                bf_path = paths.data_dir("predictions", f"{model_lower}_{case_name}_data.npz")
+                bf_path = paths.data_dir("mf", "bf", model_lower, f"{model_lower}_{case_name}_data.npz")
 
                 if bf_path.exists():
                     bf_data = np.load(bf_path, allow_pickle=True)
@@ -403,7 +403,7 @@ class CogFormerTrainer:
                         log_dict[key] = float(metrics_df[metric].mean())
 
                 if bf_data is not None:
-                    fm_pred_path = paths.data_dir("predictions", f"{model_lower}_family_{case_name}_cf_pred.npz")
+                    fm_pred_path = paths.data_dir("mf", "cf", model_lower, f"{model_lower}_family_{case_name}_cf_pred.npz")
                     if fm_pred_path.exists():
                         fm_data = np.load(fm_pred_path, allow_pickle=True)
                         joint_score = compute_joint_c2st(

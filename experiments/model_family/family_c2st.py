@@ -118,9 +118,9 @@ def run_comparison(pred_a, pred_b, design_config, intrinsic_params, variable_nam
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
-    p.add_argument("--bf_data_dir", type=str, default=str(paths.data_dir("predictions")))
-    p.add_argument("--cf_pred_dir", type=str, default=str(paths.data_dir("predictions")))
-    p.add_argument("--mc_pred_dir", type=str, default=str(paths.data_dir("predictions", "mc")),
+    p.add_argument("--bf_data_dir", type=str, default=str(paths.data_dir("mf", "bf")))
+    p.add_argument("--cf_pred_dir", type=str, default=str(paths.data_dir("mf", "cf")))
+    p.add_argument("--mc_pred_dir", type=str, default=str(paths.data_dir("mc")),
                    help="Directory with CogFormer ModelClass pred files; if set, also runs Class vs Family C2ST")
     p.add_argument("--outdir", type=str, default=None, help="Output directory (defaults per family)")
     p.add_argument("--max_num_categories", type=int, default=2)
@@ -139,8 +139,8 @@ def main():
     summary_rows = []
 
     for cfg_name, design_config in benchmark.items():
-        bf_data_path = Path(args.bf_data_dir) / f"{model}_{cfg_name}_data.npz"
-        cf_pred_path = Path(args.cf_pred_dir) / f"{model}_family_{cfg_name}_cf_pred.npz"
+        bf_data_path = Path(args.bf_data_dir) / model.lower() / f"{model}_{cfg_name}_data.npz"
+        cf_pred_path = Path(args.cf_pred_dir) / model.lower() / f"{model}_family_{cfg_name}_cf_pred.npz"
 
         if not bf_data_path.exists():
             logging.warning(f"No BF data for '{cfg_name}', skipping.")

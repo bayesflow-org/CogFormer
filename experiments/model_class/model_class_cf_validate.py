@@ -222,8 +222,8 @@ def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str, default=str(paths.figures_dir("mc", "cf")))
-    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("predictions", "mc")))
-    p.add_argument("--data_dir", type=str, default=str(paths.data_dir("predictions")), help="Directory with BayesFlow validation data")
+    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("mc")))
+    p.add_argument("--data_dir", type=str, default=str(paths.data_dir("mf", "bf")), help="Directory with BayesFlow validation data")
 
     # Validation settings
     p.add_argument("--batch_size", type=int, default=200)
@@ -343,7 +343,7 @@ def main():
                 default_fixed_values=default_fixed_values,
             )
 
-            data_path = Path(args.data_dir) / f"{model_name.lower()}_{cfg_name}_data.npz" if args.data_dir else None
+            data_path = Path(args.data_dir) / model_name.lower() / f"{model_name.lower()}_{cfg_name}_data.npz" if args.data_dir else None
             if data_path is not None and data_path.exists():
                 max_total_regressors = args.max_num_regressors * (args.max_num_regressors + 1) // 2
                 max_dm_cols = max_total_regressors * (args.max_num_categories - 1) + (1 if args.keep_intercept else 0)

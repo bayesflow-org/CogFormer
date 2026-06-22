@@ -120,7 +120,7 @@ class CogFormerAblationTrainer:
             pbar.close()
 
         prefetcher.shutdown()
-        checkpoint_dir = paths.checkpoints_dir("ablations", "component")
+        checkpoint_dir = paths.checkpoints_dir("ablations")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -171,7 +171,7 @@ class CogFormerAblationTrainer:
         coverage_dir  = fig_base / "coverage"
         ecdf_dir      = fig_base / "ecdf"
         metrics_dir   = fig_base / "metrics"
-        pred_dir      = paths.data_dir("predictions", "ablations", "component")
+        pred_dir      = paths.data_dir("ablations")
         for d in (recovery_dir, posterior_dir, coverage_dir, ecdf_dir, metrics_dir, pred_dir):
             d.mkdir(parents=True, exist_ok=True)
 

@@ -147,7 +147,7 @@ class CogFormerAblationTrainer:
         coverage_dir  = fig_base / "coverage"
         ecdf_dir      = fig_base / "ecdf"
         metrics_dir   = fig_base / "metrics"
-        pred_dir      = paths.data_dir("predictions", "ablations", "size")
+        pred_dir      = paths.data_dir("ablations", "size")
         for d in (recovery_dir, posterior_dir, coverage_dir, ecdf_dir, metrics_dir, pred_dir):
             d.mkdir(parents=True, exist_ok=True)
 

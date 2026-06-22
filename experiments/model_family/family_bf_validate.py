@@ -366,7 +366,7 @@ def main(family: str, case: str, batch_size: int = 200, num_samples: int = 200, 
     checkpoint_path = str(paths.checkpoints_dir("baselines", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
 
-    data_dir = paths.data_dir("predictions")
+    data_dir = paths.data_dir("mf", "bf", fam_lower)
     figures_dir = paths.figures_dir("mf", "baselines", fam_lower, case)
     evals_dir = paths.tables_dir("evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)

@@ -238,7 +238,7 @@ class CogFormerTrainer:
         prefetcher.shutdown()
         self.plot_amortization_gap()
         self.save_fm_predictions(val_config)
-        checkpoint_dir = paths.checkpoints_dir("mf", self.fam_lower)
+        checkpoint_dir = paths.checkpoints_dir("mf", "cf", self.fam_lower)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -389,7 +389,7 @@ class CogFormerTrainer:
         log_dict = {}
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = paths.data_dir("predictions", f"{self.fam_lower}_{case_name}_data.npz")
+            bf_path = paths.data_dir("mf", "bf", self.fam_lower, f"{self.fam_lower}_{case_name}_data.npz")
 
             # Pair CogFormer with BayesFlow by conditioning both on the SAME datasets.
             # When the BayesFlow npz exists, reconstruct the adapter input from its stored
@@ -495,10 +495,10 @@ class CogFormerTrainer:
         keep_intercept = config["model_family_config"]["keep_intercept"]
         max_total_regressors = max_num_regressors * (max_num_regressors + 1) // 2
         expected_dm_cols = max_total_regressors * (max_num_categories - 1) + (1 if keep_intercept else 0)
-        out_dir = paths.data_dir("predictions")
+        out_dir = paths.data_dir("mf", "cf", self.fam_lower)
 
         for case_name, design_config in self.benchmark_design_configs.items():
-            bf_path = paths.data_dir("predictions", f"{self.fam_lower}_{case_name}_data.npz")
+            bf_path = paths.data_dir("mf", "bf", self.fam_lower, f"{self.fam_lower}_{case_name}_data.npz")
             if not bf_path.exists():
                 logging.warning(f"No BF data for '{case_name}', skipping FM pred save.")
                 continue

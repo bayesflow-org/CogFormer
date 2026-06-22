@@ -119,8 +119,8 @@ def parse_args():
     p.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     p.add_argument("--checkpoint", type=str, required=True)
     p.add_argument("--outdir", type=str, default=None, help="Output directory (defaults per family)")
-    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("predictions")))
-    p.add_argument("--data_dir", type=str, default=str(paths.data_dir("predictions")))
+    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("mf", "cf")))
+    p.add_argument("--data_dir", type=str, default=str(paths.data_dir("mf", "bf")))
     p.add_argument("--batch_size", type=int, default=200)
     p.add_argument("--num_obs", type=int, default=500)
     p.add_argument("--max_num_regressors", type=int, default=2)
@@ -225,7 +225,7 @@ def main():
         val_params_kwargs = {"free_intrinsics": free_intr, "fixed_intrinsics": fixed_intr, "fixed_values": fixed_vals}
         val_sample_config = {"mask_randomizer_kwargs": val_params_kwargs, "min_num_regressors": 0, "fixed_config": True}
 
-        data_path = Path(args.data_dir) / f"{fam_lower}_{cfg_name}_data.npz" if args.data_dir else None
+        data_path = Path(args.data_dir) / fam_lower / f"{fam_lower}_{cfg_name}_data.npz" if args.data_dir else None
         if data_path is not None and data_path.exists():
             test_samples = load_validation_data(data_path=data_path)
 
@@ -284,7 +284,7 @@ def main():
         params_mask = adapted["param_masks"].detach().cpu().numpy()
         params_mask = params_mask.reshape((args.batch_size, n_rows, n_cols))[0]
 
-        pred_dir = Path(args.pred_dir)
+        pred_dir = Path(args.pred_dir) / fam_lower
         pred_dir.mkdir(parents=True, exist_ok=True)
         pred_path = pred_dir / f"{pred_stem}_{cfg_name}_cf_pred.npz"
         np.savez(pred_path, pred_set=pred_set, true_set=true_set, params_mask=params_mask)
