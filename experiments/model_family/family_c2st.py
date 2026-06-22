@@ -129,8 +129,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    reg = FAMILY_REGISTRY[args.model_family]
-    model = args.model_family
+    reg = FAMILY_REGISTRY[args.mf]
+    model = args.mf
     intrinsic_params = reg["intrinsic_params"]
     variable_names = reg["variable_names"]
     colors = cogformer_mf_colors()

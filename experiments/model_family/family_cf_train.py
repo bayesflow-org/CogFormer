@@ -615,7 +615,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    reg = FAMILY_REGISTRY[args.model_family]
+    reg = FAMILY_REGISTRY[args.mf]
     use_wandb = args.use_wandb
 
     max_num_regressors = 2

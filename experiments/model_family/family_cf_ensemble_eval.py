@@ -156,7 +156,7 @@ def main():
     args = parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    reg = FAMILY_REGISTRY[args.model_family]
+    reg = FAMILY_REGISTRY[args.mf]
     intrinsic_params = reg["intrinsic_params"]
     variable_names = reg["variable_names"]
     default_fixed_values = reg["default_fixed_values"]
