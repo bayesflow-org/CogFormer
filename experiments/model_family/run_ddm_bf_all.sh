@@ -7,8 +7,8 @@ cd "$PROJECT_ROOT"
 # Train and validate all DDM BayesFlow cases sequentially.
 #
 # Usage:
-#   bash experiments/model_family/run_ddm_bf_all.sh
-#   bash experiments/model_family/run_ddm_bf_all.sh --epochs 500 --batch_size 128
+#   bash experiments/mf/run_ddm_bf_all.sh
+#   bash experiments/mf/run_ddm_bf_all.sh --epochs 500 --batch_size 128
 #
 # All flags after the script name are forwarded to the train script only.
 # Validation always uses its own defaults (batch_size=200, num_samples=200).

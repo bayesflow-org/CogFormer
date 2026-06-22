@@ -333,7 +333,7 @@ def test(family: str, case: str):
     print(f"  [Check] Params zero where masked: {'OK' if zero_where_masked else 'FAIL'}")
     assert zero_where_masked, "Non-zero param values found at masked-out positions"
 
-    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
+    checkpoint_path = str(paths.checkpoints_dir("baselines", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
     print("Loaded model")
 
@@ -363,11 +363,11 @@ def main(family: str, case: str, batch_size: int = 200, num_samples: int = 200, 
 
     simulator = ModelFamilyBF(family=family, case=case)
 
-    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
+    checkpoint_path = str(paths.checkpoints_dir("baselines", f"{reg['checkpoint_prefix']}_{case}", "model.keras"))
     approximator = keras.saving.load_model(checkpoint_path)
 
     data_dir = paths.data_dir("predictions")
-    figures_dir = paths.figures_dir("model_family", "bf", fam_lower, case)
+    figures_dir = paths.figures_dir("mf", "baselines", fam_lower, case)
     evals_dir = paths.tables_dir("evaluations")
     data_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -506,7 +506,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Model Family BayesFlow Validation")
-    parser.add_argument("--model_family", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
+    parser.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     parser.add_argument("--case", type=str, default="intercept_only", help="Validation case to run")
     parser.add_argument("--batch_size", type=int, default=200)
     parser.add_argument("--num_samples", type=int, default=200)

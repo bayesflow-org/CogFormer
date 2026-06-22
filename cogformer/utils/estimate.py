@@ -67,13 +67,13 @@ __all__ = [
 
 # Models the demo exposes. Intrinsic-parameter lists are the source of truth for
 # parameter ordering/labels and are ported from FAMILY_REGISTRY in
-# experiments/model_family/family_cf_validate.py. ddm/rdm confirmed; cdm and the
-# joint model_class are TODO (port from the same registry to avoid inventing names).
+# experiments/mf/family_cf_validate.py. ddm/rdm confirmed; cdm and the
+# joint mc are TODO (port from the same registry to avoid inventing names).
 SUPPORTED_MODELS: dict[str, dict] = {
     "ddm": {"intrinsics": ["v", "a", "z", "tau", "s_v", "s_tau"]},
     "rdm": {"intrinsics": ["v", "v_diff", "a", "tau", "s_v", "s_tau"]},
     "cdm": {"intrinsics": None},          # TODO: port from FAMILY_REGISTRY
-    "model_class": {"intrinsics": None},  # TODO: joint multi-family model
+    "mc": {"intrinsics": None},  # TODO: joint multi-family model
 }
 
 DEFAULT_DIAGNOSTICS: tuple[str, ...] = ("recovery", "coverage", "ecdf")
@@ -196,7 +196,7 @@ def estimate(
     ----------
     model
         One of ``SUPPORTED_MODELS`` (``"ddm"``, ``"rdm"``, ``"cdm"``,
-        ``"model_class"``).
+        ``"mc"``).
     design_config
         Maps each regressor key to the intrinsic parameters it modulates, e.g.
         ``{"1": ["v","a","z","tau"], "u_1": ["v","a"], "u_2": [], "u_1:u_2": []}``.
@@ -236,7 +236,7 @@ def estimate(
     param_labels = active_param_labels(model, design_config)
 
     t0 = time.perf_counter()
-    # --- Phase 0 wiring (port from experiments/model_family/family_cf_validate.py) ---
+    # --- Phase 0 wiring (port from experiments/mf/family_cf_validate.py) ---
     # bundle, net = _load_model(model, checkpoint, device)        # registry + state_dict
     # true_params, adapted = _simulate_ground_truth(bundle, design_config, settings)
     # posterior = _sample_posterior(net, adapted, num_samples, steps)  # CogFormer.sample

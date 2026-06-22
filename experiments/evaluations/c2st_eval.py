@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 
-C2ST_DIR = paths.figures_dir("model_family", "c2st")
+C2ST_DIR = paths.figures_dir("mf", "c2st")
 OUT_DIR = paths.tables_dir("evaluations")
 
 MODELS = ["DDM", "RDM", "CDM"]

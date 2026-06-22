@@ -7,10 +7,10 @@ cd "$PROJECT_ROOT"
 # Train and validate all BayesFlow cases for a given model family.
 #
 # Usage:
-#   bash experiments/model_family/run_family_bf_all.sh --model_family ddm
-#   bash experiments/model_family/run_family_bf_all.sh --model_family rdm --epochs 500 --batch_size 128
+#   bash experiments/mf/run_family_bf_all.sh --mf ddm
+#   bash experiments/mf/run_family_bf_all.sh --mf rdm --epochs 500 --batch_size 128
 #
-# --model_family is required. All remaining flags are forwarded to the train script only.
+# --mf is required. All remaining flags are forwarded to the train script only.
 # Validation always uses its own defaults (batch_size=200, num_samples=200).
 
 MODEL_FAMILY=""
@@ -18,7 +18,7 @@ TRAIN_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --model_family)
+        --mf)
             MODEL_FAMILY="$2"
             shift 2
             ;;
@@ -47,8 +47,8 @@ for case in "${CASES[@]}"; do
     echo "------------------------------------------"
     echo " CHECKING SIMULATOR: $case"
     echo "------------------------------------------"
-    if ! python experiments/model_family/family_bf_train.py \
-            --model_family "$MODEL_FAMILY" --case "$case" --test; then
+    if ! python experiments/mf/family_bf_train.py \
+            --mf "$MODEL_FAMILY" --case "$case" --test; then
         echo "  !! Simulator check failed for '$case' — skipping."
         SKIPPED+=("$case")
         continue
@@ -58,8 +58,8 @@ for case in "${CASES[@]}"; do
     echo "------------------------------------------"
     echo " TRAINING: $case"
     echo "------------------------------------------"
-    python experiments/model_family/family_bf_train.py \
-        --model_family "$MODEL_FAMILY" --case "$case" "${TRAIN_ARGS[@]}"
+    python experiments/mf/family_bf_train.py \
+        --mf "$MODEL_FAMILY" --case "$case" "${TRAIN_ARGS[@]}"
     if [ $? -ne 0 ]; then
         echo "  !! Training failed for '$case' — skipping validation."
         SKIPPED+=("$case")
@@ -70,8 +70,8 @@ for case in "${CASES[@]}"; do
     echo "------------------------------------------"
     echo " VALIDATING: $case"
     echo "------------------------------------------"
-    python experiments/model_family/family_bf_validate.py \
-        --model_family "$MODEL_FAMILY" --case "$case"
+    python experiments/mf/family_bf_validate.py \
+        --mf "$MODEL_FAMILY" --case "$case"
 done
 
 echo ""

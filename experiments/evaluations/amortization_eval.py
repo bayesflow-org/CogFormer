@@ -45,17 +45,17 @@ METRIC_LABELS = {
 
 def bf_path(model: str, case: str) -> Path:
     m = model.lower()
-    return paths.metrics_dir("model_family", "bf", m, case) / f"{m}_family_{case}_bf_metrics.csv"
+    return paths.metrics_dir("mf", "baselines", m, case) / f"{m}_family_{case}_bf_metrics.csv"
 
 
 def fm_family_path(model: str, case: str) -> Path:
     m = model.lower()
-    return paths.metrics_dir("model_family", "cf", m, case) / f"{m}_{case}_mf_metrics.csv"
+    return paths.metrics_dir("mf", "cf", m, case) / f"{m}_{case}_mf_metrics.csv"
 
 
 def fm_model_class_path(model: str, case: str) -> Path:
     m = model.lower()
-    return paths.metrics_dir("model_class", "cf", m, case) / f"{m}_{case}_mc_metrics.csv"
+    return paths.metrics_dir("mc", "cf", m, case) / f"{m}_{case}_mc_metrics.csv"
 
 
 def load_metrics(path: Path) -> pd.DataFrame | None:

@@ -9,8 +9,8 @@ cd "$PROJECT_ROOT"
 # ============================================================
 # Model embedding ablation: train model class with and without
 #   model identity embedding on DDM + RDM + CDM jointly.
-# Outputs: outputs/checkpoints/model_class/
-#          outputs/figures/model_class/cf/
+# Outputs: outputs/checkpoints/mc/
+#          outputs/figures/mc/cf/
 # ============================================================
 
 EPOCHS=5000

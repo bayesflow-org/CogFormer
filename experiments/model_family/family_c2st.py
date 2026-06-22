@@ -18,7 +18,7 @@ FAMILY_REGISTRY = {
         "name": "DDM",
         "intrinsic_params": ["v", "a", "z", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$a$", r"$z$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": str(paths.figures_dir("model_family", "c2st", "ddm")),
+        "outdir_default": str(paths.figures_dir("mf", "c2st", "ddm")),
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "a", "z", "tau", "s_v", "s_tau"], "u_1": ["v", "a", "z"], "u_2": ["v", "a", "z"], "u_1:u_2": []},
@@ -31,7 +31,7 @@ FAMILY_REGISTRY = {
         "name": "RDM",
         "intrinsic_params": ["v", "v_diff", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_{\mathrm{diff}}$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": str(paths.figures_dir("model_family", "c2st", "rdm")),
+        "outdir_default": str(paths.figures_dir("mf", "c2st", "rdm")),
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "v_diff", "a", "tau", "s_v", "s_tau"], "u_1": ["v_diff", "a"], "u_2": ["v_diff", "a"], "u_1:u_2": []},
@@ -44,7 +44,7 @@ FAMILY_REGISTRY = {
         "name": "CDM",
         "intrinsic_params": ["v", "v_theta", "a", "tau", "s_v", "s_tau"],
         "variable_names": [r"$v$", r"$v_\theta$", r"$a$", r"$\tau$", r"$s_v$", r"$s_\tau$"],
-        "outdir_default": str(paths.figures_dir("model_family", "c2st", "cdm")),
+        "outdir_default": str(paths.figures_dir("mf", "c2st", "cdm")),
         "benchmark_design_configs": {
             "intercept_only": {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": [], "u_2": [], "u_1:u_2": []},
             "regressed":      {"1": ["v", "v_theta", "a", "tau", "s_v", "s_tau"], "u_1": ["v", "a"], "u_2": ["v", "a"], "u_1:u_2": []},
@@ -117,10 +117,10 @@ def run_comparison(pred_a, pred_b, design_config, intrinsic_params, variable_nam
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--model_family", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
+    p.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     p.add_argument("--bf_data_dir", type=str, default=str(paths.data_dir("predictions")))
     p.add_argument("--cf_pred_dir", type=str, default=str(paths.data_dir("predictions")))
-    p.add_argument("--mc_pred_dir", type=str, default=str(paths.data_dir("predictions", "model_class")),
+    p.add_argument("--mc_pred_dir", type=str, default=str(paths.data_dir("predictions", "mc")),
                    help="Directory with CogFormer ModelClass pred files; if set, also runs Class vs Family C2ST")
     p.add_argument("--outdir", type=str, default=None, help="Output directory (defaults per family)")
     p.add_argument("--max_num_categories", type=int, default=2)

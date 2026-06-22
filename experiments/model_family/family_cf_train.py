@@ -238,7 +238,7 @@ class CogFormerTrainer:
         prefetcher.shutdown()
         self.plot_amortization_gap()
         self.save_fm_predictions(val_config)
-        checkpoint_dir = paths.checkpoints_dir("model_family", self.fam_lower)
+        checkpoint_dir = paths.checkpoints_dir("mf", self.fam_lower)
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -274,7 +274,7 @@ class CogFormerTrainer:
         param_names = self.param_names
         colors = cogformer_mf_colors()
         max_num_categories = config["model_family_config"]["max_num_categories"]
-        fig_base = paths.figures_dir("model_family", "cf", self.fam_lower)
+        fig_base = paths.figures_dir("mf", "cf", self.fam_lower)
 
         recovery_dir = fig_base / "recovery"
         posterior_dir = fig_base / "test_posterior"
@@ -565,7 +565,7 @@ class CogFormerTrainer:
         ax.set_ylim(0.45, 1.0)
         ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15),
                   ncol=len(self.amortization_history) + 1)
-        fig_dir = paths.figures_dir("model_family", "cf", self.fam_lower)
+        fig_dir = paths.figures_dir("mf", "cf", self.fam_lower)
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / f"{self.fam_lower}_amortization_gap.pdf"
         fig.savefig(out_path, bbox_inches="tight")
@@ -581,7 +581,7 @@ class CogFormerTrainer:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_family", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
+    parser.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--use_wandb", action="store_true")
     parser.add_argument("--encoder_num_layers", type=int, default=8)

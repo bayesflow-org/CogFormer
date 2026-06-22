@@ -477,7 +477,7 @@ def main(
     )
     inference_net = bf.networks.FlowMatching()
 
-    checkpoint_path = str(paths.checkpoints_dir("bf", f"{reg['checkpoint_prefix']}_{case}"))
+    checkpoint_path = str(paths.checkpoints_dir("baselines", f"{reg['checkpoint_prefix']}_{case}"))
 
     workflow = bf.BasicWorkflow(
         simulator=simulator,
@@ -501,7 +501,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Model Family BayesFlow Training")
     parser.add_argument(
-        "--model_family",
+        "--mf",
         type=str,
         required=True,
         choices=list(FAMILY_REGISTRY.keys()),

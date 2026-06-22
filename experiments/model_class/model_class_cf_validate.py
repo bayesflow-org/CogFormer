@@ -221,8 +221,8 @@ def build_encoder_input_dim(max_num_regressors: int, max_num_categories: int, ke
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", type=str, required=True)
-    p.add_argument("--outdir", type=str, default=str(paths.figures_dir("model_class", "cf")))
-    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("predictions", "model_class")))
+    p.add_argument("--outdir", type=str, default=str(paths.figures_dir("mc", "cf")))
+    p.add_argument("--pred_dir", type=str, default=str(paths.data_dir("predictions", "mc")))
     p.add_argument("--data_dir", type=str, default=str(paths.data_dir("predictions")), help="Directory with BayesFlow validation data")
 
     # Validation settings

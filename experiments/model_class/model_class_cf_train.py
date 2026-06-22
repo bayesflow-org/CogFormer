@@ -170,7 +170,7 @@ class CogFormerTrainer:
 
         prefetcher.shutdown()
         self.plot_amortization_gap()
-        checkpoint_dir = paths.checkpoints_dir("model_class")
+        checkpoint_dir = paths.checkpoints_dir("mc")
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
         module = self.cf.module if isinstance(self.cf, torch.nn.DataParallel) else self.cf
         torch.save(module.state_dict(), checkpoint_dir / checkpoint_path)
@@ -219,7 +219,7 @@ class CogFormerTrainer:
         max_num_params = self.model_class.max_num_params
         colors = cogformer_mf_colors()
 
-        figures_dir = paths.figures_dir("model_class", "cf", "recovery")
+        figures_dir = paths.figures_dir("mc", "cf", "recovery")
         figures_dir.mkdir(parents=True, exist_ok=True)
 
         for model_name, model_cfg in MODEL_CONFIGS.items():
@@ -436,7 +436,7 @@ class CogFormerTrainer:
         ax.set_xlim(0.1, 1.1)
         ax.set_ylim(0.45, 1.0)
         ax.legend(fontsize=8, loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=len(ddm_history) + 1)
-        fig_dir = paths.figures_dir("model_class", "cf")
+        fig_dir = paths.figures_dir("mc", "cf")
         fig_dir.mkdir(parents=True, exist_ok=True)
         out_path = fig_dir / "model_class_amortization_gap.pdf"
         fig.savefig(out_path, bbox_inches="tight")

@@ -105,7 +105,7 @@ ENSEMBLE_OUTDIR="${OUTDIR}/ensemble"
 # Step 3: Ensemble eval (global 8-param space, cross-model)
 # ============================================================
 #echo "=== [3/4] Ensemble eval: ModelClass CF ==="
-#python experiments/model_class/model_class_ensemble_eval.py \
+#python experiments/mc/model_class_ensemble_eval.py \
 #    --checkpoint          "$CKPT" \
 #    --outdir              "$ENSEMBLE_OUTDIR" \
 #    --encoder_num_layers  "$ENCODER_LAYERS" \
@@ -125,7 +125,7 @@ ENSEMBLE_OUTDIR="${OUTDIR}/ensemble"
 ## Step 4: Ensemble metrics heatmap (50 configs, global space)
 ## ============================================================
 #echo "=== [4/4] Ensemble metrics: ModelClass CF ==="
-#python experiments/model_class/model_class_ensemble_metrics.py \
+#python experiments/mc/model_class_ensemble_metrics.py \
 #    --checkpoint          "$CKPT" \
 #    --outdir              "$ENSEMBLE_OUTDIR" \
 #    --encoder_num_layers  "$ENCODER_LAYERS" \

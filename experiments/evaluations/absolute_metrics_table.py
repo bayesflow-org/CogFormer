@@ -36,9 +36,9 @@ def main():
     for model in MODELS:
         m = model.lower()
         for case in CASES:
-            bf = load(paths.metrics_dir("model_family", "bf", m, case) / f"{m}_family_{case}_bf_metrics.csv")
-            fm_fam = load(paths.metrics_dir("model_family", "cf", m, case) / f"{m}_{case}_mf_metrics.csv")
-            fm_cls = load(paths.metrics_dir("model_class", "cf", m, case) / f"{m}_{case}_mc_metrics.csv")
+            bf = load(paths.metrics_dir("mf", "baselines", m, case) / f"{m}_family_{case}_bf_metrics.csv")
+            fm_fam = load(paths.metrics_dir("mf", "cf", m, case) / f"{m}_{case}_mf_metrics.csv")
+            fm_cls = load(paths.metrics_dir("mc", "cf", m, case) / f"{m}_{case}_mc_metrics.csv")
             for source, df in [("BayesFlow", bf), ("CogFormer_Family", fm_fam), ("CogFormer_ModelClass", fm_cls)]:
                 if df is None:
                     continue

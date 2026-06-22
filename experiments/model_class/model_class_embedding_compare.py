@@ -164,13 +164,13 @@ def main():
     parser.add_argument(
         "--with_embed_dir",
         type=str,
-        default=str(paths.figures_dir("model_class", "cf")),
+        default=str(paths.figures_dir("mc", "cf")),
         help="Output directory from validate run with model embedding",
     )
     parser.add_argument(
         "--no_embed_dir",
         type=str,
-        default=str(paths.figures_dir("model_class", "cf", "no_embed")),
+        default=str(paths.figures_dir("mc", "cf", "no_embed")),
         help="Output directory from validate run without model embedding",
     )
     parser.add_argument(

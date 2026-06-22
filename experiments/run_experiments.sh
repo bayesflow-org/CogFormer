@@ -81,16 +81,16 @@ run_family() {
     # BayesFlow baseline: train + validate (5 cases)
     for CASE in $CASES; do
         echo "--- BF train  [${FAM^^}] case=${CASE} ---"
-        python experiments/model_family/family_bf_train.py \
-            --model_family "$FAM" \
+        python experiments/mf/family_bf_train.py \
+            --mf "$FAM" \
             --case         "$CASE" \
             --epochs       "$EPOCHS" \
             --steps_per_epoch "$STEPS_PER_EPOCH" \
             --batch_size   "$TRAIN_BATCH"
 
         echo "--- BF validate [${FAM^^}] case=${CASE} ---"
-        python experiments/model_family/family_bf_validate.py \
-            --model_family "$FAM" \
+        python experiments/mf/family_bf_validate.py \
+            --mf "$FAM" \
             --case         "$CASE" \
             --batch_size   "$VAL_BATCH" \
             --num_samples  "$FM_NUM_SAMPLES" \
@@ -99,8 +99,8 @@ run_family() {
 
     # CogFormer: train
     echo "--- CF train [${FAM^^}] ---"
-    python experiments/model_family/family_cf_train.py \
-        --model_family      "$FAM" \
+    python experiments/mf/family_cf_train.py \
+        --mf      "$FAM" \
         --epochs            "$EPOCHS" \
         --steps_per_epoch   "$STEPS_PER_EPOCH" \
         --train_batch_size  "$TRAIN_BATCH" \
@@ -127,8 +127,8 @@ run_family() {
     CKPT=$(family_cf_checkpoint "$STEM" "$FAM")
 
     echo "--- CF validate [${FAM^^}] ---"
-    python experiments/model_family/family_cf_validate.py \
-        --model_family  "$FAM" \
+    python experiments/mf/family_cf_validate.py \
+        --mf  "$FAM" \
         --checkpoint    "$CKPT" \
         --data_dir      "$DATA_DIR" \
         --batch_size    "$VAL_BATCH" \

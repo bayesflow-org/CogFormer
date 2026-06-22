@@ -16,8 +16,8 @@ Layout::
 
 Use the helpers (``figures_dir``, ``checkpoints_dir`` …) to build sub-paths, e.g.::
 
-    figures_dir("model_family", "cf", "ddm", "interaction", make=True)
-    checkpoints_dir("model_class")
+    figures_dir("mf", "cf", "ddm", "interaction", make=True)
+    checkpoints_dir("mc")
 """
 
 from pathlib import Path
@@ -58,7 +58,7 @@ def _build(root: Path, parts, make: bool) -> Path:
 
 
 def figures_dir(*parts, make: bool = False) -> Path:
-    """Path under ``outputs/figures`` (e.g. ``figures_dir('model_family', 'cf', 'ddm')``)."""
+    """Path under ``outputs/figures`` (e.g. ``figures_dir('mf', 'cf', 'ddm')``)."""
     return _build(FIGURES, parts, make)
 
 
@@ -88,7 +88,7 @@ def metrics_mirror(path, make: bool = False) -> Path:
 
 
 def checkpoints_dir(*parts, make: bool = False) -> Path:
-    """Path under ``outputs/checkpoints`` (e.g. ``checkpoints_dir('model_family', 'ddm')``)."""
+    """Path under ``outputs/checkpoints`` (e.g. ``checkpoints_dir('mf', 'ddm')``)."""
     return _build(CHECKPOINTS, parts, make)
 
 
