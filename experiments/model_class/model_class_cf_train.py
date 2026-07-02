@@ -452,7 +452,7 @@ class CogFormerTrainer:
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--no_wandb", action="store_false", dest="use_wandb")
     parser.add_argument("--use_amp", action="store_true",
                         help="Enable automatic mixed precision (float16) training")
     parser.add_argument("--no_model_embedding", action="store_true",

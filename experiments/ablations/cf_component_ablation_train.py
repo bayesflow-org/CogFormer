@@ -312,7 +312,7 @@ def parse_args():
         required=True,
         help="Which component to ablate: no_sab, no_mab, no_film, no_fourier",
     )
-    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--no_wandb", action="store_false", dest="use_wandb")
     parser.add_argument("--use_amp", action="store_true",
                         help="Enable automatic mixed precision (float16) training")
 

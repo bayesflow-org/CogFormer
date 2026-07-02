@@ -298,7 +298,7 @@ def parse_args():
     parser.add_argument("--size", type=str, choices=["s", "m", "l", "xl"], required=True,
                         help="Model size: s / m / l / xl")
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--no_wandb", action="store_false", dest="use_wandb")
 
     # Training
     parser.add_argument("--num_obs", type=int, default=500)

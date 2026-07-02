@@ -583,7 +583,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mf", type=str, required=True, choices=list(FAMILY_REGISTRY.keys()))
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--no_wandb", action="store_false", dest="use_wandb")
     parser.add_argument("--encoder_num_layers", type=int, default=8)
     parser.add_argument("--decoder_num_layers", type=int, default=8)
     parser.add_argument("--encoder_num_heads", type=int, default=8)
